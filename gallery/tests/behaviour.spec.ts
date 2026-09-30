@@ -3,7 +3,8 @@ import { EN_STRINGS } from "../../src/config/strings";
 import { STORY_GROUPS, storyId } from "../../src/stories";
 
 // Behaviour the screenshots cannot prove (spec §11.1 "behaviour", §12.0 G4 by hand, automated
-// here): the Dialog and Sheet discard prompts, toast lifetimes, DateInput typing and calendar,
+// here): the Dialog and Sheet discard prompts, toast lifetimes, the toast hooks and Field messages
+// (localized, re-raised, taken away on unmount), DateInput typing and calendar,
 // Combobox matching and keyboard, RowMenu placement, MonthNav, Segmented at 375 and the
 // read-only default-deny. One brand is enough: behaviour does not depend on colour.
 
@@ -106,6 +107,51 @@ test.describe("desktop behaviour", () => {
     await expect(page.locator("[data-toast]")).toHaveCount(0);
   });
 
+  test("toast hooks: each raises its message localized; a new trigger raises it again; unmounting takes it away", async ({ page }) => {
+    await open(page, "toast--raised-by-components-localized");
+    await page.clock.pauseAt(FIXED_NOW); // "Saved" must not fade in the middle of the test
+    const toasts = page.locator("[data-toast]");
+    const toast = (tone: string, text: string) => page.locator(`[data-toast="${tone}"]`, { hasText: text });
+    await expect(toasts).toHaveCount(4);
+    // ErrorToast, SheetError, NoticeToast, SuccessToast: each through the provider's localize.
+    await expect(toast("danger", "Najprej zaključi aktivna delovišča.")).toHaveCount(1);
+    await expect(toast("danger", "Vodilo že ima zapis stranke.")).toHaveCount(1);
+    await expect(toast("info", "Že načrtovano: nič se ni spremenilo.")).toHaveCount(1);
+    await expect(toast("success", "Shranjeno")).toHaveCount(1);
+    await expect(toasts.filter({ hasText: "End its active worksites first." })).toHaveCount(0);
+
+    // Dismissed, then the same message again on the next submit (a new trigger).
+    await toast("danger", "Najprej").getByRole("button", { name: EN_STRINGS.close }).click();
+    await expect(toasts).toHaveCount(3);
+    await page.getByRole("button", { name: "Submit again" }).click();
+    await expect(toasts).toHaveCount(4);
+    await expect(toast("danger", "Najprej zaključi aktivna delovišča.")).toHaveCount(1);
+
+    // Unmounting the components takes every toast they raised with them.
+    await page.getByRole("button", { name: "Unmount" }).click();
+    await expect(toasts).toHaveCount(0);
+    await page.getByRole("button", { name: "Mount" }).click();
+    await expect(toasts).toHaveCount(4);
+  });
+
+  test("Field: an error is raised localized as it appears, a warning on focus only, and focus re-raises", async ({ page }) => {
+    await open(page, "toast--field-messages-localized");
+    await page.clock.pauseAt(FIXED_NOW);
+    const toasts = page.locator("[data-toast]");
+    const error = page.locator('[data-toast="danger"]');
+    const warning = page.locator('[data-toast="warning"]');
+    await expect(toasts).toHaveCount(1);
+    await expect(error).toContainText("PIN: Neveljaven EMŠO.");
+    await expect(warning).toHaveCount(0); // a warning waits for focus
+    await error.getByRole("button", { name: EN_STRINGS.close }).click();
+    await expect(toasts).toHaveCount(0);
+    await page.getByLabel("Valid to").focus();
+    await expect(warning).toContainText("Valid to: Prebrano kot 31-12-2027 (ročno)");
+    await page.getByLabel("PIN").focus(); // the dismissed error comes back where it is fixed
+    await expect(error).toContainText("PIN: Neveljaven EMŠO.");
+    await expect(toasts).toHaveCount(2);
+  });
+
   test("DateInput: typing, masking, reverting, limits", async ({ page }) => {
     await open(page, "date-input--states");
     const empty = page.getByLabel("Empty", { exact: true });
@@ -181,12 +227,50 @@ test.describe("desktop behaviour", () => {
     await expect(calendar.getByRole("button", { name: "06-10-2026" })).toBeDisabled();
   });
 
-  test("Combobox: words in any order, arrows, Enter picks without submitting", async ({ page }) => {
+  test("Combobox: words in any order, arrows walk and wrap past a disabled row, Enter picks without submitting", async ({ page }) => {
     await open(page, "combobox--open-list");
     const form = page.locator("form[data-submits]");
     const input = page.getByRole("combobox");
-    await input.fill("dinh nguyen");
     const options = page.getByRole("option");
+    // The highlighted row is the one painted bg-surface-raised outright (the others only on hover).
+    const NAMES = ["Barišić, Josip", "Nguyen, Dinh Hai", "Hodžić, Aldin", "Mehmedović, Senad", "Šabanović, Emir"];
+    const highlighted = () =>
+      page.evaluate(
+        (names) =>
+          [...document.querySelectorAll('[role="option"]')]
+            .filter((el) => el.classList.contains("bg-surface-raised"))
+            .map((el) => names.find((name) => el.textContent?.includes(name)) ?? el.textContent),
+        NAMES,
+      );
+
+    // The whole list: Barišić, Nguyen, Hodžić (disabled), Mehmedović, Šabanović.
+    await input.focus();
+    await expect(page.getByRole("listbox")).toBeVisible();
+    await expect(options.filter({ hasText: "Hodžić, Aldin" })).toHaveAttribute("aria-disabled", "true");
+    expect(await highlighted()).toEqual([]); // no highlight until the person steers
+    const walk: [string, string][] = [
+      ["ArrowDown", "Barišić, Josip"], // the first arrow lands on the first row
+      ["ArrowDown", "Nguyen, Dinh Hai"],
+      ["ArrowDown", "Mehmedović, Senad"], // Hodžić is disabled: skipped
+      ["ArrowUp", "Nguyen, Dinh Hai"],
+      ["ArrowUp", "Barišić, Josip"],
+      ["ArrowUp", "Šabanović, Emir"], // wraps to the last pickable row
+      ["ArrowDown", "Barišić, Josip"], // and back to the first
+      ["ArrowDown", "Nguyen, Dinh Hai"],
+      ["ArrowDown", "Mehmedović, Senad"],
+    ];
+    for (const [key, expected] of walk) {
+      await input.press(key);
+      expect(await highlighted(), `${key} → ${expected}`).toEqual([expected]);
+    }
+    await input.press("Enter");
+    await expect(input).toHaveValue("Mehmedović, Senad");
+    await expect(form).toHaveAttribute("data-value", "w4");
+    await expect(form).toHaveAttribute("data-submits", "0");
+    await expect(page.getByRole("listbox")).toBeHidden();
+
+    // Words in any order, punctuation ignored; Enter picks the one match.
+    await input.fill("dinh nguyen");
     await expect(options.filter({ hasText: "Nguyen, Dinh Hai" })).toHaveCount(1);
     await expect(options.filter({ hasText: "Barišić" })).toHaveCount(0);
     await input.press("ArrowDown");
@@ -194,14 +278,17 @@ test.describe("desktop behaviour", () => {
     await expect(input).toHaveValue("Nguyen, Dinh Hai");
     await expect(form).toHaveAttribute("data-value", "w2");
     await expect(form).toHaveAttribute("data-submits", "0");
-    await expect(page.getByRole("listbox")).toBeHidden();
 
-    // Diacritics folded; a disabled row is skipped by the arrows and cannot be picked.
+    // Diacritics folded; a disabled row is listed but can be picked neither by keys nor by a click.
     await input.fill("hodzic");
-    await expect(options.filter({ hasText: "Hodžić, Aldin" })).toHaveAttribute("aria-disabled", "true");
+    const hodzic = options.filter({ hasText: "Hodžić, Aldin" });
+    await expect(hodzic).toHaveAttribute("aria-disabled", "true");
     await input.press("ArrowDown");
+    expect(await highlighted()).toEqual([]);
     await input.press("Enter");
+    await hodzic.click({ force: true }); // Playwright would wait for an enabled row; the kit must ignore it
     await expect(form).toHaveAttribute("data-value", "");
+    await expect(form).toHaveAttribute("data-submits", "0");
     await input.fill("bosnia");
     await expect(options).toHaveCount(2); // the clear row and Šabanović, found by a keyword
     await input.press("Escape");

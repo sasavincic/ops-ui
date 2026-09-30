@@ -50,6 +50,8 @@ export type StoryGroup = { component: string; stories: readonly Story[] };
  * The registry: one group per kit component, in file order. Each story module is a client
  * module, so read the registry from a client component (a server component cannot iterate a
  * client module's exports) - the gallery's StoryIndex / StoryView, an app's /dev/kit view.
+ * Render each story inside `StoryHost` (./story-host): the gallery as it is, an app's /dev/kit
+ * with `pageToaster` (its root layout already mounts a Toaster).
  */
 export const STORY_GROUPS: readonly StoryGroup[] = [
   { component: "action-icon", stories: actionIcon },

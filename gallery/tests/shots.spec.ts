@@ -3,7 +3,8 @@ import { STORY_GROUPS, storyId } from "../../src/stories";
 import { BRANDS, REQUIRED_BRAND_VARIABLES } from "../brands";
 
 // A fixed clock: DateInput's today, MonthNav's month and every relative date
-// render the same on every run.
+// render the same on every run. setFixedTime freezes Date only; the page's
+// timers still run in real time until the shot pauses them (see the matrix).
 const FIXED_NOW = new Date("2026-09-30T10:00:00");
 
 test.beforeEach(async ({ page }) => {
@@ -74,6 +75,29 @@ for (const brand of BRANDS) {
     expect(read.touchAction).toBe("pan-x pan-y");
   });
 
+  test(`${brand}: Geist and Geist Mono really load (not the metric-adjusted fallback)`, async ({ page }) => {
+    await page.goto(`/${brand}`);
+    // The computed font-family names Geist even when its woff2 never arrives (the fallback face
+    // is "GeistSans Fallback", local Arial), and fonts.ready resolves on a failed face too. So ask
+    // the FontFaceSet to load each family and require real, loaded faces back.
+    const faces = await page.evaluate(async () => {
+      await document.fonts.ready;
+      const load = async (font: string) => {
+        try {
+          const loaded = await document.fonts.load(font);
+          return loaded.map((face) => `${face.family.replace(/"/g, "")}:${face.status}`);
+        } catch (error) {
+          return [`error: ${(error as Error).message}`];
+        }
+      };
+      return { sans: await load("16px GeistSans"), mono: await load("13px GeistMono") };
+    });
+    for (const [family, loaded] of Object.entries(faces)) {
+      expect(loaded.length, `${family}: ${loaded.join(", ")}`).toBeGreaterThan(0);
+      for (const face of loaded) expect(face, family).toMatch(/^Geist(Sans|Mono):loaded$/);
+    }
+  });
+
   // The matrix (spec §11.2): every story x 3 brands x {1440, 375}, 0 changed pixels.
   for (const group of STORY_GROUPS) {
     for (const story of group.stories) {
@@ -82,6 +106,11 @@ for (const brand of BRANDS) {
         await page.goto(`/${brand}/${id}`);
         // Hydrated: the story's own mount effects (showModal, toasts pushed on mount) have run.
         await page.locator(`[data-story="${id}"][data-ready]`).waitFor();
+        // Freeze the page's timers the moment the story is ready: a toast pushed on mount
+        // (toast--stack's "Saved" fades after 6 s of real time) must not race a slow runner, and
+        // nothing a shot shows may depend on how long the steps below take. The kit's only
+        // timers are that fade and Combobox's blur close; Date stays at FIXED_NOW.
+        await page.clock.pauseAt(FIXED_NOW);
         await page.evaluate(() => document.fonts.ready);
         if (story.open) await page.locator(story.open).first().click();
         await expect(page).toHaveScreenshot([brand, `${id}.png`], { fullPage: true });

@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { defineConfig } from "@playwright/test";
+import { SHOT_COMPARISON } from "./shot-options";
 
 // Pinned browser: @playwright/test is pinned to exactly 1.56.1 in package.json,
 // which drives Chromium revision 1194 (preinstalled under /opt/pw-browsers).
@@ -25,7 +26,8 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   expect: {
-    toHaveScreenshot: { maxDiffPixels: 0, threshold: 0.1, animations: "disabled", caret: "hide" },
+    // Exact (shot-options.ts): no tolerance, so a one-step colour change is never "0 changed pixels".
+    toHaveScreenshot: { ...SHOT_COMPARISON, animations: "disabled", caret: "hide" },
   },
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
