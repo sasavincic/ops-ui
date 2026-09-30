@@ -15,7 +15,7 @@ import {
 } from "@/domain/date-input";
 import { formatDate, shiftDay } from "@/domain/dates";
 import { useOpsUi } from "../config/provider";
-import { fmt } from "@/i18n/locales";
+import { fmt } from "../lib/fmt";
 import { useDismissable } from "../lib/use-dismissable";
 import { cn } from "../lib/cn";
 
