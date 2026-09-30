@@ -13,7 +13,7 @@ import {
   shiftMonth,
   withinRange,
 } from "../lib/date-input";
-import { formatDate, shiftDay } from "@/domain/dates";
+import { formatDate, shiftDay } from "../lib/dates";
 import { useOpsUi } from "../config/provider";
 import { fmt } from "../lib/fmt";
 import { useDismissable } from "../lib/use-dismissable";
