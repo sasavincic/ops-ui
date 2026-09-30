@@ -1,0 +1,22 @@
+/* PrefabOps brand fixture for the gallery: the Prefab light palette (D3, prefab-restyle plan 9.8),
+   the default until Saša picks another. Once PrefabOps carries src/app/brand.css (step P2),
+   tools/pull-brands.mjs regenerates this file from the app. Never @theme in a brand file. */
+html[data-brand=prefab] {
+  --brand-sidebar: oklch(0.968 0.004 257);           /* #f3f5f7, light sidebar */
+  --brand-sidebar-fg: oklch(0.42 0.02 257);          /* 7.71:1 on the sidebar */
+  --brand-sidebar-fg-active: oklch(0.21 0.012 257);
+  --brand-sidebar-hover: oklch(0.935 0.008 257);
+  --brand-sidebar-active: oklch(0.915 0.03 257);     /* active item: 13.78:1 */
+  --brand-sidebar-border: oklch(0.9 0.006 257);
+  --brand-primary: oklch(0.53 0.185 257);            /* #0667d3 = Prefab blue; white text 5.40:1 */
+  --brand-primary-hover: oklch(0.477 0.171 257);     /* #0058ba; 7.20:1 */
+  --brand-primary-subtle: oklch(0.95 0.022 257);
+  --brand-accent: oklch(0.6 0.13 45);                /* copper #be6438; 4.15:1 on white */
+  --brand-surface: oklch(0.975 0.003 257);
+  --brand-surface-raised: oklch(0.955 0.005 257);
+  --brand-border: oklch(0.9 0.006 257);
+  --brand-border-strong: oklch(0.8 0.01 257);
+  --brand-ink: oklch(0.21 0.012 257);                /* 17.71:1 on white */
+  --brand-ink-secondary: oklch(0.42 0.018 257);
+  --brand-ink-muted: oklch(0.52 0.018 257);          /* 5.12:1 on surface */
+}

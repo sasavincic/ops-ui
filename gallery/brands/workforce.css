@@ -1,0 +1,25 @@
+/* Workforce Ops brand fixture for the gallery. Until the app carries src/app/brand.css (step W4)
+   these are the spec 8.4 values, copied by hand; after that tools/pull-brands.mjs regenerates this
+   file from the app, rewriting :root to html[data-brand=workforce]. Never @theme in a brand file. */
+html[data-brand=workforce] {
+  --brand-sidebar: oklch(0.185 0.025 255);
+  --brand-sidebar-fg: oklch(0.78 0.012 250);
+  --brand-sidebar-fg-active: oklch(0.97 0.005 250);
+  --brand-sidebar-hover: oklch(0.24 0.03 255);
+  --brand-sidebar-active: oklch(0.29 0.055 253);
+  --brand-sidebar-border: oklch(0.27 0.03 255);
+  --brand-primary: oklch(0.45 0.12 250);
+  --brand-primary-hover: oklch(0.39 0.115 250);
+  --brand-primary-subtle: oklch(0.94 0.03 250);
+  --brand-accent: oklch(0.64 0.13 60);
+  --brand-surface: oklch(0.975 0.003 250);
+  --brand-surface-raised: oklch(0.955 0.005 250);
+  --brand-border: oklch(0.9 0.006 250);
+  --brand-border-strong: oklch(0.8 0.01 250);
+  --brand-ink: oklch(0.21 0.015 255);
+  --brand-ink-secondary: oklch(0.42 0.02 255);
+  --brand-ink-muted: oklch(0.52 0.02 255);
+  --brand-success: oklch(0.48 0.11 155);
+  --brand-success-subtle: oklch(0.955 0.04 155);
+  --ops-toast-offset: 3.75rem;   /* clears the assistant bubble */
+}

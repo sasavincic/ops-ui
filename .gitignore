@@ -1,0 +1,33 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# testing
+/coverage
+
+# next.js (the gallery)
+/.next/
+/gallery/.next/
+/out/
+/build
+next-env.d.ts
+
+# playwright (baselines in gallery/__screenshots__ ARE committed)
+/gallery/test-results/
+/gallery/playwright-report/
+/blob-report/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+.pnpm-debug.log*
+
+# env files
+.env*
+
+# typescript
+*.tsbuildinfo

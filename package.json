@@ -1,0 +1,53 @@
+{
+  "name": "@latro/ops-ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The shared UI kit of Workforce Ops, FinaOps and PrefabOps. Never published: apps vendor a released copy with scripts/sync-ops-ui.mjs.",
+  "license": "UNLICENSED",
+  "repository": "github:sasavincic/ops-ui",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint",
+    "test": "vitest run",
+    "gallery": "next dev gallery --port 3300",
+    "gallery:build": "next build gallery",
+    "gallery:start": "next start gallery --port 3300",
+    "shots": "playwright test -c gallery/playwright.config.ts",
+    "shots:accept": "playwright test -c gallery/playwright.config.ts --update-snapshots=all"
+  },
+  "peerDependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "next": ">=16.2 <17",
+    "react": ">=19.2 <20",
+    "react-dom": ">=19.2 <20",
+    "tailwind-merge": "^3.6",
+    "tailwindcss": ">=4.1 <5"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.10",
+    "geist": "^1.7.2",
+    "next": "16.2.10",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.10"
+  }
+}

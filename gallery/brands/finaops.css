@@ -1,0 +1,25 @@
+/* FinaOps brand fixture for the gallery. Until the app carries src/app/brand.css (step F3) these
+   are the spec 8.4 values, copied by hand; after that tools/pull-brands.mjs regenerates this file
+   from the app, rewriting :root to html[data-brand=finaops]. Never @theme in a brand file. */
+html[data-brand=finaops] {
+  --brand-sidebar: oklch(0.31 0.064 160);
+  --brand-sidebar-fg: oklch(0.87 0.03 157);
+  --brand-sidebar-fg-active: oklch(0.98 0.008 160);
+  --brand-sidebar-hover: oklch(0.355 0.068 160);
+  --brand-sidebar-active: oklch(0.4 0.074 160);
+  --brand-sidebar-border: oklch(0.41 0.052 160);
+  --brand-primary: oklch(0.47 0.083 178);
+  --brand-primary-hover: oklch(0.41 0.075 178);
+  --brand-primary-subtle: oklch(0.95 0.03 178);
+  --brand-accent: oklch(0.77 0.13 86);
+  --brand-surface: oklch(0.976 0.004 170);
+  --brand-surface-raised: oklch(0.956 0.006 170);
+  --brand-border: oklch(0.9 0.008 170);
+  --brand-border-strong: oklch(0.8 0.012 170);
+  --brand-ink: oklch(0.21 0.014 185);
+  --brand-ink-secondary: oklch(0.42 0.018 185);
+  --brand-ink-muted: oklch(0.52 0.018 185);
+  --brand-success: oklch(0.49 0.12 145);
+  --brand-success-subtle: oklch(0.955 0.045 145);
+  --ops-toast-offset: 3.75rem;   /* removed in F7 - FinaOps has no assistant bubble */
+}
