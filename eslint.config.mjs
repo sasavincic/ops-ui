@@ -43,14 +43,6 @@ const eslintConfig = defineConfig([
       ],
     },
   },
-  // L2 (spec §12.1): the kit is imported verbatim and still names app modules
-  // (@/i18n/client, @/domain/..., ...). Until L3 decouples it, it is also left
-  // out of tsconfig.json. L3 deletes this block and that tsconfig exclude; every
-  // other rule still applies here. (The two navigation modules left it in L3 row 5.)
-  {
-    files: ["src/components/**"],
-    rules: { "no-restricted-imports": "off" },
-  },
   globalIgnores([
     ".next/**",
     "gallery/.next/**",

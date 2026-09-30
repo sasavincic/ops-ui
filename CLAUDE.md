@@ -149,7 +149,20 @@ or scratch exports.
   still import `@/…` (all components, `navigation/history.ts`,
   `navigation/nav-trail.tsx`) are excluded from `tsconfig.json` and have
   `no-restricted-imports` off in `eslint.config.mjs` (every other lint rule
-  applies). **L3 removes both exclusions.**
-- L3 Decouple · L4 Styles, strings and types · L5 Tests, stories and
-  baselines · L6 Extraction proof · L7 `pnpm release 1.0.0`: pending
-  (spec §12.1).
+  applies). L3 removed both exclusions.
+- **L3 Decouple** (2026-09-30): spec §7 applied one commit per row
+  (`L3 row N/17: …`, rows 13 and 14 empty on purpose: validity-cell is not in
+  1.0, and FinaOps' action-icon never used `usePathname`), after one
+  `L3 (kit-internal)` commit turning `@/components/ui/<name>` into `./<name>`.
+  New: `config/read-only.tsx` (row 3), `config/strings.ts` +
+  `config/provider.tsx` (row 6: `OpsUiStrings`, `EN_STRINGS` = WFO en
+  `common`, `OpsUiProvider`, `useOpsUi`), `types.ts` (row 17: the seven
+  React-free types, re-exported by their components). So L4's
+  `config/strings.ts` and `types.ts` exist already. Library `RecordTab` has no
+  `area`; the toast lift is `var(--ops-toast-offset,0px)`; Monogram's external
+  tone is `*-external` (needs `--color-external` from L4's tokens.css). The
+  literal `"Close"`/`"Open"`/`"Tabs"` defaults stay (§7 "Unchanged in 1.0").
+  Nothing is excluded from `tsconfig.json` or the ESLint import boundary any
+  more; `tests/no-app-alias.test.ts` fails on any `@/` text under `src/`.
+- L4 Styles, strings and types · L5 Tests, stories and baselines · L6
+  Extraction proof · L7 `pnpm release 1.0.0`: pending (spec §12.1).

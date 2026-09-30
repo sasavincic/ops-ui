@@ -24,7 +24,6 @@
     "node_modules",
     "gallery/.next",
     "gallery/next-env.d.ts",
-    "gallery/test-results",
-    "src/components/**"
+    "gallery/test-results"
   ]
 }
