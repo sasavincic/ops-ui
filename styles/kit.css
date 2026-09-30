@@ -1,0 +1,8 @@
+/* @latro/ops-ui kit: what the components themselves need beyond utilities (spec 8.1).
+   Every app imports it after tokens.css. */
+
+/* Toasts slide in from the right edge (kit toast.tsx). */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(1rem); }
+  to { opacity: 1; transform: translateX(0); }
+}

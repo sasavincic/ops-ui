@@ -1,4 +1,9 @@
 @import "tailwindcss";
-/* The kit styles join here as the library grows them (styles/tokens.css, kit.css, base.css). */
+/* The library styles, in the order an app imports them (spec 8.4). The brand fixtures
+   (gallery/brands/*.css) are imported by the layout and play the part of an app brand.css. */
+@import "../../styles/tokens.css";
+@import "../../styles/kit.css";
+@import "../../styles/base.css";
+@import "../../styles/app-feel.css";
 @source "../../src";
 @source "../components";

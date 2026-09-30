@@ -1,0 +1,93 @@
+/* @latro/ops-ui base: the page rules Workforce Ops and FinaOps shared word for word (spec 8.1).
+   Unlayered on purpose, exactly like the app rules it replaces: an unlayered rule outranks
+   every Tailwind layer. The touch rules live in app-feel.css. */
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+}
+
+/* Tailwind v4's preflight leaves buttons on the OS default arrow; links get
+   the pointer natively. One rule keeps every enabled control consistent. */
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--color-primary-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Print (Workforce Ops, 2026-08-28, for the movement plan)
+
+   Deliberately narrow: it exists so a page can print or save as PDF what a
+   dialog previews - the modal IS the document, so the printer must get the
+   [data-print-root] DOM and nothing else.
+
+   The mechanism: hide everything, then re-show the print root and every
+   ancestor it needs to still be laid out. The <dialog> also has to leave the
+   top layer, or the browser paints it as a fixed overlay on page one and
+   clips the rest.
+   -------------------------------------------------------------------------- */
+@media print {
+  body:has([data-print-root]) {
+    background: #fff;
+  }
+
+  /* Everything is out unless it is the print root or one of its ancestors. */
+  body:has([data-print-root]) *:not(:has([data-print-root])):not(
+      [data-print-root]
+    ):not([data-print-root] *) {
+    display: none !important;
+  }
+
+  body:has([data-print-root]) dialog[open] {
+    position: static;
+    display: block !important;
+    max-width: none;
+    max-height: none;
+    width: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  body:has([data-print-root]) dialog[open]::backdrop {
+    display: none;
+  }
+
+  [data-print-root] {
+    display: block !important;
+    color: #000;
+  }
+
+  /* Ink, not screen colours: a printed page is read on paper. */
+  [data-print-root] * {
+    color: #000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  [data-print-root] .break-inside-avoid {
+    break-inside: avoid;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}

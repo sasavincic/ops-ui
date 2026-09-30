@@ -1,0 +1,19 @@
+/* @latro/ops-ui app feel: an installed app, not a website (spec 8.1). The same rules
+   Workforce Ops and FinaOps carried word for word. */
+
+/* App, not website (Saša, 2026-08-25): pan-x pan-y allows scrolling but
+   excludes the zoom gestures (pinch, double-tap) wherever the engine honors
+   element touch-action — the viewport meta in the app layout covers the rest. */
+html,
+body {
+  touch-action: pan-x pan-y;
+}
+
+/* Phones own the pull-down (Workforce Ops pull-to-search, 2026-09-22): the
+   browser's pull-to-refresh and overscroll glow would fight the gesture, so
+   scroll chaining stops at the document on touch screens. */
+@media (pointer: coarse) {
+  html {
+    overscroll-behavior-y: contain;
+  }
+}
