@@ -78,7 +78,7 @@ pnpm install
 pnpm typecheck && pnpm lint && pnpm test   # tsc, eslint (import boundary), vitest
 pnpm gallery                               # the story gallery on http://localhost:3300/workforce
 pnpm api-surface                           # regenerate api-surface.d.txt after a declaration change
-pnpm shots                                 # Playwright: every story x 3 brands x {1440, 375}, 0-pixel diffs, + behaviour tests
+pnpm shots                                 # Playwright: every story x 3 brands x {1440, 375, 375-touch} + hover/focus states, 0-pixel diffs, + behaviour tests
 node tools/diff-against-app.mjs --app ../fina-ops --ref origin/main        # the extraction proof (spec §12.1 L6)
 node tools/diff-against-app.mjs --app ../workforce-ops --ref origin/main   # (reads the apps through git only)
 pnpm shots:accept                          # write baselines (a major, or a pure `shots: rebaseline (…)` commit)

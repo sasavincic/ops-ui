@@ -390,7 +390,14 @@ test.describe("desktop behaviour", () => {
 
 test.describe("phone behaviour", () => {
   test.beforeEach(({}, info) => {
-    test.skip(info.project.name !== "375", "phone behaviour runs at 375");
+    test.skip(!info.project.name.startsWith("375"), "phone behaviour runs at 375 and 375-touch");
+  });
+
+  test("DateInput: a coarse pointer gets the calendar, never the keyboard (inputmode)", async ({ page }, info) => {
+    await open(page, "date-input--states");
+    // A pixel shot cannot see an attribute: on a phone the field asks for no keyboard, since a
+    // tap opens the calendar; a fine pointer types digits.
+    await expect(page.getByLabel("Empty", { exact: true })).toHaveAttribute("inputmode", info.project.name === "375-touch" ? "none" : "numeric");
   });
 
   test("Segmented wider than its row scrolls inside itself; the page never scrolls sideways", async ({ page }) => {

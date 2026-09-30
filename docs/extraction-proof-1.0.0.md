@@ -82,6 +82,16 @@ The consequence: Workforce Ops cannot take 1.0.0 as written.
 
 Spec §12.4 ("Found while proving 1.0 (L6)") gives three options. The recommendation is to align FinaOps first and re-import before L7b. `tools/diff-against-app.mjs` records the three files in `WFO_AHEAD`, with their line counts, and exits 1 against Workforce Ops until that entry records a decision. **L7b (`pnpm release 1.0.0`) waits for it** (and for L7a, the release and app-shots tooling).
 
+## FinaOps is ahead too (found after the proof; re-import before L7b)
+
+A verified review (2026-09-30, after this proof) found that FinaOps changed its kit after the 1.0 source commit as well: b775fb6 ("Sign-in hardening", 2026-09-30 20:47, on `origin/claude/trusting-keller-r5bi2t`, not yet on its `main`) edits `src/components/ui/button.tsx`. `AdminIconButton`'s `icon` union gains `"deactivate" | "reactivate"`, with two glyph paths, and `settings/user-active-button.tsx` uses them.
+
+- The proof above holds for 80828fc, which is still FinaOps' `origin/main`.
+- Against b775fb6 the tool (with the `FINAOPS_AHEAD` entry added in the same review) reports `button.tsx` as **FinaOps ahead** (4 FinaOps-only lines, 1 library-only line) and exits 1: "EXTRACTION PROVEN against FinaOps (29 components identical after normalization, 5 differing only by named spec rows), but FinaOps is ahead of the 1.0 source in button.tsx". Before the entry existed the same run said `UNEXPLAINED`.
+- Against 80828fc the run is still PROVEN and adds one line: the named drift is not at this ref, so the proof holds for this ref only.
+
+Spec §12.4 ("FinaOps ahead") resolves it without a decision: FinaOps is the 1.0 source, so the library re-imports `button.tsx` from FinaOps' `main` once the branch has merged, deletes the entry, and L7b re-runs this proof against that `main`.
+
 ## Output against FinaOps (verbatim)
 
 ```text

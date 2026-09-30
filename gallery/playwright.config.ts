@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { defineConfig } from "@playwright/test";
+import { SHOT_PROJECTS } from "./shot-matrix";
 import { SHOT_COMPARISON } from "./shot-options";
 
 // Pinned browser: @playwright/test is pinned to exactly 1.56.1 in package.json,
@@ -18,8 +19,12 @@ const repoRoot = path.join(__dirname, "..");
 export default defineConfig({
   testDir: "./tests",
   outputDir: "./test-results",
-  // Baselines: gallery/__screenshots__/<width>/<brand>/<story>.png. Only
-  // `pnpm shots:accept` writes them.
+  // Baselines: gallery/__screenshots__/<project>/<brand>/<story>.png. Only `pnpm shots:accept`
+  // writes them: Playwright's default ("missing") would write a baseline nobody accepted the first
+  // time a new shot runs, and pass against it from then on, so a plain `pnpm shots` writes nothing
+  // (the CLI's --update-snapshots of shots:accept overrides this). tests/baselines.test.ts keeps
+  // the files equal to the matrix, so a missing or orphaned baseline is red.
+  updateSnapshots: "none",
   snapshotPathTemplate: "{testDir}/../__screenshots__/{projectName}/{arg}{ext}",
   fullyParallel: true,
   forbidOnly: true,
@@ -35,10 +40,8 @@ export default defineConfig({
     deviceScaleFactor: 1,
     contextOptions: { reducedMotion: "reduce" },
   },
-  projects: [
-    { name: "1440", use: { viewport: { width: 1440, height: 900 } } },
-    { name: "375", use: { viewport: { width: 375, height: 812 } } },
-  ],
+  // 1440, 375 and 375-touch (a phone: touch, a coarse pointer, no hover): gallery/shot-matrix.ts.
+  projects: SHOT_PROJECTS.map((project) => ({ name: project.name, use: { ...project.use } })),
   // A production build of the gallery: what the shots compare is never a dev overlay.
   webServer: {
     command: `pnpm gallery:build && pnpm exec next start gallery --port ${PORT} --hostname 127.0.0.1`,

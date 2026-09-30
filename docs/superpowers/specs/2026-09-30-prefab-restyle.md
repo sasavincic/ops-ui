@@ -305,7 +305,10 @@ After P2, `layout.tsx` imports one file, `src/app/app.css`:
 @import "./styles/financials.css" layer(legacy);
 /* …the other 15 sheets in today's layout.tsx order, all layer(legacy) */
 @source "../vendor/ops-ui";
-@source not "../vendor/ops-ui/*.md";   /* the shipped docs never reach the CSS (library spec 8.4) */
+@source not "../vendor/ops-ui/*.md";       /* the library spec 8.4 exclusions: the shipped docs, */
+@source not "../../scripts/sync-ops-ui.*"; /* the sync script, */
+@source not "../../ops-ui.config.json";    /* the config and the lock never reach the CSS, */
+@source not "../../ops-ui.lock.json";      /* also once P5 turns automatic scanning on */
 @source "../components/prefab-ui";
 @source "./dev/kit";
 /* + one @source per migrated file or folder, added area by area */
@@ -357,7 +360,7 @@ From P4.1, `base.css` makes the page body match the kit: Geist, white background
 
 ### 5.6 Utility generation
 
-- **Scanning.** `source(none)` plus one `@source` line per migrated file or folder. Tailwind never scans legacy TSX, so it cannot generate a utility for a legacy word that happens to be a utility name (`hidden`, `truncate`, `container`, …). The vendor folder's docs are excluded (`@source not "../vendor/ops-ui/*.md"`, library spec §8.4): they name classes and tokens, and a docs-only release must not change the CSS. With `source(none)` nothing scans `scripts/`, so the library template's second exclusion is not needed here.
+- **Scanning.** `source(none)` plus one `@source` line per migrated file or folder. Tailwind never scans legacy TSX, so it cannot generate a utility for a legacy word that happens to be a utility name (`hidden`, `truncate`, `container`, …). The vendor folder's docs are excluded (`@source not "../vendor/ops-ui/*.md"`, library spec §8.4): they name classes and tokens, and a docs-only release must not change the CSS. With `source(none)` nothing scans `scripts/` or the root JSON files, but the library template's other three exclusions (`scripts/sync-ops-ui.*`, `ops-ui.config.json`, `ops-ui.lock.json`) are there from P2 anyway: P5 drops `source(none)`, and automatic detection then reads them.
 - **Build checks at P2 and at every area merge** (`scripts/restyle/collision-gate.mjs`):
   1. The class selectors in the built utilities, intersected with (legacy class names ∪ class names used in unmigrated TSX), must be empty.
   2. Every legacy rule must sit inside `@layer legacy`.
@@ -790,7 +793,7 @@ Every control is `size="lg"` (48px, 16px text) at every width, matching the port
    - the `legacy` layer, which must be empty by now;
    - `globals.css` and any remaining legacy sheet;
    - the §5.5 `--ops-z-*` overrides, re-tuning the Prefab shell's own z-values below the kit's;
-   - `source(none)` and the per-area `@source` lines, so scanning becomes automatic.
+   - `source(none)` and the per-area `@source` lines, so scanning becomes automatic (the four `@source not` lines of library spec §8.4 stay).
 4. **Delete the old helpers:** `use-body-scroll-lock.ts`, `use-dialog-focus.ts`, `icons.tsx`, `download-icon.tsx`.
 5. **Guard tests** (in `apps/web/src/components/ui/restyle-guards.test.ts`):
    - no legacy class name from the frozen list appears in `src/**/*.tsx`;

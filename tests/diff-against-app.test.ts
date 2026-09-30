@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import {
   EXCERPT_MODULES,
+  FINAOPS_AHEAD,
   LIBRARY_CHANGES,
   ROWS,
   WFO_AHEAD,
@@ -99,8 +100,16 @@ describe("the tables", () => {
   });
 
   it("library changes and named drift point at real components; the named drift waits for a decision", () => {
-    for (const file of [...Object.keys(LIBRARY_CHANGES), ...Object.keys(WFO_AHEAD)]) expect(components).toContain(file);
-    for (const entry of Object.values(WFO_AHEAD)) expect(entry.ref).toMatch(/§12\.4/);
+    for (const file of [...Object.keys(LIBRARY_CHANGES), ...Object.keys(WFO_AHEAD), ...Object.keys(FINAOPS_AHEAD)]) expect(components).toContain(file);
+    for (const entry of [...Object.values(WFO_AHEAD), ...Object.values(FINAOPS_AHEAD)]) expect(entry.ref).toMatch(/§12\.4/);
+  });
+
+  it("each FinaOps-ahead entry names library lines the library really holds (or it could never match)", () => {
+    for (const [file, entry] of Object.entries(FINAOPS_AHEAD)) {
+      const lib = readSource(`src/components/${file}`).split("\n").map((l) => l.trim());
+      for (const line of entry.libraryOnly) expect(lib, `${file}: ${line}`).toContain(line);
+      for (const line of entry.appOnly) expect(lib, `${file}: ${line}`).not.toContain(line);
+    }
   });
 });
 
@@ -156,6 +165,44 @@ describe.skipIf(!L2)("end to end", () => {
     const res = run({ app: dir });
     expect(res.lines.at(-1)).toMatch(/^Verdict: PROVEN against FinaOps: 30 components identical after normalization, 5 differing only by named spec rows$/);
     expect(res.ok).toBe(true);
+  });
+
+  it("FinaOps' kit moving after the 1.0 source commit is named drift, never passed silently (spec §12.4)", T, () => {
+    // b775fb6 (FinaOps, 2026-09-30 20:47): AdminIconButton's deactivate / reactivate glyphs.
+    const b775fb6 = (s: string) =>
+      s
+        .replace('icon?: "edit" | "delete" | "unlock" | "permissions" | "key";', 'icon?: "edit" | "delete" | "unlock" | "permissions" | "key" | "deactivate" | "reactivate";')
+        .replace(
+          '    key: "M10 9a3.5 3.5 0 1 0-3-3L1.5 11.5v3h3v-2h2v-2z",\n',
+          '    key: "M10 9a3.5 3.5 0 1 0-3-3L1.5 11.5v3h3v-2h2v-2z",\n' +
+            "    // An account that can't sign in: the circle crossed out.\n" +
+            '    deactivate: "M14.5 8a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0M3.4 3.4l9.2 9.2",\n' +
+            '    reactivate: "M2 6h7a4 4 0 0 1 0 8H6M5 3 2 6l3 3",\n',
+        );
+    const dir = path.join(SANDBOX, "fina-ops-ahead");
+    const app = appFromL2(dir, "fina-ops");
+    app.edit("src/components/ui/button.tsx", b775fb6);
+    const res = run({ app: dir });
+    const text = res.lines.join("\n");
+    expect(res.ok).toBe(false);
+    expect(text).toMatch(/ 5 {2}button\.tsx +FinaOps ahead \(spec §12\.4 L6 review, RE-IMPORT PENDING\)/);
+    expect(text).toMatch(/FAIL FinaOps ahead/);
+    expect(text).not.toMatch(/not at this ref/);
+    expect(res.lines.at(-1)).toMatch(/^Verdict: EXTRACTION PROVEN against FinaOps \(29 components identical .*\), but FinaOps is ahead of the 1\.0 source in button\.tsx: .*re-import them before L7b\.$/);
+
+    // Half of the change, or the change plus one more line, is not the named drift.
+    const partial = path.join(SANDBOX, "fina-ops-ahead-partial");
+    appFromL2(partial, "fina-ops").edit("src/components/ui/button.tsx", (s) => b775fb6(s).replace(/ *reactivate: [^\n]*\n/, ""));
+    const partialRes = run({ app: partial });
+    expect(partialRes.lines.join("\n")).toMatch(/ 5 {2}button\.tsx +UNEXPLAINED/);
+    expect(partialRes.lines.at(-1)).toMatch(/^Verdict: NOT PROVEN against FinaOps/);
+
+    // The 1.0 source itself: proven, with the named drift listed as not at this ref.
+    const source = path.join(SANDBOX, "fina-ops-at-l2");
+    appFromL2(source, "fina-ops");
+    const base = run({ app: source });
+    expect(base.ok).toBe(true);
+    expect(base.lines.join("\n")).toMatch(/FinaOps ahead of the 1\.0 source, but not at this ref \(spec §12\.4\): the proof holds for this ref only\n {2}button\.tsx: b775fb6/);
   });
 
   it("a planted change fails the proof and names the line", T, () => {

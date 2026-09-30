@@ -119,6 +119,48 @@ export function themeGotchas(css, file = "css") {
 }
 
 /**
+ * Every custom property a stylesheet declares, at any depth: `theme` says whether the block that
+ * holds the declaration is an `@theme` block (a Tailwind theme variable) or an ordinary rule (a
+ * `:root` variable, possibly inside `@media`). A namespace reset (`--color-*: initial`) counts,
+ * with its star.
+ * @param {string} css
+ * @returns {{ name: string, line: number, theme: boolean }[]}
+ */
+export function customPropertyDeclarations(css) {
+  /** @type {{ name: string, line: number, theme: boolean }[]} */
+  const found = [];
+  /** @type {boolean[]} one entry per open block: is it an @theme block? */
+  const stack = [];
+  let text = "";
+  let textLine = 1;
+  const flush = () => {
+    const m = text.trim().match(/^(--[A-Za-z0-9_*-]*)\s*:/);
+    if (m && stack.length > 0) found.push({ name: m[1], line: textLine, theme: stack[stack.length - 1] });
+    text = "";
+  };
+  for (const token of cssTokens(css)) {
+    if (token.type === "comment") continue;
+    if (token.type === "{") {
+      stack.push(/^@theme\b/.test(text.trim()));
+      text = "";
+    } else if (token.type === "}") {
+      flush();
+      stack.pop();
+    } else if (token.type === ";") {
+      flush();
+    } else {
+      if (!text.trim()) {
+        // The line of the first character that is not whitespace.
+        const lead = token.text.match(/^\s*/)?.[0] ?? "";
+        textLine = token.line + (lead.match(/\n/g)?.length ?? 0);
+      }
+      text += token.text;
+    }
+  }
+  return found;
+}
+
+/**
  * @typedef {{ prelude: string, line: number, declarations: { name: string, value: string, line: number }[], nested: string[] }} CssRule
  */
 
@@ -139,7 +181,8 @@ export function topLevelRules(css) {
   /** @type {CssRule | null} */
   let rule = null;
   const add = (/** @type {CssToken} */ token) => {
-    if (!text.trim()) textLine = token.line;
+    // The line of the first character that is not whitespace.
+    if (!text.trim()) textLine = token.line + (token.text.match(/^\s*/)?.[0].match(/\n/g)?.length ?? 0);
     text += token.text;
   };
   for (const token of cssTokens(css)) {
@@ -858,9 +901,64 @@ function importsVendoredTokens(/** @type {string} */ globalsCss) {
 }
 
 /**
- * The brand contract and the theme gotcha against the app's own files (spec §8.5 checks 1-4
- * and 6). A missing brand.css counts only once globals.css imports the vendored tokens: in the
- * vendor-only step (F2/W3) nothing reads the brand yet.
+ * The app's own globals.css against the token contract (spec §8.5 check 7), once it imports the
+ * vendored tokens (F3/W4; before that step its own @theme IS the palette):
+ * - its `@theme` blocks declare only the names listed in `config.extensions`, never a library
+ *   token (fixed, brand, role, tint or tunable: tokens.css declares them) and never a name the
+ *   config does not list (a later library release could take it without the extension-clash
+ *   refusal ever firing), namespace resets such as `--color-*: initial` included;
+ * - no ordinary rule sets a library token either (a `:root { --color-warning: … }` would override
+ *   the library's value as surely as an @theme), and no brand variable is set outside brand.css,
+ *   where the contract checks read them;
+ * - it imports `config.brandCss`, after the tokens.
+ * Each problem names the file and line.
+ * @param {string} globals the app's globals.css
+ * @param {AppConfig} config
+ * @param {TokenContract} contract the library's (parseTokenContract of its tokens.css)
+ * @returns {string[]}
+ */
+export function checkAppTheme(globals, config, contract) {
+  /** @type {string[]} */
+  const problems = [];
+  const file = config.globalsCss;
+  const library = new Set(contract.tokens.map((t) => t.token));
+  const extensions = new Set(config.extensions);
+  for (const { name, line, theme } of customPropertyDeclarations(globals)) {
+    const at = `${file}:${line}`;
+    if (library.has(name)) {
+      problems.push(
+        `${at}: ${theme ? "its @theme declares" : "a rule sets"} ${name}, a library token (spec §8.3: the library declares it; brand values go into ${config.brandCss} as --brand-* variables)`,
+      );
+    } else if (name.startsWith("--brand-")) {
+      problems.push(`${at}: sets ${name} - brand variables live only in ${config.brandCss}, where the contract checks read them (spec §8.4)`);
+    } else if (theme && !extensions.has(name)) {
+      problems.push(
+        `${at}: its @theme declares ${name}, which config.extensions does not list (an app's @theme holds only its listed extensions, spec §8.3; list it in ${CONFIG_FILE}, or remove it)`,
+      );
+    }
+  }
+  const imports = topLevelRules(globals)
+    .statements.map((s) => ({ ...s, url: s.text.match(/^@import\s+(?:url\(\s*)?["']([^"']+)["']/)?.[1] ?? null }))
+    .filter((s) => s.url !== null);
+  const dir = path.posix.dirname(config.globalsCss.replace(/\\/g, "/"));
+  const brandTarget = path.posix.normalize(config.brandCss.replace(/\\/g, "/"));
+  const tokensAt = imports.findIndex((s) => /ops-ui\/styles\/tokens\.css$/.test(/** @type {string} */ (s.url)));
+  const brandAt = imports.findIndex(
+    (s) => !/^[a-z][a-z0-9+.-]*:/i.test(/** @type {string} */ (s.url)) && path.posix.normalize(path.posix.join(dir, /** @type {string} */ (s.url))) === brandTarget,
+  );
+  if (brandAt === -1) {
+    problems.push(`${file} imports the library tokens but not ${config.brandCss} (config.brandCss): import it after tokens.css (spec §8.4)`);
+  } else if (tokensAt !== -1 && brandAt < tokensAt) {
+    problems.push(`${file}:${imports[brandAt].line}: imports ${config.brandCss} before the library tokens: import it after tokens.css (spec §8.4)`);
+  }
+  return problems;
+}
+
+/**
+ * The brand contract and the theme gotcha against the app's own files (spec §8.5 checks 1-4, 6
+ * and 7). A missing brand.css, and check 7, count only once globals.css imports the vendored
+ * tokens: in the vendor-only step (F2/W3) nothing reads the brand yet, and the app's own @theme
+ * is still its whole palette.
  * @param {string} appRoot
  * @param {AppConfig} config
  * @param {string} tokensCss the library's tokens.css (at the release, or vendored)
@@ -878,16 +976,28 @@ export function checkAppStyles(appRoot, config, tokensCss) {
   const globals = existsSync(globalsPath) ? readFileSync(globalsPath, "utf8") : null;
   if (globals === null) theme.push(`${config.globalsCss} (config.globalsCss) does not exist`);
   else theme.push(...themeGotchas(globals, config.globalsCss));
+  /** @type {TokenContract | null | undefined} parsed on first use; null = malformed (reported once) */
+  let parsed;
+  const contract = () => {
+    if (parsed === undefined) {
+      try {
+        parsed = parseTokenContract(tokensCss);
+      } catch (error) {
+        parsed = null;
+        brand.push(`the library's tokens.css is malformed: ${/** @type {Error} */ (error).message}`);
+      }
+    }
+    return parsed;
+  };
+  if (globals !== null && importsVendoredTokens(globals)) {
+    const c = contract();
+    if (c) theme.push(...checkAppTheme(globals, config, c));
+  }
   if (existsSync(brandPath)) {
     const css = readFileSync(brandPath, "utf8");
     theme.push(...themeGotchas(css, config.brandCss));
-    let contract;
-    try {
-      contract = parseTokenContract(tokensCss);
-    } catch (error) {
-      brand.push(`the library's tokens.css is malformed: ${/** @type {Error} */ (error).message}`);
-    }
-    if (contract) brand.push(...checkBrandCss(css, contract, { file: config.brandCss }));
+    const c = contract();
+    if (c) brand.push(...checkBrandCss(css, c, { file: config.brandCss }));
   } else if (globals !== null && importsVendoredTokens(globals)) {
     brand.push(`${config.brandCss} (config.brandCss) does not exist, but ${config.globalsCss} imports the library tokens`);
   } else {

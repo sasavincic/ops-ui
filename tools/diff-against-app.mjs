@@ -22,13 +22,17 @@
 // spec row: LIBRARY_CHANGES below (the §7 / §9 "Change" items, the same against both apps) or,
 // against Workforce Ops, a line where the two app kits differ in a file §9 sources from FinaOps.
 // A Workforce Ops kit change §9 does not know of (the app moved after the survey) is reported as
-// such, never as an extraction bug; WFO_AHEAD records it once the spec names it. The library's
+// such, never as an extraction bug; WFO_AHEAD records it once the spec names it. A FinaOps kit
+// change made after the 1.0 source commit is named in FINAOPS_AHEAD: found at the ref, it fails
+// the run until the library re-imports the file; absent, the report says the proof holds for that
+// ref only. The library's
 // other extracted modules (navigation/, lib/) are compared whole or declaration by declaration,
 // and EN_STRINGS against the app's en `common` words.
 //
 // Exit 0: every difference is accounted for. 1: something is not (an extraction bug to fix in
-// the library, app drift the spec has not named, or named drift whose decision is still open -
-// releasing 1.0.0 would foreclose one of the options, spec §12.4). 2: usage or environment error.
+// the library, app drift the spec has not named, named Workforce Ops drift whose decision is still
+// open - releasing 1.0.0 would foreclose one of the options, spec §12.4 - or named FinaOps drift
+// the library has not re-imported yet). 2: usage or environment error.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -209,6 +213,34 @@ export const WFO_AHEAD = {
     what: "ff90dde: below sm every Dialog is a bottom sheet that rises in (lib/sheet-motion.ts)",
     removed: 9,
     added: 1,
+    decided: null,
+  },
+};
+
+/**
+ * FinaOps kit changes made after the 1.0 source commit (80828fc, the L2 import) that the library
+ * has not re-imported (spec §12.4 "Found after proving 1.0: FinaOps ahead"). FinaOps IS the 1.0
+ * source, so such a line is not an extraction bug either: the app moved, the library did not.
+ * Keyed by file: `appOnly` = the normalized, trimmed lines FinaOps has that the library lacks,
+ * `libraryOnly` = the library's lines FinaOps no longer has. An entry applies only when the app
+ * carries exactly those lines (so a further change shows up again as unexplained); a FinaOps ref
+ * that predates the change (origin/main 80828fc) simply does not have it, and the report says the
+ * proof holds for that ref only. Found and not `decided`, it fails the run (exit 1): at F5 the
+ * wrapper would re-export the library's older copy (tsc fails where the app uses the new lines),
+ * so the library re-imports the file from FinaOps' post-merge main before L7b (§12.4 option 1's
+ * re-import) and this entry is deleted in the same commit.
+ */
+export const FINAOPS_AHEAD = {
+  "button.tsx": {
+    ref: "spec §12.4 L6 review",
+    what: "b775fb6 (Sign-in hardening, on origin/claude/trusting-keller-r5bi2t): AdminIconButton gains the deactivate / reactivate glyphs, used by settings/user-active-button.tsx",
+    appOnly: [
+      'icon?: "edit" | "delete" | "unlock" | "permissions" | "key" | "deactivate" | "reactivate";',
+      "// An account that can't sign in: the circle crossed out.",
+      'deactivate: "M14.5 8a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0M3.4 3.4l9.2 9.2",',
+      'reactivate: "M2 6h7a4 4 0 0 1 0 8H6M5 3 2 6l3 3",',
+    ],
+    libraryOnly: ['icon?: "edit" | "delete" | "unlock" | "permissions" | "key";'],
     decided: null,
   },
 };
@@ -627,6 +659,17 @@ export function account(fileName, ops, kind, kitDiff) {
     change.added.forEach((l) => added.take(l));
     explained.push({ rule: change.rule, why: change.why, lines: change.removed.length + change.added.length });
   }
+  // FinaOps moved after the 1.0 source commit: its named lines, taken only when all are there.
+  let finaAhead = null;
+  const ahead = kind === "finaops" ? FINAOPS_AHEAD[fileName] : null;
+  if (ahead) {
+    const has = (list, bag) => [...new Bag(list).m].every(([l, c]) => bag.count(l) >= c);
+    if (has(ahead.appOnly, removed) && has(ahead.libraryOnly, added)) {
+      ahead.appOnly.forEach((l) => removed.take(l));
+      ahead.libraryOnly.forEach((l) => added.take(l));
+      finaAhead = { ...ahead, lines: ahead.appOnly.length + ahead.libraryOnly.length };
+    }
+  }
   let appKits = null;
   if (kind === "workforce" && kitDiff) {
     const wfoOnly = new Bag(kitDiff.filter((o) => o.op === "-").map((o) => o.line.trim()));
@@ -637,7 +680,7 @@ export function account(fileName, ops, kind, kitDiff) {
     for (const l of added.list()) if (finaOnly.take(l) && added.take(l)) a++;
     if (r + a) appKits = { removed: r, added: a };
   }
-  return { explained, missing, appKits, unexplained: { removed: removed.list(), added: added.list() } };
+  return { explained, missing, appKits, finaAhead, unexplained: { removed: removed.list(), added: added.list() } };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -904,7 +947,7 @@ export function run({ app, ref, source, label }) {
       } else {
         const known = WFO_AHEAD[file];
         const matches = known && known.removed === acc.appKits.removed && known.added === acc.appKits.added;
-        ahead.push({ file, ...acc.appKits, known: Boolean(matches), decided: matches ? known.decided : null });
+        ahead.push({ file, app: "Workforce Ops", ...acc.appKits, known: Boolean(matches), decided: matches ? known.decided : null });
         if (matches) {
           parts.push(`Workforce Ops ahead (${known.ref}${known.decided ? `, decided: ${known.decided}` : ", DECISION OPEN"})`);
           res.details.push(`Workforce Ops changed this file after the survey (${known.what}); §9 says Same, the library follows FinaOps. Named in ${known.ref}: ${acc.appKits.removed} Workforce-Ops-only line(s), ${acc.appKits.added} FinaOps-only line(s). Not an extraction bug.`);
@@ -917,6 +960,16 @@ export function run({ app, ref, source, label }) {
           res.details.push(`the app kits differ in a file §9 lists as Same: ${acc.appKits.removed} Workforce-Ops-only line(s), ${acc.appKits.added} FinaOps-only line(s). Workforce Ops changed its kit after the survey; the library follows FinaOps. Not an extraction bug, but the spec does not name it (${known ? "WFO_AHEAD records a different count" : "add it to §12.4 and WFO_AHEAD"}).`);
           failures++;
         }
+      }
+    }
+    if (acc.finaAhead) {
+      const f = acc.finaAhead;
+      ahead.push({ file, app: "FinaOps", known: true, decided: f.decided });
+      parts.push(`FinaOps ahead (${f.ref}${f.decided ? `, decided: ${f.decided}` : ", RE-IMPORT PENDING"})`);
+      res.details.push(`FinaOps changed this file after the 1.0 source commit (${f.what}). Named in ${f.ref}: ${f.appOnly.length} FinaOps-only line(s), ${f.libraryOnly.length} library-only line(s). Not an extraction bug.`);
+      if (!f.decided) {
+        res.details.push(`FAIL FinaOps ahead (${f.ref}): the library still holds the 1.0 source's copy, so F5's wrapper would drop the change (re-import before L7b)`);
+        failures++;
       }
     }
     for (const e of acc.explained) res.details.push(`${e.rule}: ${e.why} (${e.lines} line${e.lines === 1 ? "" : "s"})`);
@@ -1028,15 +1081,27 @@ export function run({ app, ref, source, label }) {
   const decidedAhead = ahead.filter((x) => x.known && x.decided);
   const aheadFailures = unnamedAhead.length + openAhead.length;
   const extraction = `${counts.identical} components identical after normalization, ${counts.changed} differing only by named spec rows`;
+  // Named FinaOps drift this ref does not carry yet: the proof holds for this ref, not for the
+  // FinaOps main that will have it.
+  if (kind === "finaops") {
+    const notHere = Object.entries(FINAOPS_AHEAD).filter(([file]) => !ahead.some((x) => x.file === file));
+    if (notHere.length) {
+      say("FinaOps ahead of the 1.0 source, but not at this ref (spec §12.4): the proof holds for this ref only");
+      for (const [file, f] of notHere) say(`  ${file}: ${f.what}`);
+      say();
+    }
+  }
   let verdict;
   if (failures === 0) {
     verdict = `PROVEN against ${appName}: ${extraction}`;
-    if (decidedAhead.length) verdict += `; Workforce Ops is ahead of the 1.0 source in ${decidedAhead.map((x) => x.file).join(", ")} (decided in the spec)`;
+    if (decidedAhead.length) verdict += `; ${appName} is ahead of the 1.0 source in ${decidedAhead.map((x) => x.file).join(", ")} (decided in the spec)`;
   } else if (aheadFailures && failures === aheadFailures) {
-    verdict =
-      `EXTRACTION PROVEN against ${appName} (${extraction}), but Workforce Ops is ahead of the 1.0 source in ` +
-      `${ahead.map((x) => x.file).join(", ")}: kit changes made after the survey that 1.0.0 does not carry. ` +
-      (unnamedAhead.length ? "The spec does not name them yet (add them to §12.4 and WFO_AHEAD)." : "Named in spec §12.4 (L6); the decision is open, so 1.0.0 is not releasable for Workforce Ops as it stands.");
+    const why =
+      kind === "finaops"
+        ? "kit changes FinaOps made after the 1.0 source commit that the library has not re-imported. Named in spec §12.4; re-import them before L7b."
+        : "kit changes made after the survey that 1.0.0 does not carry. " +
+          (unnamedAhead.length ? "The spec does not name them yet (add them to §12.4 and WFO_AHEAD)." : "Named in spec §12.4 (L6); the decision is open, so 1.0.0 is not releasable for Workforce Ops as it stands.");
+    verdict = `EXTRACTION PROVEN against ${appName} (${extraction}), but ${appName} is ahead of the 1.0 source in ${ahead.map((x) => x.file).join(", ")}: ${why}`;
   } else {
     verdict = `NOT PROVEN against ${appName}: ${failures - aheadFailures} unaccounted difference(s) - see FAIL lines above`;
   }

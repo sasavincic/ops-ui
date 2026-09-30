@@ -19,6 +19,19 @@ export function cssTokens(css: string): CssToken[];
  */
 export function themeGotchas(css: string, file?: string): string[];
 /**
+ * Every custom property a stylesheet declares, at any depth: `theme` says whether the block that
+ * holds the declaration is an `@theme` block (a Tailwind theme variable) or an ordinary rule (a
+ * `:root` variable, possibly inside `@media`). A namespace reset (`--color-*: initial`) counts,
+ * with its star.
+ * @param {string} css
+ * @returns {{ name: string, line: number, theme: boolean }[]}
+ */
+export function customPropertyDeclarations(css: string): {
+    name: string;
+    line: number;
+    theme: boolean;
+}[];
+/**
  * @typedef {{ prelude: string, line: number, declarations: { name: string, value: string, line: number }[], nested: string[] }} CssRule
  */
 /**
@@ -159,9 +172,28 @@ export function stableJson(value: unknown): string;
  */
 export function readConfig(appRoot: string): AppConfig;
 /**
- * The brand contract and the theme gotcha against the app's own files (spec §8.5 checks 1-4
- * and 6). A missing brand.css counts only once globals.css imports the vendored tokens: in the
- * vendor-only step (F2/W3) nothing reads the brand yet.
+ * The app's own globals.css against the token contract (spec §8.5 check 7), once it imports the
+ * vendored tokens (F3/W4; before that step its own @theme IS the palette):
+ * - its `@theme` blocks declare only the names listed in `config.extensions`, never a library
+ *   token (fixed, brand, role, tint or tunable: tokens.css declares them) and never a name the
+ *   config does not list (a later library release could take it without the extension-clash
+ *   refusal ever firing), namespace resets such as `--color-*: initial` included;
+ * - no ordinary rule sets a library token either (a `:root { --color-warning: … }` would override
+ *   the library's value as surely as an @theme), and no brand variable is set outside brand.css,
+ *   where the contract checks read them;
+ * - it imports `config.brandCss`, after the tokens.
+ * Each problem names the file and line.
+ * @param {string} globals the app's globals.css
+ * @param {AppConfig} config
+ * @param {TokenContract} contract the library's (parseTokenContract of its tokens.css)
+ * @returns {string[]}
+ */
+export function checkAppTheme(globals: string, config: AppConfig, contract: TokenContract): string[];
+/**
+ * The brand contract and the theme gotcha against the app's own files (spec §8.5 checks 1-4, 6
+ * and 7). A missing brand.css, and check 7, count only once globals.css imports the vendored
+ * tokens: in the vendor-only step (F2/W3) nothing reads the brand yet, and the app's own @theme
+ * is still its whole palette.
  * @param {string} appRoot
  * @param {AppConfig} config
  * @param {string} tokensCss the library's tokens.css (at the release, or vendored)

@@ -9,7 +9,9 @@ This file is part of the contract, not a description of it:
 
 - `tests/tokens.test.ts` fails when a table below and `styles/tokens.css` disagree.
 - `sync/sync-ops-ui.mjs` (shipped to every app as `scripts/sync-ops-ui.mjs`) checks an app's
-  `brand.css` against the same contract in the sync pre-flight and in `checkVendor()`.
+  `brand.css` against the same contract in the sync pre-flight and in `checkVendor()`, and, once
+  its `globals.css` imports the library tokens, that the app declares no token of this file
+  itself (rules 1 and 4).
 - The release script counts a new row under **Brand, required** as a major (spec §4.2).
 
 ## Rules
@@ -25,7 +27,10 @@ This file is part of the contract, not a description of it:
    the start of a string and silently dropped the declaration after the comment (the
    `--color-tool` incident, 2026-08-28). The tokens test and the sync refuse one.
 4. **App extensions** are new names only, in the app's own `@theme` in `globals.css`, listed in
-   its `ops-ui.config.json` `extensions`. The sync refuses a library release that takes one.
+   its `ops-ui.config.json` `extensions`. The sync refuses a library release that takes one, and
+   (spec §8.5 check 7) an app whose `@theme` declares any other name or a token of this file,
+   whose rules set a token of this file or a `--brand-*` variable outside `brand.css`, or whose
+   `globals.css` does not import `brand.css` after `tokens.css`.
 5. **No dark mode.**
 
 ## Fixed (15)

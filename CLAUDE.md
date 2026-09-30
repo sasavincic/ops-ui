@@ -67,7 +67,9 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm shots
 ```
 
 Never commit red. `pnpm shots` builds the gallery, compares every story ×
-3 brands × {1440, 375} against `gallery/__screenshots__/` byte for byte
+3 brands × {1440, 375, 375-touch} (a phone: touch, coarse pointer, no hover)
+plus the hover / focus-visible state shots (`gallery/shot-matrix.ts`) against
+`gallery/__screenshots__/<project>/<brand>/` byte for byte
 (`gallery/shot-options.ts`: `toHaveScreenshot` at 0 changed pixels and a
 per-pixel threshold of 0, then `exactDiff` on every RGBA byte, because
 Playwright's comparator skips anti-aliased edge pixels at any threshold; never
@@ -85,7 +87,13 @@ declarations, shipped beside it as `scripts/sync-ops-ui.d.mts` so an app with
   **Never run `playwright install`.** If a Playwright version ever wants
   another browser, launch with the binary under `/opt/pw-browsers`
   (`chromium-1194/chrome-linux/chrome`).
-- Only `pnpm shots:accept` writes baselines. A baseline change is either part
+- Only `pnpm shots:accept` writes baselines (`updateSnapshots: "none"` in the
+  config: a plain `pnpm shots` never writes a missing one), and
+  `tests/baselines.test.ts` requires the files to be exactly the matrix (a
+  renamed or deleted story's PNGs are red, not silently kept). To add shots
+  without rewriting the existing files: `pnpm exec playwright test -c
+  gallery/playwright.config.ts --update-snapshots=missing`, then check
+  `git status` shows only new files. A baseline change is either part
   of a major release or a commit titled `shots: rebaseline (<reason>)` that
   touches only `gallery/__screenshots__/**` and the gallery's pinned rendering
   environment: `gallery/playwright.config.ts` (the Chromium pin) and
@@ -304,5 +312,37 @@ or scratch exports.
     `data-story-id` / `data-story-open`); `app-shots` captures each story as
     its own route with a paused clock, and a new story id is a new route
     (spec §3.2, §11.4; the gallery's index keeps the same contract).
+- **L6 review round 3** (2026-09-30), from a third verified review:
+  - FinaOps moved its kit too: b775fb6 (its security branch, not yet on
+    `main`) adds `deactivate` / `reactivate` to `AdminIconButton`.
+    `FINAOPS_AHEAD` in `tools/diff-against-app.mjs` names the lines: found at
+    a ref, the run exits 1 ("FinaOps ahead … re-import before L7b"); absent
+    (80828fc), the proof holds for that ref only and says so. Spec §12.4
+    "FinaOps ahead": re-import `button.tsx` from FinaOps' post-merge `main`
+    before L7b, delete the entry, re-run L6 against that `main`. The kit-freeze
+    notes must land in both apps from their own sessions.
+  - an app's Tailwind never scans `ops-ui.config.json` or `ops-ui.lock.json`
+    either (four `@source not` lines, spec §8.4, F2/W3 land them with the
+    config and run G3; P2/P5 too); `tests/app-scan.test.ts` writes the §3.3
+    config and a lock into its app.
+  - sync §8.5 check 7 (`checkAppTheme`, reported in `checkVendor().theme`):
+    once globals.css imports the library tokens, its `@theme` declares only
+    `config.extensions`, no rule sets a library token or a `--brand-*` outside
+    brand.css, and brand.css is imported after tokens.css.
+    `customPropertyDeclarations` reads the declarations; `topLevelRules` now
+    reports a statement's own line.
+  - spec: `app-shots capture --config <file>` (F0/W0 write a scratch config,
+    every capture uses it until F5/W6 merge), captures sign in as the fixture
+    editor (owners are forced into two-step sign-in) and fail any route whose
+    final URL differs from the one requested unless `visual.redirects` lists
+    it (L7a builds both).
+  - shots: a third project `375-touch` (hasTouch, isMobile: coarse pointer, no
+    hover; 180 new baselines), state shots for every Button variant and the
+    admin icon button hovered and keyboard-focused (42 new baselines at
+    1440), a pointer-media smoke test and a DateInput `inputmode` behaviour
+    test; interaction styles of other controls are hand-reviewed (§4.1: the
+    release script asks for `Reviewed:` lines). `updateSnapshots: "none"` and
+    `tests/baselines.test.ts` (files = matrix). Existing baselines unchanged.
 - L7a release and visual tooling: pending (spec §12.1).
-- L7b `pnpm release 1.0.0`: pending, after L7a and the §12.4 L6 decision.
+- L7b `pnpm release 1.0.0`: pending, after L7a, the §12.4 L6 decision and the
+  §12.4 FinaOps-ahead re-import.

@@ -5,6 +5,7 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { STORY_GROUPS, storyId } from "../../src/stories";
 import { BRANDS, REQUIRED_BRAND_VARIABLES } from "../brands";
 import { CHROMIUM_REVISION } from "../playwright.config";
+import { STATE_PROJECT, STATE_SHOTS, stateShotName } from "../shot-matrix";
 import { SHOT_COMPARISON, exactDiff } from "../shot-options";
 
 // A fixed clock: DateInput's today, MonthNav's month and every relative date
@@ -85,6 +86,19 @@ async function expectExactShot(page: Page, testInfo: TestInfo, name: [string, st
 test("the shots run in the pinned Chromium", async ({ browser, browserName }) => {
   expect(browserName).toBe("chromium");
   expect(browser.browserType().executablePath()).toMatch(new RegExp(`[/\\\\]chromium(?:_headless_shell)?-${CHROMIUM_REVISION}[/\\\\]`));
+});
+
+test("each project paints the pointer its name says (375-touch: coarse, no hover)", async ({ page }, testInfo) => {
+  await page.goto("/workforce");
+  const media = await page.evaluate(() => ({
+    coarse: matchMedia("(pointer: coarse)").matches,
+    fine: matchMedia("(pointer: fine)").matches,
+    hover: matchMedia("(hover: hover)").matches,
+    width: document.documentElement.clientWidth,
+  }));
+  const touch = testInfo.project.name === "375-touch";
+  // isMobile honours the page's viewport meta: the layout is still the project's width.
+  expect(media).toEqual({ coarse: touch, fine: !touch, hover: !touch, width: testInfo.project.use.viewport?.width });
 });
 
 test("the gate sees a filled control's corner radius move 6px → 7px; Playwright's comparator does not", async ({ page }, testInfo) => {
@@ -198,7 +212,7 @@ for (const brand of BRANDS) {
     }
   });
 
-  // The matrix (spec §11.2): every story x 3 brands x {1440, 375}, 0 changed pixels.
+  // The matrix (spec §11.2): every story x 3 brands x {1440, 375, 375-touch}, 0 changed pixels.
   for (const group of STORY_GROUPS) {
     for (const story of group.stories) {
       const id = storyId(group.component, story.name);
@@ -219,5 +233,27 @@ for (const brand of BRANDS) {
         if (brand === BRANDS[0]) expect(await hostFontGlyphs(page), "text painted from a host font").toEqual([]);
       });
     }
+  }
+
+  // The states (gallery/shot-matrix.ts): one control hovered or keyboard-focused on its story,
+  // at 1440, 0 changed pixels like the stories.
+  for (const shot of STATE_SHOTS) {
+    const name = stateShotName(shot);
+    test(`${brand}/${name}`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== STATE_PROJECT, `states are shot at ${STATE_PROJECT}`);
+      await page.goto(`/${brand}/${shot.story}`);
+      await page.locator(`[data-story="${shot.story}"][data-ready]`).waitFor();
+      await page.clock.pauseAt(FIXED_NOW);
+      await loadGalleryFonts(page);
+      const target = page.locator(shot.target);
+      await expect(target).toHaveCount(1);
+      if (shot.state === "hover") await target.hover();
+      else await target.focus();
+      // The state really holds (a focus() that Chromium did not take for keyboard focus would
+      // shoot the rest state and pass for the wrong reason).
+      expect(await target.evaluate((el, state) => el.matches(`:${state}`), shot.state), `${name}: :${shot.state}`).toBe(true);
+      await expect(page).toHaveScreenshot([brand, `${name}.png`], { fullPage: true });
+      await expectExactShot(page, testInfo, [brand, `${name}.png`]);
+    });
   }
 }

@@ -17,6 +17,7 @@ import {
   blankNonCode,
   changelogBetween,
   checkVendor,
+  customPropertyDeclarations,
   kitDependents,
   kitImportGraph,
   moduleExports,
@@ -468,6 +469,86 @@ describe("sync: refusals", () => {
     expect((await checkVendor(a)).theme).toHaveLength(1);
   });
 
+  it("an app's own @theme declares only its listed extensions: no library token, no unlisted name (spec §8.5 check 7)", T, async () => {
+    const { a } = pinned();
+    const globals = read(a, "src/app/globals.css").replace(
+      "  --color-tool: oklch(0.74 0.1 195);\n",
+      [
+        "  --color-tool: oklch(0.74 0.1 195);",
+        "  --color-warning: oklch(0.6 0.2 60);",
+        "  --color-primary: oklch(0.5 0.2 20);",
+        "  --radius-control: 2px;",
+        "  --color-new-unlisted: oklch(0.5 0.1 100);",
+        "  --color-*: initial;",
+        "",
+      ].join("\n"),
+    );
+    write(a, "src/app/globals.css", globals);
+    const expected = [
+      "src/app/globals.css:8: its @theme declares --color-warning, a library token (spec §8.3: the library declares it; brand values go into src/app/brand.css as --brand-* variables)",
+      "src/app/globals.css:9: its @theme declares --color-primary, a library token (spec §8.3: the library declares it; brand values go into src/app/brand.css as --brand-* variables)",
+      "src/app/globals.css:10: its @theme declares --radius-control, a library token (spec §8.3: the library declares it; brand values go into src/app/brand.css as --brand-* variables)",
+      "src/app/globals.css:11: its @theme declares --color-new-unlisted, which config.extensions does not list (an app's @theme holds only its listed extensions, spec §8.3; list it in ops-ui.config.json, or remove it)",
+      "src/app/globals.css:12: its @theme declares --color-*, which config.extensions does not list (an app's @theme holds only its listed extensions, spec §8.3; list it in ops-ui.config.json, or remove it)",
+    ];
+    const refused = run(a, "--version", "1.0.0");
+    expect(refused.status).toBe(1);
+    for (const line of expected) expect(refused.out).toContain(line);
+    const vendor = await checkVendor(a);
+    expect(vendor.ok).toBe(false);
+    expect(vendor.theme).toEqual(expected);
+    // A listed extension is fine: list the new name and drop the rest, and the app passes again.
+    write(a, "ops-ui.config.json", JSON.stringify({ ...JSON.parse(read(a, "ops-ui.config.json")), extensions: ["--color-tool", "--color-new-unlisted"] }));
+    write(
+      a,
+      "src/app/globals.css",
+      globals.replace(/ {2}--color-(warning|primary|\*): [^\n]*\n/g, "").replace(/ {2}--radius-control: [^\n]*\n/, ""),
+    );
+    expect((await checkVendor(a)).theme).toEqual([]);
+    expect(run(a, "--version", "1.0.0").status).toBe(0);
+  });
+
+  it("a library token set by an ordinary rule, or a brand variable outside brand.css, is refused", T, async () => {
+    const { a } = pinned();
+    write(
+      a,
+      "src/app/globals.css",
+      `${read(a, "src/app/globals.css")}\n:root {\n  --color-info: oklch(0.47 0.1 245);\n  --ops-toast-offset: 3.75rem;\n}\n@media (max-width: 640px) {\n  :root {\n    --brand-accent: oklch(0.6 0.13 60);\n    --page-gutter: 16px;\n  }\n}\n`,
+    );
+    const vendor = await checkVendor(a);
+    expect(vendor.theme).toEqual([
+      "src/app/globals.css:11: a rule sets --color-info, a library token (spec §8.3: the library declares it; brand values go into src/app/brand.css as --brand-* variables)",
+      "src/app/globals.css:16: sets --brand-accent - brand variables live only in src/app/brand.css, where the contract checks read them (spec §8.4)",
+    ]);
+    expect(run(a, "--version", "1.0.0").status).toBe(1);
+  });
+
+  it("once globals.css imports the tokens it must import brand.css, after them", T, async () => {
+    const { a } = pinned();
+    const globals = read(a, "src/app/globals.css");
+    write(a, "src/app/globals.css", globals.replace('@import "./brand.css";\n', ""));
+    expect((await checkVendor(a)).theme).toEqual([
+      "src/app/globals.css imports the library tokens but not src/app/brand.css (config.brandCss): import it after tokens.css (spec §8.4)",
+    ]);
+    expect(run(a, "--version", "1.0.0").status).toBe(1);
+    write(
+      a,
+      "src/app/globals.css",
+      globals.replace('@import "../vendor/ops-ui/styles/tokens.css";\n@import "./brand.css";\n', '@import "brand.css";\n@import "../vendor/ops-ui/styles/tokens.css";\n'),
+    );
+    expect((await checkVendor(a)).theme).toEqual([
+      "src/app/globals.css:2: imports src/app/brand.css before the library tokens: import it after tokens.css (spec §8.4)",
+    ]);
+    // Before the tokens step (F2/W3) the app's own @theme is still its whole palette: not checked.
+    write(
+      a,
+      "src/app/globals.css",
+      '@import "tailwindcss";\n\n@theme {\n  --color-primary: oklch(0.45 0.12 250);\n  --color-tool: oklch(0.74 0.1 195);\n  --radius-control: 6px;\n}\n',
+    );
+    expect((await checkVendor(a)).theme).toEqual([]);
+    expect(run(a, "--version", "1.0.0").status).toBe(0);
+  });
+
   it("an extension-name clash is refused", T, () => {
     const lib = library();
     const a = app(lib, { extensions: ["--color-tool", "--color-surface"] });
@@ -556,6 +637,35 @@ describe("sync: dev builds, wrappers, usage", () => {
 });
 
 describe("sync helpers", () => {
+  it("customPropertyDeclarations: every custom property with its line, @theme told from ordinary rules", () => {
+    const css = [
+      '@import "tailwindcss";',
+      "@theme inline {",
+      "  /* a comment; with --color-fake: 1 inside */",
+      "  --color-a: oklch(1 0 0);",
+      '  --font-x: "A; B", sans-serif;',
+      "  @keyframes spin {",
+      "    to { --inside-keyframes: 1; opacity: 1; }",
+      "  }",
+      "  --color-*: initial;",
+      "}",
+      ":root { --color-b: red; color: blue }",
+      "@media (max-width: 640px) {",
+      "  :root {",
+      "    --brand-accent: red;",
+      "  }",
+      "}",
+    ].join("\n");
+    expect(customPropertyDeclarations(css)).toEqual([
+      { name: "--color-a", line: 4, theme: true },
+      { name: "--font-x", line: 5, theme: true },
+      { name: "--inside-keyframes", line: 7, theme: false },
+      { name: "--color-*", line: 9, theme: true },
+      { name: "--color-b", line: 11, theme: false },
+      { name: "--brand-accent", line: 14, theme: false },
+    ]);
+  });
+
   it("peer ranges: ^, >=, <, ||, x-ranges and exact", () => {
     expect(satisfies("16.2.10", ">=16.2 <17")).toBe(true);
     expect(satisfies("17.0.0", ">=16.2 <17")).toBe(false);

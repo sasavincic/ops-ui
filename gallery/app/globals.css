@@ -2,8 +2,8 @@
    and its own frame, never the docs, tests or configs. source(none) turns automatic detection off,
    so a word in a test or a config (gallery/tests named blur and shadow) cannot generate a class
    that makes a story look right here while an app renders it without. An app gets the same set
-   from its @source line plus the two @source not lines that keep the shipped docs and the sync
-   script out (tests/app-scan.test.ts). */
+   from its @source line plus the four @source not lines that keep the shipped docs, the sync
+   script, ops-ui.config.json and ops-ui.lock.json out (tests/app-scan.test.ts). */
 @import "tailwindcss" source(none);
 /* The library styles, in the order an app imports them (spec 8.4). The brand fixtures
    (gallery/brands/*.css) are imported by the layout and play the part of an app brand.css. */
