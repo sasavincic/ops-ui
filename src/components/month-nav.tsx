@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { shiftMonth } from "@/domain/months";
+import { shiftMonth } from "../lib/months";
 import { useOpsUi } from "../config/provider";
 import { useDismissable } from "../lib/use-dismissable";
 import { cn } from "../lib/cn";
