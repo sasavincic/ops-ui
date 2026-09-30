@@ -305,6 +305,7 @@ After P2, `layout.tsx` imports one file, `src/app/app.css`:
 @import "./styles/financials.css" layer(legacy);
 /* …the other 15 sheets in today's layout.tsx order, all layer(legacy) */
 @source "../vendor/ops-ui";
+@source not "../vendor/ops-ui/*.md";   /* the shipped docs never reach the CSS (library spec 8.4) */
 @source "../components/prefab-ui";
 @source "./dev/kit";
 /* + one @source per migrated file or folder, added area by area */
@@ -356,7 +357,7 @@ From P4.1, `base.css` makes the page body match the kit: Geist, white background
 
 ### 5.6 Utility generation
 
-- **Scanning.** `source(none)` plus one `@source` line per migrated file or folder. Tailwind never scans legacy TSX, so it cannot generate a utility for a legacy word that happens to be a utility name (`hidden`, `truncate`, `container`, …).
+- **Scanning.** `source(none)` plus one `@source` line per migrated file or folder. Tailwind never scans legacy TSX, so it cannot generate a utility for a legacy word that happens to be a utility name (`hidden`, `truncate`, `container`, …). The vendor folder's docs are excluded (`@source not "../vendor/ops-ui/*.md"`, library spec §8.4): they name classes and tokens, and a docs-only release must not change the CSS. With `source(none)` nothing scans `scripts/`, so the library template's second exclusion is not needed here.
 - **Build checks at P2 and at every area merge** (`scripts/restyle/collision-gate.mjs`):
   1. The class selectors in the built utilities, intersected with (legacy class names ∪ class names used in unmigrated TSX), must be empty.
   2. Every legacy rule must sit inside `@layer legacy`.

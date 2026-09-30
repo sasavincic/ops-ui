@@ -210,7 +210,7 @@ tests/ops-ui/vendor.test.ts        app-owned (§11.3)
 tests/ops-ui/bridge.test.tsx       app-owned (§11.3)
 ```
 
-ESLint ignores `src/vendor/**`, because the library lints itself. `tsc` does type-check the vendor folder under the app's config. Tailwind scans it through the explicit `@source` in globals.css (§8.4).
+ESLint ignores `src/vendor/**`, because the library lints itself. `tsc` does type-check the vendor folder under the app's config. Tailwind scans it through the explicit `@source` in globals.css, and never the shipped docs or the sync script (the two `@source not` lines, §8.4).
 
 **The `/dev/kit` page guards itself.** Both apps' page-guard tests (Phase 0 security: WFO `tests/permissions/guards.test.ts` "every page guards itself", FinaOps `tests/lib/guards.test.ts` "pages") require every non-public `page.tsx` to be an async default function whose FIRST statement awaits a session guard; the `(app)` layout's check does not count. The story registry is read from a client component. So the page is a server component that guards first, then refuses production, then hands over to a client view:
 
@@ -715,6 +715,8 @@ These are today's rules, word for word. They leave the apps' globals.css files w
 @import "../vendor/ops-ui/styles/app-feel.css";
 @import "./brand.css";
 @source "../vendor/ops-ui";
+@source not "../vendor/ops-ui/*.md";
+@source not "../../scripts/sync-ops-ui.*";
 
 /* App extensions - new names only (see ops-ui.config.json). No double quotes in comments here. */
 @theme {
@@ -724,6 +726,8 @@ These are today's rules, word for word. They leave the apps' globals.css files w
 }
 /* …the app's own non-kit rules (pull-to-search etc.) stay below… */
 ```
+
+**What Tailwind scans.** `@source "../vendor/ops-ui"` scans the kit's code (and so does automatic detection: the folder is not ignored). The two `@source not` lines keep out everything else a release ships into the app tree: `DESIGN.md`, `TOKENS.md` and `CHANGELOG.md` in the vendor folder, and the sync script with its declarations under `scripts/`. Tailwind emits a class or a theme variable for any name it finds in a scanned file, and those files name classes and tokens (TOKENS.md names `--color-sick-subtle`, which WFO declares and never uses; the CHANGELOG names `bg-primary/10`; the script names `--color-tool`). Without the exclusions a docs-only patch would change an app's CSS and its G3 token dump. The library's `app-scan` test builds an app from this template and `ship.json` and requires the same CSS whatever those files say. `styles/*.css` need no line: Tailwind never scans CSS files for candidates.
 
 **WFO `brand.css`.** The values are copied verbatim from today's globals.css, so the token dump matches as text:
 
@@ -934,6 +938,7 @@ export function AppSwitcher(p: {
   - the scanner finds a planted double-quote comment inside `@theme`;
   - `TOKENS.md` equals the `tokens.css` contract;
   - §8.5 contrast and bounds pass for every gallery brand.
+- **`app-scan`:** an app built from the §8.4 template and `ship.json`, compiled with the pinned Tailwind, gives the same CSS whether the shipped docs and sync script are present, absent or full of class and token names; without the two `@source not` lines it does not (TOKENS.md alone adds `--color-sick-subtle`).
 - **`glyphs`:** a Badge needs an icon, and the icon names equal the `types.ts` unions.
 - **`manifest`:**
   - every file under `src/` and `styles/` is shipped by `ship.json`;
@@ -1114,7 +1119,7 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
 - **F2 Vendor only.**
   - Add `.gitattributes`, `ops-ui.config.json` and the ESLint ignore for `src/vendor/**`.
   - Copy `scripts/sync-ops-ui.mjs` from the library once by hand, then run `node scripts/sync-ops-ui.mjs --version 1.0.0` (it refuses while any `@theme` comment in globals.css holds a double quote: F1 removed FinaOps' one).
-  - Add `@source "../vendor/ops-ui";` to globals.css.
+  - Add `@source "../vendor/ops-ui";`, `@source not "../vendor/ops-ui/*.md";` and `@source not "../../scripts/sync-ops-ui.*";` to globals.css (§8.4: the shipped docs and the sync script never reach the CSS).
   - Nothing imports the vendor folder yet.
   - Gates: G1, G2 zero.
 - **F3 Tokens.**
@@ -1278,6 +1283,7 @@ Whatever is decided, the kit-freeze notes (F0/W0) should land in both apps' CLAU
 @import "./styles/financials.css" layer(legacy);
 /* …the other 15 sheets, in today's order, all layer(legacy) */
 @source "../vendor/ops-ui";
+@source not "../vendor/ops-ui/*.md";                                /* the shipped docs never reach the CSS (§8.4) */
 /* + one @source line per migrated file or folder, added area by area (P4) */
 ```
 
@@ -1370,6 +1376,7 @@ The alternative stays open. If Saša asks later, a library minor `styles/dark.cs
 | 3 | A second read-only context appears, and buttons silently stop hiding | The library owns the only context. The app's own context is deleted. Default-deny smoke test in every app. |
 | 4 | Two tailwind-merge configs, bringing back the old bug where `text-detail` removed `text-white` | One `cn` in the library. App `lib/utils` re-exports it (reference-equality test). Boundary test. |
 | 5 | Vendor folder not scanned by Tailwind, or gitignored: classes silently vanish | Explicit `@source`. `git check-ignore` test. `/dev/kit` in every G2 run. |
+| 5a | The shipped docs or the sync script scanned: a docs-only release changes an app's CSS and token dump (a class or token they name gets generated) | The two `@source not` lines of §8.4. The library's `app-scan` test proves them against the template and `ship.json`. |
 | 6 | The `@theme` double-quote gotcha | Brand files never contain `@theme`. Quote-free generated headers. Scanner in the library tests, the sync pre-flight and `checkVendor`, proved by a planted quote. |
 | 7 | Brand variables set on a subtree | `:root`-only rule checked by the contract. The gallery sets `data-brand` on `<html>`. |
 | 8 | A release is spoofed, moved or ambiguous | Exactly one `release: vX` commit on `main`. The `release/vX` branch must agree. The lock pins the commit, and "release moved" is refused. |
