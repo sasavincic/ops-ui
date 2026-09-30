@@ -7,24 +7,17 @@
 // a line saying what the tab is for, its single create action, then the
 // content.
 
-import { WriteScope } from "@/components/permissions-provider";
 import { useReadOnlyScope } from "../config/read-only";
 import { Button } from "./button";
-import type { PermissionArea } from "@/domain/permissions";
 
+// The permission area is the app's: each app's record-tab binding requires
+// `area` and wraps this in its WriteScope, so everything inside is
+// default-deny for a session without edit rights there (spec §6.4).
 export function RecordTab({
-  area,
   intro,
   action,
   children,
 }: {
-  /**
-   * The permission area this tab writes to — required, so adding a tab
-   * cannot forget it (2026-08-28). Everything inside becomes default-deny
-   * for a session without edit rights here: the create action and every
-   * per-row Edit/Delete disappear rather than leading to an error page.
-   */
-  area: PermissionArea;
   /** One line: what this tab holds and what to do with it. */
   intro?: React.ReactNode;
   /**
@@ -36,11 +29,9 @@ export function RecordTab({
   children: React.ReactNode;
 }) {
   return (
-    <WriteScope area={area}>
-      <RecordTabLayout intro={intro} action={action}>
-        {children}
-      </RecordTabLayout>
-    </WriteScope>
+    <RecordTabLayout intro={intro} action={action}>
+      {children}
+    </RecordTabLayout>
   );
 }
 
