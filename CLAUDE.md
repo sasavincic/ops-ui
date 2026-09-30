@@ -66,9 +66,11 @@ the gallery's `prefab` fixture).
 pnpm typecheck && pnpm lint && pnpm test && pnpm shots
 ```
 
-Never commit red. `pnpm shots` builds the gallery and compares every story ×
+Never commit red. `pnpm shots` builds the gallery, compares every story ×
 3 brands × {1440, 375} against `gallery/__screenshots__/` with 0 changed
-pixels.
+pixels, and runs the browser behaviour tests (`gallery/tests/behaviour.spec.ts`).
+`pnpm test` includes the api-surface check: after changing a declaration under
+`src/`, run `pnpm api-surface` and commit `api-surface.d.txt`.
 
 - Playwright is pinned to exactly `@playwright/test` 1.56.1 = Chromium
   revision 1194, preinstalled under `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`.
@@ -176,9 +178,8 @@ or scratch exports.
   tokens.css disagree. The contract checks (§8.5 checks 1-4: brand.css shape,
   required variables, tint/tunable bounds, contrast via OKLCH to sRGB) and the
   theme-gotcha scanner (check 6) live in `sync/sync-ops-ui.mjs` as exports
-  (`parseTokenContract`, `checkBrandCss`, `themeGotchas`, ...): that file so
-  far carries ONLY the contract; the §5 commands land on top of it in L5
-  (running it directly exits 2 saying so). The tokens test also compiles
+  (`parseTokenContract`, `checkBrandCss`, `themeGotchas`, ...); the §5
+  commands landed on top of it in L5. The tokens test also compiles
   tokens.css with the pinned Tailwind and requires every declaration back,
   value for value, and reproduces the spec's contrast numbers (7.44, 9.32...).
   `pnpm shots` gained a per-brand smoke check that the tokens resolve through
@@ -190,5 +191,34 @@ or scratch exports.
   cover them (keys, English defaults, provider defaults and partials,
   localize, nested read-only scopes, Button/Input/DateInput in a scope, the
   seven React-free types re-exported by their components).
-- L5 Tests, stories and baselines · L6 Extraction proof · L7
-  `pnpm release 1.0.0`: pending (spec §12.1).
+- **L5 Tests, stories and baselines** (2026-09-30): **stories** for all 35
+  components in `src/stories/<component>.stories.tsx` (58 stories, every one a
+  `"use client"` module; `story-layout.tsx` lays them out; `index.ts` is the
+  registry, read it from a client component). **Shots**: 58 stories x 3 brands x
+  {1440, 375} = 348 baselines in `gallery/__screenshots__/<width>/<brand>/`;
+  the gallery's StoryView sets `data-ready` after hydration and the shots wait
+  for it, then click the story's `open` selector. The `prefab` brand stays the
+  Prefab plan's D3 palette (§9.8). **Browser behaviour**
+  (`gallery/tests/behaviour.spec.ts`, run by `pnpm shots`): Dialog and Sheet
+  discard prompts, toast lifetimes and toasts inside a dialog, DateInput typing,
+  masking, reverting, limits and the calendar (year → month → day, keyboard,
+  Today/Clear; the keyboard walk runs with motion on: see the §12.4 follow-up),
+  Combobox (reverse-order words, arrows, Enter never submits, disabled rows,
+  keywords), RowMenu below/upward/dismiss, MonthNav, read-only default-deny,
+  Segmented at 375 and no story ever scrolling the 375 page sideways. **Unit
+  tests** (spec §11.1): ported from WFO (toast, file-link, date-input,
+  nav-trail, navigation-history, the search folds) and new (boundary,
+  client-directive, read-only, strings, cn, text, glyphs, combobox, dialog,
+  stories, manifest, sync, pull-brands). **The sync script** gained every §5
+  command (`--version`, `--ref`, `--check` = `checkVendor`,
+  `--write-wrappers`, `--dry-run`, `--discard-local-edits`,
+  `--allow-downgrade`, `--repo`); `tests/sync.test.ts` runs the real script
+  against temporary git repos. Two readings the spec left open: the running
+  script is exempt from the collision rule (F2 starts from a hand copy) and a
+  missing brand.css counts only once globals.css imports the vendored tokens
+  (F2/W3). **`ship.json`** (src/**, styles/*.css, DESIGN/TOKENS/CHANGELOG, the
+  sync script), **`tools/api-surface.mjs`** (`pnpm api-surface`, comments
+  stripped, `api-surface.d.txt` committed; stale = red) and
+  **`tools/pull-brands.mjs`** (app brand.css → gallery fixture, through git;
+  no app has a brand.css yet, so the fixtures stay hand-copied).
+- L6 Extraction proof · L7 `pnpm release 1.0.0`: pending (spec §12.1).

@@ -75,7 +75,8 @@ never a tag (the session git proxy refuses tag pushes).
 pnpm install
 pnpm typecheck && pnpm lint && pnpm test   # tsc, eslint (import boundary), vitest
 pnpm gallery                               # the story gallery on http://localhost:3300/workforce
-pnpm shots                                 # Playwright: every story x 3 brands x {1440, 375}, 0-pixel diffs
+pnpm api-surface                           # regenerate api-surface.d.txt after a declaration change
+pnpm shots                                 # Playwright: every story x 3 brands x {1440, 375}, 0-pixel diffs, + behaviour tests
 pnpm shots:accept                          # write baselines (a major, or a pure `shots: rebaseline (…)` commit)
 ```
 
@@ -90,7 +91,8 @@ fixture from `gallery/brands/`.
 src/            the library (relative imports only): components/, config/, lib/, navigation/, stories/, types.ts, version.ts
 styles/         tokens.css (@theme contract), kit.css, base.css, app-feel.css
 sync/           sync-ops-ui.mjs, shipped to each app as scripts/sync-ops-ui.mjs
-tools/          release, api-surface, app-shots, diff-against-app, pull-brands
+tools/          api-surface, pull-brands (L5); release, app-shots, diff-against-app arrive with L6-L7
+ship.json       what a release ships to an app, and where (read by the sync from the release commit)
 gallery/        Next app for stories and screenshots (brands/, tests/, __screenshots__/)
 tests/          vitest (node environment, renderToStaticMarkup)
 docs/           the spec and the kit inventory
