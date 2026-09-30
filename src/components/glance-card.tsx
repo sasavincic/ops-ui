@@ -10,7 +10,7 @@ export function GlanceCard({
 }: {
   title: string;
   href: string;
-  /** Localised link text — pass t.common.open. */
+  /** Localised link text — pass strings.open. */
   openLabel?: string;
   children: React.ReactNode;
 }) {

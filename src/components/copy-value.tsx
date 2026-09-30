@@ -2,7 +2,7 @@
 
 import { ActionIcon } from "./action-icon";
 import { pushToast } from "./toast";
-import { useDict } from "@/i18n/client";
+import { useOpsUi } from "../config/provider";
 import { cn } from "../lib/cn";
 
 /**
@@ -19,18 +19,18 @@ export function CopyValue({
   value: string;
   className?: string;
 }) {
-  const t = useDict();
+  const { strings } = useOpsUi();
   return (
     <button
       type="button"
-      title={t.common.copyValue}
-      aria-label={`${t.common.copyValue}: ${value}`}
+      title={strings.copyValue}
+      aria-label={`${strings.copyValue}: ${value}`}
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(value);
-          pushToast("success", `${t.common.copied}: ${value}`, t.common.close);
+          pushToast("success", `${strings.copied}: ${value}`, strings.close);
         } catch {
-          pushToast("danger", t.common.copyFailed, t.common.close);
+          pushToast("danger", strings.copyFailed, strings.close);
         }
       }}
       className={cn(

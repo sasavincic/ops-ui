@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Input } from "./field";
 import { cn } from "../lib/cn";
 import { Monogram } from "./monogram";
-import { useDict } from "@/i18n/client";
+import { useOpsUi } from "../config/provider";
 import { matchesAllWords } from "@/domain/search";
 
 /** Supporting line under an option's label; the tone picks a token colour. */
@@ -92,13 +92,13 @@ export function Combobox({
    */
   tall?: boolean;
 }) {
-  const t = useDict();
+  const { strings } = useOpsUi();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   // The highlight shows only once the person is steering — typing or arrows.
   const [steering, setSteering] = useState(false);
-  const effectivePlaceholder = placeholder ?? `${t.common.search}…`;
+  const effectivePlaceholder = placeholder ?? `${strings.search}…`;
   const selected = options.find((o) => o.value === value) ?? null;
   const matches = query.trim()
     ? options.filter((o) => comboboxOptionMatches(o, query))
@@ -187,7 +187,7 @@ export function Combobox({
             </li>
           )}
           {matches.length === 0 && (
-            <li className="px-3 py-2 text-sm text-ink-muted">{t.common.noMatches}</li>
+            <li className="px-3 py-2 text-sm text-ink-muted">{strings.noMatches}</li>
           )}
           {matches.map((o, i) => {
             const heading =

@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef } from "react";
-import { useDict } from "@/i18n/client";
+import { useOpsUi } from "../config/provider";
 import { cn } from "../lib/cn";
 import { useErrorToast } from "./toast";
 
@@ -21,7 +21,7 @@ import { useErrorToast } from "./toast";
  *
  * `exitCheck` adds the Dialog's discard prompt (2026-08-19) for sheets that
  * edit records in place: typing anything arms it, the ✕ then asks before
- * throwing the edit away, and a click on a plain `{t.common.save}` button
+ * throwing the edit away, and a click on a plain `{strings.save}` button
  * (exact label, capture phase — the kit cannot wrap buttons it does not
  * render) disarms it again.
  */
@@ -51,7 +51,7 @@ export function Sheet({
   children: React.ReactNode;
   className?: string;
 }) {
-  const t = useDict();
+  const { strings } = useOpsUi();
   const titleId = useId();
   const dirty = useRef(false);
 
@@ -61,14 +61,14 @@ export function Sheet({
 
   function disarmOnSave(e: React.MouseEvent) {
     const button = (e.target as Element | null)?.closest?.("button");
-    if (button && button.textContent?.trim() === t.common.save) {
+    if (button && button.textContent?.trim() === strings.save) {
       dirty.current = false;
     }
   }
 
   /** `dirty` can only ever arm when `exitCheck` wired the guards above. */
   function closeFromX() {
-    if (dirty.current && !confirm(t.common.unsavedConfirm)) return;
+    if (dirty.current && !confirm(strings.unsavedConfirm)) return;
     dirty.current = false;
     onClose();
   }
@@ -100,7 +100,7 @@ export function Sheet({
               it sits outside the scroller and can never scroll away. */}
           <button
             type="button"
-            aria-label={t.common.close}
+            aria-label={strings.close}
             className="shrink-0 rounded-control p-2.5 text-sm leading-none text-ink-muted transition-colors duration-150 hover:bg-surface hover:text-ink"
             onClick={closeFromX}
           >

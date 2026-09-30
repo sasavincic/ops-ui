@@ -4,7 +4,7 @@ import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { shiftMonth } from "@/domain/months";
-import { useDict, useLocale } from "@/i18n/client";
+import { useOpsUi } from "../config/provider";
 import { useDismissable } from "../lib/use-dismissable";
 import { cn } from "../lib/cn";
 
@@ -28,8 +28,7 @@ export function MonthNav({
   hrefPattern: string;
   className?: string;
 }) {
-  const t = useDict();
-  const locale = useLocale();
+  const { strings, locale } = useOpsUi();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [year, setYear] = useState(Number(month.slice(0, 4)));
@@ -74,14 +73,14 @@ export function MonthNav({
         }
       }}
     >
-      <ArrowLink href={hrefFor(shiftMonth(month, -1))} label={t.common.prevMonth} dir="prev" />
+      <ArrowLink href={hrefFor(shiftMonth(month, -1))} label={strings.prevMonth} dir="prev" />
       <button
         ref={trigger}
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        title={t.common.pickMonth}
+        title={strings.pickMonth}
         onClick={() => {
           setYear(Number(month.slice(0, 4)));
           setOpen((v) => !v);
@@ -91,18 +90,18 @@ export function MonthNav({
         {label(month)}
         <Chevron dir="down" />
       </button>
-      <ArrowLink href={hrefFor(shiftMonth(month, 1))} label={t.common.nextMonth} dir="next" />
+      <ArrowLink href={hrefFor(shiftMonth(month, 1))} label={strings.nextMonth} dir="next" />
       {open && (
         <div
           id={id}
           role="dialog"
-          aria-label={t.common.pickMonth}
+          aria-label={strings.pickMonth}
           className="absolute left-1/2 top-full z-30 mt-2 w-64 -translate-x-1/2 rounded-container border border-border bg-bg p-2 shadow-lg"
         >
           <div className="mb-2 flex items-center justify-between">
             <button
               type="button"
-              aria-label={t.common.prevYear}
+              aria-label={strings.prevYear}
               onClick={() => setYear((y) => y - 1)}
               className={ARROW}
             >
@@ -111,7 +110,7 @@ export function MonthNav({
             <span className="text-sm font-medium text-ink">{year}</span>
             <button
               type="button"
-              aria-label={t.common.nextYear}
+              aria-label={strings.nextYear}
               onClick={() => setYear((y) => y + 1)}
               className={ARROW}
             >

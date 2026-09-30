@@ -13,7 +13,7 @@ import {
   DialogError,
   DialogFooter,
 } from "./dialog";
-import { useDict } from "@/i18n/client";
+import { useOpsUi } from "../config/provider";
 
 /**
  * A destructive action that lives INSIDE an open dialog, where a second
@@ -38,7 +38,7 @@ export function InlineConfirm({
   armed: boolean;
   onArm: (armed: boolean) => void;
 }) {
-  const t = useDict();
+  const { strings } = useOpsUi();
   if (!armed) {
     return (
       <Button icon="delete" variant="ghostDanger" onClick={() => onArm(true)}>
@@ -50,10 +50,10 @@ export function InlineConfirm({
     <span className="flex flex-wrap items-center gap-2">
       <span className="text-detail text-ink-secondary">{question}</span>
       <Button icon="close" variant="ghost" onClick={() => onArm(false)}>
-        {t.common.cancel}
+        {strings.cancel}
       </Button>
       <Button icon="delete" variant="danger" disabled={pending} onClick={onConfirm}>
-        {pending ? t.common.saving : confirmLabel}
+        {pending ? strings.saving : confirmLabel}
       </Button>
     </span>
   );

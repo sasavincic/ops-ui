@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useReturnNavigation } from "../navigation/nav-trail";
-import { useDict } from "@/i18n/client";
+import { useOpsUi } from "../config/provider";
 
 /** Cancel and Back share the same return behavior without adding a visit. */
 export function ReturnLink({ href, onNavigate, ...props }: Omit<React.ComponentProps<typeof Link>, "href"> & { href: string }) {
@@ -19,7 +19,7 @@ export function BackLink({ href, label, onBackClick }: {
   label?: string;
   onBackClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }) {
-  const t = useDict();
+  const { strings } = useOpsUi();
   const navigation = useReturnNavigation(href);
   return (
     <Link
@@ -31,7 +31,7 @@ export function BackLink({ href, label, onBackClick }: {
       }}
       className="mb-1 inline-block text-detail text-ink-muted transition-colors duration-150 hover:text-ink"
     >
-      ← {navigation.contextual ? t.common.back : (label ?? t.common.back)}
+      ← {navigation.contextual ? strings.back : (label ?? strings.back)}
     </Link>
   );
 }

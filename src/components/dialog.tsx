@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { ActionIconName } from "./action-icon";
 import { Button } from "./button";
-import { useDict } from "@/i18n/client";
+import { useOpsUi } from "../config/provider";
 import { cn } from "../lib/cn";
 import { ToastViewport, useErrorToast, useToastHost } from "./toast";
 
@@ -33,7 +33,7 @@ export function Dialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const dirty = useRef(false);
-  const t = useDict();
+  const { strings } = useOpsUi();
   // An open modal is the top layer: toasts must be drawn INSIDE it to sit
   // above it and stay clickable (toast.tsx).
   const toastHost = useToastHost(open);
@@ -49,14 +49,14 @@ export function Dialog({
   }, [open]);
 
   // Guard the in-dialog Cancel buttons too (capture phase): every dialog
-  // renders its own `{t.common.cancel}` ghost button wired straight to its
+  // renders its own `{strings.cancel}` ghost button wired straight to its
   // close handler — the kit can't wrap those, so it recognizes them by
   // their exact label. Action buttons ("Cancel deployment"…) don't match.
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    const cancelLabel = t.common.cancel;
-    const confirmText = t.common.unsavedConfirm;
+    const cancelLabel = strings.cancel;
+    const confirmText = strings.unsavedConfirm;
     const onClick = (e: MouseEvent) => {
       if (!confirmDiscard || !dirty.current) return;
       const button = (e.target as Element | null)?.closest?.("button");
@@ -70,10 +70,10 @@ export function Dialog({
     };
     dialog.addEventListener("click", onClick, true);
     return () => dialog.removeEventListener("click", onClick, true);
-  }, [t.common.cancel, t.common.unsavedConfirm, confirmDiscard]);
+  }, [strings.cancel, strings.unsavedConfirm, confirmDiscard]);
 
   function closeFromX() {
-    if (confirmDiscard && dirty.current && !confirm(t.common.unsavedConfirm)) return;
+    if (confirmDiscard && dirty.current && !confirm(strings.unsavedConfirm)) return;
     dirty.current = false;
     onClose();
   }
@@ -114,7 +114,7 @@ export function Dialog({
         <h2 className="text-sm font-semibold">{title}</h2>
         <button
           type="button"
-          aria-label={t.common.close}
+          aria-label={strings.close}
           className="rounded-control p-2.5 text-sm leading-none text-ink-muted transition-colors duration-150 hover:bg-surface hover:text-ink"
           onClick={closeFromX}
         >
@@ -204,7 +204,7 @@ export function DialogFooter({
   note?: React.ReactNode;
   children?: React.ReactNode;
 }) {
-  const t = useDict();
+  const { strings } = useOpsUi();
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
       {children}
@@ -212,7 +212,7 @@ export function DialogFooter({
         <span className="mr-auto text-detail text-ink-muted">{note}</span>
       )}
       <Button icon={closeLabel ? "back" : "close"} type="button" variant="ghost" onClick={onClose}>
-        {closeLabel ?? t.common.cancel}
+        {closeLabel ?? strings.cancel}
       </Button>
       <Button
         type={onSubmit ? "button" : "submit"}
@@ -222,7 +222,7 @@ export function DialogFooter({
         disabled={pending || disabled}
         onClick={onSubmit}
       >
-        {pending ? (pendingLabel ?? t.common.saving) : submitLabel}
+        {pending ? (pendingLabel ?? strings.saving) : submitLabel}
       </Button>
     </div>
   );

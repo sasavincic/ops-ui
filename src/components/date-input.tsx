@@ -14,7 +14,7 @@ import {
   withinRange,
 } from "@/domain/date-input";
 import { formatDate, shiftDay } from "@/domain/dates";
-import { useDict } from "@/i18n/client";
+import { useOpsUi } from "../config/provider";
 import { fmt } from "@/i18n/locales";
 import { useDismissable } from "../lib/use-dismissable";
 import { cn } from "../lib/cn";
@@ -89,8 +89,8 @@ export function DateInput({
   readOnlySafe?: boolean;
   "aria-label"?: string;
 }) {
-  const t = useDict();
-  const dp = t.common.datePicker;
+  const { strings } = useOpsUi();
+  const dp = strings.datePicker;
   const locked = useReadOnlyScope() && !readOnlySafe;
   const off = disabled || locked;
   const coarse = useSyncExternalStore(subscribeCoarse, coarseNow, () => false);
