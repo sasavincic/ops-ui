@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useSyncExternalStore } from "react";
 import { CALLOUT_TONE, Callout } from "./callout";
-import { useMaybeDict } from "@/i18n/client";
-import { localizeMessage } from "@/i18n/messages";
+import { useOpsUi } from "../config/provider";
 import { cn } from "../lib/cn";
 
 /**
@@ -103,7 +102,7 @@ export function useErrorToast(
   tone: ToastTone = "danger",
   action?: ToastAction
 ) {
-  const t = useMaybeDict();
+  const { strings, localize } = useOpsUi();
   // The action's closure changes every render; the toast keeps the latest.
   const actionRef = useRef(action);
   useEffect(() => {
@@ -115,14 +114,14 @@ export function useErrorToast(
     if (!error) return;
     const id = pushToast(
       tone,
-      t ? localizeMessage(t, error) : error,
-      t?.common.close ?? "Close",
+      localize(error),
+      strings.close,
       hasAction && actionLabel
         ? { label: actionLabel, onClick: () => actionRef.current?.onClick() }
         : undefined
     );
     return () => dismissToast(id);
-    // t is stable for the page's lifetime; the message is what matters.
+    // strings and localize are stable for the page's lifetime; the message is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error, trigger, tone, hasAction, actionLabel]);
 }

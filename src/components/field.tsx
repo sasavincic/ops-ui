@@ -1,8 +1,7 @@
 "use client";
 
 import { useReadOnlyScope } from "../config/read-only";
-import { useMaybeDict } from "@/i18n/client";
-import { localizeMessage } from "@/i18n/messages";
+import { useOpsUi } from "../config/provider";
 import { cn } from "../lib/cn";
 import { StatusIcon } from "./status-icon";
 import { useAnchoredToast } from "./toast";
@@ -38,10 +37,10 @@ export function Field({
   children: React.ReactNode;
 }) {
   // Server-side refusals arrive in English; the kit translates them.
-  const dict = useMaybeDict();
-  const closeLabel = dict?.common.close ?? "Close";
+  const { strings, localize } = useOpsUi();
+  const closeLabel = strings.close;
   const say = (text?: string) =>
-    text ? `${label}: ${dict ? localizeMessage(dict, text) : text}` : null;
+    text ? `${label}: ${localize(text)}` : null;
   const reannounceError = useAnchoredToast(say(error), "danger", true, closeLabel);
   const reannounceWarning = useAnchoredToast(
     error ? null : say(warning),
