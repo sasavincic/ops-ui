@@ -5,7 +5,7 @@ import { Input } from "./field";
 import { cn } from "../lib/cn";
 import { Monogram } from "./monogram";
 import { useOpsUi } from "../config/provider";
-import { matchesAllWords } from "@/domain/search";
+import { matchesAllWords } from "../lib/text";
 
 /** Supporting line under an option's label; the tone picks a token colour. */
 export type ComboboxOptionLine = { text: string; tone?: "muted" | "warning" };
