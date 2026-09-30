@@ -1,4 +1,4 @@
-import { navigateTrail, parseTrail, startTrail, type NavTrailState } from "@/domain/nav-trail";
+import { navigateTrail, parseTrail, startTrail, type NavTrailState } from "./trail";
 
 export const NAVIGATION_STATE_KEY = "__workforceNavigation";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useReturnNavigation } from "@/components/shell/nav-trail";
+import { useReturnNavigation } from "../navigation/nav-trail";
 import { useDict } from "@/i18n/client";
 
 /** Cancel and Back share the same return behavior without adding a visit. */

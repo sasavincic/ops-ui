@@ -2,8 +2,8 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
-import { backTarget, type NavTrailState } from "@/domain/nav-trail";
-import { trackNavigation } from "@/lib/navigation-history";
+import { backTarget, type NavTrailState } from "./trail";
+import { trackNavigation } from "./history";
 
 let snapshot: NavTrailState | null = null;
 let returning = false;
