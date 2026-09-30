@@ -1,6 +1,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../lib/cn";
-import { StatusIcon, type StatusIconName } from "./status-icon";
+import { StatusIcon } from "./status-icon";
+import type { BadgeVariant, StatusIconName } from "../types";
 
 const badgeVariants = cva(
   "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium leading-4 whitespace-nowrap",
@@ -12,13 +13,13 @@ const badgeVariants = cva(
         warning: "border-warning/30 bg-warning-subtle text-warning",
         danger: "border-danger/30 bg-danger-subtle text-danger",
         info: "border-info/30 bg-info-subtle text-info",
-      },
+      } satisfies Record<BadgeVariant, string>,
     },
     defaultVariants: { variant: "neutral" },
   }
 );
 
-export type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
+export type { BadgeVariant };
 
 /**
  * A STATUS pill: the current lifecycle position of the record it sits on

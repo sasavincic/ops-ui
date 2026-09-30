@@ -1,4 +1,5 @@
-import { StatusIcon, type StatusIconName } from "./status-icon";
+import { StatusIcon } from "./status-icon";
+import type { CalloutTone, StatusIconName } from "../types";
 import { cn } from "../lib/cn";
 
 /**
@@ -19,7 +20,7 @@ import { cn } from "../lib/cn";
  * context, success = done (toasts), neutral = a plain fact, admin = the
  * violet escape hatches.
  */
-export type CalloutTone = "danger" | "warning" | "info" | "success" | "neutral" | "admin";
+export type { CalloutTone };
 
 export const CALLOUT_TONE: Record<
   CalloutTone,

@@ -1,4 +1,7 @@
 import { cn } from "../lib/cn";
+import type { StatusIconName } from "../types";
+
+export type { StatusIconName };
 
 /**
  * One small line-icon vocabulary for read-only state indicators — ONE
@@ -10,24 +13,6 @@ import { cn } from "../lib/cn";
  * settled negative outcome, send = sent, key = privilege, info = a notice
  * about what an action did (toasts).
  */
-export type StatusIconName =
-  | "current"
-  | "check"
-  | "clock"
-  | "alert"
-  | "problem"
-  | "question"
-  | "close"
-  | "draft"
-  | "ended"
-  | "inactive"
-  | "archive"
-  | "key"
-  | "lock"
-  | "send"
-  | "minus"
-  | "info";
-
 const paths: Record<StatusIconName, React.ReactNode> = {
   current: <><circle cx="8" cy="8" r="5.5" /><circle cx="8" cy="8" r="2" fill="currentColor" stroke="none" /></>,
   check: <path d="m3 8 3 3 7-7" />,

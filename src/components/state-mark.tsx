@@ -1,5 +1,5 @@
-import { Badge, type BadgeVariant } from "./badge";
-import type { StatusIconName } from "./status-icon";
+import { Badge } from "./badge";
+import type { StateMarkSpec } from "../types";
 
 /**
  * The outlined status pill: the same status as a Badge, worn where the
@@ -7,7 +7,7 @@ import type { StatusIconName } from "./status-icon";
  * so only the exception carries a mark. Any status variant (an outlined
  * Amended is blue, a Terminated slate).
  */
-export type StateMarkSpec = { tone: BadgeVariant; icon: StatusIconName };
+export type { StateMarkSpec };
 
 export function StateMark({
   tone, icon, className, children, title,

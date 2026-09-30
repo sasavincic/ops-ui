@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useSyncExternalStore } from "rea
 import { CALLOUT_TONE, Callout } from "./callout";
 import { useOpsUi } from "../config/provider";
 import { cn } from "../lib/cn";
+import type { ToastAction, ToastTone } from "../types";
 
 /**
  * Alerts as toasts (Saša, 2026-09-25: "any error, any alert, should open as
@@ -23,9 +24,7 @@ import { cn } from "../lib/cn";
  * draws it when no dialog is open.
  */
 
-export type ToastTone = "danger" | "warning" | "info" | "success";
-
-export type ToastAction = { label: string; onClick: () => void };
+export type { ToastAction, ToastTone };
 
 type ToastItem = {
   id: number;

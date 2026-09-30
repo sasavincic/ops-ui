@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from "react";
 import { cn } from "../lib/cn";
+import type { ActionIconName } from "../types";
 
 // Workforce Ops rolled action icons out route by route; FinaOps starts with
 // them everywhere. The scope stays so a surface can opt out (the wall-style
@@ -17,7 +18,7 @@ export function ActionIconScope({
   return <IconScope.Provider value={enabled}>{children}</IconScope.Provider>;
 }
 
-const paths = {
+const paths: Record<ActionIconName, string> = {
   add: "M8 2v12M2 8h12",
   edit: "m10.5 2.5 3 3-8 8-4 1 1-4zM9 4l3 3",
   save: "M2 2h10l2 2v10H2zM5 2v4h6V2M5 14V9h6v5",
@@ -52,8 +53,8 @@ const paths = {
   user: "M10.5 4a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0M2 14v-2a6 6 0 0 1 12 0v2",
   bed: "M2 4v10M14 7v7M2 11h12M2 7h12M5 7V5H2",
   refresh: "M13 6a5 5 0 0 0-9-3L2 5M2 2v3h3M3 10a5 5 0 0 0 9 3l2-2M11 11h3v3",
-} as const;
-export type ActionIconName = keyof typeof paths;
+};
+export type { ActionIconName };
 
 /** Explicit action semantics; never infer icons from translated labels. */
 export function ActionIcon({
