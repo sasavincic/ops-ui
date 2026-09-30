@@ -156,21 +156,23 @@ ops-ui/
     navigation/history.ts      (was lib/navigation-history.ts)
     navigation/nav-trail.tsx   NavTrail, useReturnNavigation            ("use client")
     components/           the 35 kit files of §9
-    stories/              <component>.stories.tsx + index.ts (registry), shipped so apps render them in /dev/kit
+    stories/              <component>.stories.tsx + index.ts (registry) + story-host.tsx (StoryHost, StoryToaster), shipped so apps render them in /dev/kit
   styles/
     tokens.css            the @theme contract (§8.2)
     kit.css               what components need: @keyframes toast-in
     base.css              page rules both apps share word for word (§8.1)
     app-feel.css          no-zoom touch-action, coarse-pointer overscroll contain
   sync/sync-ops-ui.mjs    shipped to each app as scripts/sync-ops-ui.mjs
+  sync/sync-ops-ui.d.mts  its declarations (generated from its JSDoc by api-surface.mjs), shipped as scripts/sync-ops-ui.d.mts
   tools/
-    release.mjs           §4.2
-    app-shots.mjs         per-app visual check, run from the library (apps carry no Playwright) §11.4
+    release.mjs           §4.2 (built in L7a)
+    app-shots.mjs         per-app visual check, run from the library (apps carry no Playwright) §11.4 (built in L7a)
     diff-against-app.mjs  proves 1.0 is an extraction (§12.1)
     pull-brands.mjs       copies the apps' brand.css into gallery fixtures
-    api-surface.mjs       regenerates api-surface.d.txt
+    api-surface.mjs       regenerates api-surface.d.txt and sync/sync-ops-ui.d.mts
   gallery/                Next 16 app: app/[brand]/layout.tsx sets <html data-brand>, app/[brand]/[story]/page.tsx
     brands/workforce.css finaops.css prefab.css    (html[data-brand=x] { --brand-*: … })
+    shot-options.ts       the comparison: { maxDiffPixels: 0, threshold: 0 } (§11.2)
     tests/shots.spec.ts   Playwright; __screenshots__/ baselines
   tests/                  vitest (node environment, renderToStaticMarkup)
 ```
@@ -196,17 +198,37 @@ ops-ui.config.json                 app-owned (§3.3)
 ops-ui.lock.json                   written by the sync, never by hand (§5.3)
 .gitattributes                     src/vendor/ops-ui/** linguist-generated=true (GitHub folds the diffs)
 scripts/sync-ops-ui.mjs            library-owned (synced)
+scripts/sync-ops-ui.d.mts          library-owned (synced): its declarations, for an app with allowJs off
 src/vendor/ops-ui/**               library-owned (synced): src/** + styles/ + DESIGN.md, TOKENS.md, CHANGELOG.md
 src/app/globals.css                app-owned: imports (§8.4) + app extension tokens
 src/app/brand.css                  app-owned: :root { --brand-* } only
 src/components/ui/<name>.tsx       app-owned wrappers, one per library component (§6.4)
 src/components/ui/kit-contract.ts  app-owned: pickKitStrings + compile-time conformance (§6.3)
-src/app/(app)/dev/kit/[[...story]]/page.tsx   app-owned: the vendored stories with the real providers; notFound() in production
+src/app/(app)/dev/kit/[[...story]]/page.tsx   app-owned: the vendored stories with the real providers (below)
+src/app/(app)/dev/kit/kit-view.tsx             app-owned ("use client"): reads STORY_GROUPS, renders each story in <StoryHost pageToaster>
 tests/ops-ui/vendor.test.ts        app-owned (§11.3)
 tests/ops-ui/bridge.test.tsx       app-owned (§11.3)
 ```
 
 ESLint ignores `src/vendor/**`, because the library lints itself. `tsc` does type-check the vendor folder under the app's config. Tailwind scans it through the explicit `@source` in globals.css (§8.4).
+
+**The `/dev/kit` page guards itself.** Both apps' page-guard tests (Phase 0 security: WFO `tests/permissions/guards.test.ts` "every page guards itself", FinaOps `tests/lib/guards.test.ts` "pages") require every non-public `page.tsx` to be an async default function whose FIRST statement awaits a session guard; the `(app)` layout's check does not count. The story registry is read from a client component. So the page is a server component that guards first, then refuses production, then hands over to a client view:
+
+```tsx
+// src/app/(app)/dev/kit/[[...story]]/page.tsx
+import { notFound } from "next/navigation";
+import { requireSession } from "@/lib/session";            // the app's own guard (the same module in both apps)
+import { KitView } from "../kit-view";
+
+export default async function KitPage({ params }: { params: Promise<{ story?: string[] }> }) {
+  await requireSession();                                   // first statement: the page-guard tests
+  if (process.env.NODE_ENV === "production") notFound();
+  const { story } = await params;
+  return <KitView story={story?.[0] ?? null} />;
+}
+```
+
+`KitView` (`"use client"`) lists `STORY_GROUPS` (or renders the one story named) inside `<StoryHost pageToaster>` from `@/vendor/ops-ui/stories/story-host`. `StoryHost` turns ActionIcon on for the stories (WFO switches icons off on `/dev`, W2), and `pageToaster` makes the toast stories leave their own `<Toaster />` out, because the app's root layout already mounts one (two viewports over one store would draw every toast twice).
 
 ### 3.3 `ops-ui.config.json` (app-owned)
 
@@ -333,24 +355,24 @@ The script never commits, never pushes, and never touches anything outside the d
 3. **Read content from git objects only.** It lists files with `git ls-tree -r --name-only C`, filters them by the globs and mappings in `ship.json` at C, and reads each one with `git show C:<path>`. The library's working tree is never read, so uncommitted library edits cannot leak into an app.
 4. **Pre-flight.** Nothing has been written yet. Every failed check is collected, printed, and exits 1.
    - **Local edits.** Every destination listed in the current lock is hashed (sha256). A mismatched or missing file is a local edit. With `--discard-local-edits` it is overwritten; otherwise the script refuses and prints `git diff -- <file>` hints and "fix it in ops-ui, release, sync".
-   - **Unknown files.** A file in `vendorDir` that is not in the lock is refused, unless `--discard-local-edits` is given, in which case it is removed.
-   - **Destination allow-list.** Every destination in the new file set must sit under `vendorDir` or be exactly `scripts/sync-ops-ui.mjs`. Otherwise the release is malformed and the script refuses. A release can never write app code.
+   - **Unknown files.** A file in `vendorDir` that is not in the lock is refused, unless `--discard-local-edits` is given, in which case it is removed. OS and editor litter (`.DS_Store`, `._*`, `Thumbs.db`, `desktop.ini`, swap and `~` backup files) is not counted: it is never an edit, and it leaves with the old folder at the next swap.
+   - **Destination allow-list.** Every destination in the new file set must sit under `vendorDir` or be exactly `scripts/sync-ops-ui.mjs` or `scripts/sync-ops-ui.d.mts`. Otherwise the release is malformed and the script refuses. A release can never write app code.
    - **Collisions.** A destination that is not in the old lock but already exists on disk is refused, even with `--discard-local-edits`. The message says to move the app's file.
    - **Downgrade.** A new version lower than the locked one is refused unless `--allow-downgrade` is given.
    - **Peers.** The version in each `node_modules/<pkg>/package.json` must satisfy `peerDependencies` at C. The script has its own small range matcher for `^`, `>=`, `<` and `||`.
    - **Extensions.** If `styles/tokens.css` at C declares a name listed in `config.extensions`, the script refuses. The library may never take an app's token name.
    - **Brand contract.** It runs the §8.5 checks against `config.brandCss`. So a major that adds a required brand variable fails loudly, naming the variable.
-   - **Theme gotcha.** Inside an `@theme` block in `config.globalsCss` or `config.brandCss`, any comment containing a double-quote character is refused.
+   - **Theme gotcha.** Inside an `@theme` block in `config.globalsCss` or `config.brandCss`, any comment containing a double-quote character is refused, with the comment and the fix (remove the quotes, or move the comment out of the block). This applies to an app's own `@theme` from its first sync, before the tokens step: FinaOps' palette comment carries quotes today and loses them in F1.
    - **Crossing a major.** If the upgrade crosses one or more majors, it prints every `Visible:`, `Breaking:` and `Upgrade steps:` section in between. This is informational, not a refusal.
    - With `--dry-run`, the script prints the plan (files added, changed, removed) and exits here.
 5. **Write the files into a temporary directory** `<vendorDir>.ops-ui-tmp`, using the `ship.json` mapping:
    - `src/**` goes to `<vendorDir>/**`.
    - `styles/*.css` goes to `<vendorDir>/styles/`.
    - `DESIGN.md`, `TOKENS.md` and `CHANGELOG.md` go to `<vendorDir>/`.
-   - `sync/sync-ops-ui.mjs` goes to `scripts/sync-ops-ui.mjs`.
+   - `sync/sync-ops-ui.mjs` goes to `scripts/sync-ops-ui.mjs`, and `sync/sync-ops-ui.d.mts` to `scripts/sync-ops-ui.d.mts`.
    
    Each file gets a first-line header with no double quotes, so no CSS comment can trigger the gotcha:
-   - `.ts`, `.tsx`, `.mjs`: `// GENERATED from @latro/ops-ui v1.2.0 (abc1234) by scripts/sync-ops-ui.mjs - do not edit; change ops-ui, release, sync.`
+   - `.ts`, `.tsx`, `.mjs`, `.mts`: `// GENERATED from @latro/ops-ui v1.2.0 (abc1234) by scripts/sync-ops-ui.mjs - do not edit; change ops-ui, release, sync.`
      A comment above `"use client"` is legal, because a directive must only be the first *statement*.
    - `.css`: `/* GENERATED from @latro/ops-ui v1.2.0 (abc1234) - do not edit. */`
    - `.md`: `<!-- GENERATED from @latro/ops-ui v1.2.0 (abc1234) - do not edit. -->`
@@ -363,14 +385,16 @@ The script never commits, never pushes, and never touches anything outside the d
    
    If any rename fails, the old directory is restored and the script exits 1. Library-owned files that left `ship.json` disappear with the old folder. A removed `scripts/` destination is deleted explicitly.
 7. **Write the lock** (§5.3).
-8. **Update itself last.** If the content of `scripts/sync-ops-ui.mjs` changed, the script writes it last (temp file, then rename). It prints "the sync script was updated - run the same command again" and exits 0. The second run is a no-op sync that applies the new script's checks.
+8. **Update itself last.** If the content of `scripts/sync-ops-ui.d.mts` changed, the script writes it (temp file, then rename); then, if the content of `scripts/sync-ops-ui.mjs` changed, it writes that last, the same way. It prints "the sync script was updated - run the same command again" and exits 0. The second run is a no-op sync that applies the new script's checks.
 9. **Report:**
    - old → new version, and the counts of files added, changed and removed;
    - the CHANGELOG between the two versions;
    - for pure wrappers: any new component module without a wrapper ("run --write-wrappers");
    - the next steps: `pnpm typecheck && pnpm test`, then the visual check (§11.4).
 
-`--write-wrappers` creates `src/components/ui/<name>.tsx` for every `<vendorDir>/components/<name>.tsx` that has no wrapper. The new file contains named re-exports of the vendored module's runtime and type exports, which are parsed from its `export function` / `export const` / `export type` / `export {…}` statements. It never overwrites a file.
+`--write-wrappers` creates `src/components/ui/<name>.tsx` for every `<vendorDir>/components/<name>.tsx` that has no wrapper. The new file contains named re-exports of the vendored module's runtime and type exports, which are parsed from its top-level `export function` / `export const` / `export type` / `export {…}` statements after a small lexer has blanked every comment and every string, template and regex literal (a quoted `image/*` is not a comment opener; the library test checks every component against the TypeScript AST and its runtime exports). It never overwrites a file.
+
+**Declarations.** The script is plain JavaScript with JSDoc. Its declarations ship beside it as `scripts/sync-ops-ui.d.mts` (generated by `tools/api-surface.mjs`, stale = red in the library), so an app whose tsconfig has `allowJs` off (PrefabOps) type-checks its vendor test's `import { checkVendor } from "../scripts/sync-ops-ui.mjs"`; with `allowJs` on, TypeScript prefers the declaration file too.
 
 ### 5.3 The lock (`ops-ui.lock.json`)
 
@@ -410,6 +434,8 @@ export async function checkVendor(appRoot: string): Promise<{
 - there are no theme gotchas.
 
 `--check` prints the same result.
+
+It also exports `vendoredKitGraph(appRoot)` and `kitDependents(graph, name)` for the vendor test's `KIT-OVERRIDE` check (§6.4).
 
 ### 5.5 Upgrading an app
 
@@ -539,6 +565,18 @@ export const areaIsString: AreaIsString = true;   // RecordTab/WriteScope areas 
   ```
 - **App-local kit files** are listed in `config.local`. In 1.0 that is WFO `validity-cell.tsx` only. They stay in `src/components/ui` untouched, and their `./status-icon` imports resolve through the wrappers.
 - **`KIT-OVERRIDE`.** In an emergency, a wrapper may export a local variant instead of the vendored one. The line must carry `// KIT-OVERRIDE until ops-ui X.Y: <reason>`. The vendor test fails once the locked version is ≥ X.Y. The vendored copy itself is never edited.
+  - **An override reaches the app's import sites only.** Kit files import each other *relatively* (`./button`, `./dialog`), and the vendored copies are never edited, so every vendored module that renders the overridden one keeps rendering the vendored original: override `dialog` and every `ConfirmDialog` still draws the vendored Dialog. A `KIT-OVERRIDE` of X must therefore also override every module that renders X at run time, directly or through another kit module (each of those local copies importing the local X). The sync script computes the list from the vendored files: `kitDependents(vendoredKitGraph(appRoot), X)`; the vendor test (§11.3) fails when one of them has no `KIT-OVERRIDE` wrapper. In 1.0:
+
+    | Overriding | Also requires overriding |
+    |---|---|
+    | `button` | `confirm-dialog`, `dialog`, `record-tab`, `row-menu` |
+    | `dialog` | `confirm-dialog` |
+    | `date-input` | — |
+    | `field` | `combobox`, `date-input`, `search-form`, `search-input`, `url-select` |
+    | `toast` | `combobox`, `confirm-dialog`, `copy-value`, `date-input`, `dialog`, `field`, `search-form`, `search-input`, `sheet`, `url-select` |
+    | `action-icon`, `back-link` | `button`, `confirm-dialog`, `dialog`, `record-tab`, `row-menu` (+ `copy-value` / `page-header`) |
+
+    (`import type` edges carry no runtime code and are not counted.) Overriding a widely rendered primitive is therefore close to forking the kit: fix it in the library instead.
 
 ---
 
@@ -562,7 +600,7 @@ The rows cover all 17 external modules found in the inventory (§3 of `kit-inven
 | `shiftMonth` from `@/domain/hours-periods` (WFO) / `@/domain/months` (FinaOps) (month-nav) | `lib/months.ts` | both app modules re-export `shiftMonth` and keep their other functions |
 | `@/domain/compliance` `documentExpiryStatus`, `@/domain/operations` `daysBetween` (validity-cell, WFO) | not in 1.0; 1.1 `lib/validity.ts` (`validityState`, `daysBetween`) | WFO `validity-cell.tsx` stays local in 1.0, then becomes a binding in 1.1 (§12.4) |
 | `next/navigation` `usePathname` (WFO action-icon) | removed; FinaOps' `ActionIconScope({ enabled = true })`, context default `true` | WFO `RouteActionIconScope` + root-layout `enabled={false}` (§12.3 W2) |
-| Toast viewport `+ 3.75rem` (WFO assistant bubble) | `bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))+var(--ops-toast-offset,0px))]` | each app sets `--ops-toast-offset` in `brand.css` |
+| Toast viewport `+ 3.75rem` (WFO assistant bubble) | `bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))+var(--ops-toast-offset,0px))]` | each app sets a fixed `--ops-toast-offset` in `brand.css`; an offset that changes with the screen (PrefabOps' phones, §13.2 P3) needs a media query, which a brand file may not hold (§8.5 check 1), so it lives in the app's own stylesheet |
 | Monogram `external` tone = brand `accent` | `border-external/50 bg-external/10 text-external`; `--color-external` defaults to the accent | FinaOps sets `--brand-external` in F7 |
 | Domain → kit type imports: `status-meta.ts` (`BadgeVariant`, `StatusIconName`, WFO `StateMarkSpec`), `search.ts` (`StatusIconName`), WFO `compliance.ts` (`StatusIconName`) | `types.ts`, React-free | these domain files import from `@/vendor/ops-ui/types` (in `bindings`), so the domain no longer points at a component module |
 
@@ -653,7 +691,7 @@ These are today's rules, word for word. They leave the apps' globals.css files w
 | **Brand, optional role** (1) | `--brand-external` ("not ours": the Monogram external tone) | default = the accent; when set, ≥ 3:1 against `--color-bg` |
 | **Brand, optional tint** (7) | `--brand-surface`, `--brand-surface-raised`, `--brand-border`, `--brand-border-strong`, `--brand-ink`, `--brand-ink-secondary`, `--brand-ink-muted` | OKLCH; lightness within ±0.01 of the default; chroma ≤ 0.025; hue free |
 | **Brand, tunable status** (2) | `--brand-success`, `--brand-success-subtle` | hue 140–160 (FinaOps' 145 is deliberate: it must not read as its teal primary) |
-| **Layout variable** (1) | `--ops-toast-offset` | plain `:root`, default `0px` via the `var()` fallback; never in `@theme`, because Tailwind drops theme variables that no utility uses |
+| **Layout variable** (1) | `--ops-toast-offset` | plain `:root`, default `0px` via the `var()` fallback; never in `@theme`, because Tailwind drops theme variables that no utility uses. A fixed value goes into `brand.css`; a responsive one (inside `@media`) into the app's own stylesheet, never `brand.css` (§8.5 check 1 allows no at-rule there) |
 | **App extensions** | WFO: `--color-tool`, `--color-sick`, `--color-sick-subtle` | the app's own `@theme` in globals.css, new names only, listed in `config.extensions`; the sync refuses a library release that takes one |
 
 **Placement.** Brand variables are set on `:root` only.
@@ -663,6 +701,8 @@ These are today's rules, word for word. They leave the apps' globals.css files w
 **Not tokens.** The kit's literal `text-white` (5×, on primary and danger fills), its `bg-ink/40` backdrops, and `rounded-[4px]` / `rounded-sm` / `rounded-full` stay as they are.
 
 **Dark mode.** There is none (§13.3).
+
+**Browser floor: `color-mix()`** (Safari 16.2, Chrome 111, Firefox 113). Because the brand tokens are `var()` indirections, Tailwind cannot precompute an opacity-modified brand colour (`bg-primary/10`, `ring-primary/25`, `bg-ink/40`, the external Monogram's `bg-external/10`) for a browser without `color-mix()`: its no-`color-mix()` fallback becomes the opaque token (a solid focus ring, a solid backdrop, ochre text on an ochre chip), where today's literal tokens degrade to a translucent tint. Tailwind v4's own floor (Safari 16.4, Chrome 111, Firefox 128) already lies above it, so no browser either app supports sees a difference, and the Chromium-only G2/G3 gates cannot see it by construction. Recorded in `TOKENS.md` and the 1.0.0 CHANGELOG; not worked around.
 
 ### 8.4 App `globals.css` and `brand.css`
 
@@ -771,7 +811,7 @@ These run in `checkVendor()`, the sync pre-flight and the library `tokens` test,
 
 Legend:
 - **Source** says which app's copy the library takes.
-- **Same** means byte-identical in both apps today (28 of the 33 shared files).
+- **Same** means byte-identical in both apps at the survey (28 of the 33 shared files). **Three of those have moved since:** on 2026-09-30 Workforce Ops changed `button.tsx`, `date-input.tsx` and `dialog.tsx` (rows 5, 11, 13, marked **WFO ahead**). The library takes FinaOps' copies, which are what the survey saw; what 1.0.0 does about the Workforce Ops changes is the open decision in §12.4 ("Found while proving 1.0 (L6)"), and until it is recorded these three rows cannot be read as "same".
 - Every file's `@/` imports are replaced as in §7. That, plus `t.common.x` → `strings.x`, is the only change unless the row says otherwise.
 - **S** = server-safe (no directive). **C** = `"use client"`.
 
@@ -781,15 +821,15 @@ Legend:
 | 2 | attention-list.tsx | S | same | — | 11 / 10 |
 | 3 | back-link.tsx | C | same | — | via PageHeader, Button |
 | 4 | badge.tsx | S | same | — | 25 / 13 |
-| 5 | button.tsx | C | same | — | 115 / 40 |
+| 5 | button.tsx | C | same at the survey; **WFO ahead** (`ExternalButtonLink`, §12.4) | — (the WFO change: §12.4) | 115 / 40 |
 | 6 | callout.tsx | S | same | — | 26 / 13 |
 | 7 | card.tsx | S | same | — | 49 / 19 |
 | 8 | combobox.tsx | C | same | — | 16 / 6 |
 | 9 | confirm-dialog.tsx | C | **FinaOps** (the unused `useDict()` in `ConfirmDialog` removed) | — | 17 / 11 |
 | 10 | copy-value.tsx | C | same | — | 6 / 0 |
-| 11 | date-input.tsx | C | same | — | 42 / 5 |
+| 11 | date-input.tsx | C | same at the survey; **WFO ahead** (the calendar kept on screen, a bottom sheet on touch; §12.4) | — (the WFO change: §12.4) | 42 / 5 |
 | 12 | description-list.tsx | S | same | — | 10 / 8 |
-| 13 | dialog.tsx | C | same | label-matched discard guard kept until 2.0 | 62 / 12 |
+| 13 | dialog.tsx | C | same at the survey; **WFO ahead** (a bottom sheet below `sm`; §12.4) | label-matched discard guard kept until 2.0 (the WFO change: §12.4) | 62 / 12 |
 | 14 | empty-state.tsx | S | same | — | 28 / 16 |
 | 15 | field.tsx | C | same | — | 82 / 25 |
 | 16 | form-actions.tsx | S | same | — | 9 / 2 |
@@ -897,9 +937,11 @@ export function AppSwitcher(p: {
 - **`glyphs`:** a Badge needs an icon, and the icon names equal the `types.ts` unions.
 - **`manifest`:**
   - every file under `src/` and `styles/` is shipped by `ship.json`;
+  - `DESIGN.md`, `TOKENS.md`, `CHANGELOG.md` and the sync script with its declarations exist and are shipped (the sync skips a single-file rule whose source is absent, so a missing doc would otherwise ship silently);
   - every destination is on the allow-list;
   - `version.ts` equals `package.json`;
-  - `api-surface.d.txt` is current.
+  - `api-surface.d.txt` and `sync/sync-ops-ui.d.mts` are current.
+- **`shot-comparator`:** Playwright's own comparator, with the options `pnpm shots` uses (`gallery/shot-options.ts`), refuses a baseline repainted by one token step (primary → primary-hover, bg → surface, surface → surface-raised, one lightness hundredth), so the gate's tolerance can never silently widen again.
 - **`sync`:** runs the real `sync/sync-ops-ui.mjs` against temporary git repos (a fake library plus a fake app). It covers:
   - first pin;
   - an idempotent re-run (no diff);
@@ -913,8 +955,10 @@ export function AppSwitcher(p: {
   - an extension-name clash;
   - `--ref` giving `dev`, which `checkVendor` fails;
   - `--dry-run` writing nothing;
-  - self-update last;
-  - `--write-wrappers` never overwriting.
+  - self-update last, proved from the recorded order of the script's file operations;
+  - `--write-wrappers` never overwriting, and the export scan equal to the TypeScript AST for every component;
+  - OS litter in the vendor folder not counted as unknown;
+  - the kit's internal import graph (`kitDependents`, §6.4).
 
 ### 11.2 Gallery snapshots (`pnpm shots`, `pnpm shots:accept`)
 
@@ -932,9 +976,10 @@ export function AppSwitcher(p: {
 - **Matrix:** every story × 3 brands × {1440, 375}.
 - **Determinism:**
   - `reducedMotion: "reduce"`, a fixed clock (`page.clock`), and the caret hidden;
-  - Geist from the `geist` package;
+  - the page's timers paused (`page.clock.pauseAt`) the moment the story is ready, so a toast's 6 s fade never races a slow runner;
+  - Geist from the `geist` package, and a smoke check that GeistSans and GeistMono really load (a computed `font-family` names Geist even when only the fallback paints);
   - the Playwright Chromium version pinned in `gallery/playwright.config.ts`;
-  - `toHaveScreenshot` with `maxDiffPixels: 0` and a per-pixel `threshold: 0.1`.
+  - `toHaveScreenshot` with `maxDiffPixels: 0` and a per-pixel `threshold: 0` (`gallery/shot-options.ts`). Rendering is fully pinned, so any tolerance only hides real changes: at 0.1 a whole-page swap of one token for its neighbour counted as 0 changed pixels (the `shot-comparator` test, §11.1).
 - **Baselines** live in `gallery/__screenshots__/`, and only `pnpm shots:accept` writes them. That commit is then either part of a major, or a pure `shots: rebaseline (…)` commit (§4.1).
 
 ### 11.3 App tests (app-owned; `tests/ops-ui/`, PrefabOps `src/components/ui/*.test.ts`)
@@ -947,6 +992,8 @@ export function AppSwitcher(p: {
   - every vendored component module has a wrapper;
   - for pure wrappers (not binding, not `local`, no `KIT-OVERRIDE`), the runtime export names equal the vendored module's (via `Object.keys(await import(…))`).
 - Every `KIT-OVERRIDE until ops-ui X.Y` marker has X.Y > the locked version.
+- A `KIT-OVERRIDE` of a component is matched by a `KIT-OVERRIDE` wrapper for every module in `kitDependents(vendoredKitGraph(appRoot), name)` (§6.4); otherwise those vendored modules keep rendering the original.
+- PrefabOps' tsconfig has `allowJs` off: its import of `checkVendor` type-checks through the shipped `scripts/sync-ops-ui.d.mts`.
 
 **`bridge.test.tsx`:**
 - **Default-deny smoke:** `renderToStaticMarkup(<PermissionsProvider areas={[]}><WriteScope area={A}><Button>x</Button></WriteScope></PermissionsProvider>)` with `Button` imported from `@/components/ui/button` is `""`. With `areas={[A]}` it renders the button. A nested granted `WriteScope` re-opens.
@@ -963,7 +1010,7 @@ export function AppSwitcher(p: {
 cd /home/user/ops-ui
 node tools/app-shots.mjs capture --app ../fina-ops --label main     # on the app's main, dev server running
 node tools/app-shots.mjs capture --app ../fina-ops --label branch   # on the branch
-node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file listing pages allowed to differ>]
+node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file: pages allowed to differ, new routes, new tokens>]
 ```
 
 **`capture`:**
@@ -972,16 +1019,18 @@ node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file l
 - Masks the `mask` selectors, sets reduced motion and hides the caret.
 - Writes to `$TMPDIR/ops-ui-shots/<app>/<label>/`.
 
-**The token dump** is written beside the PNGs as `tokens.json`, once per width. For each name in the contract, plus `config.extensions`, plus every `--color-*`, `--text-*`, `--radius-*`, `--font-*` and `--ops-*` declared in `document.styleSheets`:
+**The token dump** is written beside the PNGs as `tokens.json`, once per width. For each name in the contract, plus `config.extensions`, plus every `--color-*`, `--text-*`, `--radius-*`, `--font-*` and `--ops-*` declared in `document.styleSheets`, it records **whether the name is declared** (in some rule of `document.styleSheets`) and its value:
 - **Colour tokens** are read through a probe element (`color: var(--x)`, then the computed `color`). So a serialization difference is not a false alarm, while a real value difference is.
 - **Other tokens** are read as the trimmed `getComputedStyle(documentElement)` value.
+- An undeclared name has no value: its colour probe would only read the inherited colour, and `getComputedStyle` gives `""`. It is recorded as undeclared, never compared as a value.
 
 **`compare`:**
-- Counts changed pixels per page with pixelmatch (per-pixel threshold 0.1) and writes red-overlay diff PNGs.
-- Diffs `tokens.json` exactly.
+- Counts changed pixels per page with the same comparison as the gallery (`gallery/shot-options.ts`: pixelmatch per-pixel threshold 0, 0 changed pixels) and writes red-overlay diff PNGs.
+- **Tokens (G3):** every name declared on `main` must be declared on the branch with an identical value. A name declared **only on the branch** passes only when the `--expect` file lists it as a new token with its value (for example `token --ops-toast-offset = 3.75rem`, `token --color-external = <the accent's computed colour>`), and the value matches; a name that disappears is a failure unless listed. New names are reported separately from changed ones.
+- **Routes:** a route that does not exist on `main` (a 404 there) is captured on the branch only and passes only when `--expect` lists it as a new route; it is reported as new, not diffed. From the next capture of `main` it is compared like any other route.
 - Exits 1 on any difference outside `--expect`.
 
-The route list always includes `/dev/kit`. It renders every vendored story with the app's real bridge, providers and brand, so a Tailwind class missing from the app's CSS shows up as a pixel diff.
+The route list always includes `/dev/kit`. It renders every vendored story with the app's real bridge, providers and brand (inside `StoryHost pageToaster`, §3.2), so a Tailwind class missing from the app's CSS shows up as a pixel diff. It is new at the step that adds it (F5, W6) and compared from then on.
 
 ---
 
@@ -998,8 +1047,8 @@ The route list always includes `/dev/kit`. It renders every vendored story with 
 - **Parallel sessions.** Other sessions edit these repos. The wrappers keep every import site, and the swap branches live hours, not days. Before merging, rebase and re-run G1–G3.
 - **Gates:**
   - **G1 code:** `pnpm typecheck && pnpm test && pnpm lint <changed files>` and `pnpm build`. WFO adds `RUN_DATABASE_TESTS=1 pnpm test` on local Postgres at the swap step. PrefabOps runs `npx tsc --noEmit && npm test` and `npm run build` in `apps/web`.
-  - **G2 pixels:** `app-shots` main vs branch, with 0 changed pixels on every route at 1440, 375 and 375-touch, including the read-only routes. Only the pages a step lists as **Expected** may differ, and only in the way it says.
-  - **G3 tokens:** `tokens.json` identical.
+  - **G2 pixels:** `app-shots` main vs branch, with 0 changed pixels (threshold 0) on every route at 1440, 375 and 375-touch, including the read-only routes. Only the pages a step lists as **Expected** may differ, and only in the way it says; a route a step adds (`/dev/kit`) is listed as a **new route**, captured on the branch only.
+  - **G3 tokens:** every token declared on `main` identical on the branch (§11.4). A token that exists only on the branch must be listed by the step as an **Expected new token** with its value.
   - **G4 by hand** (browser, 1440 and 375):
     1. A Dialog: type into a field, then Cancel. The discard prompt appears. Then ✕.
     2. Raise an error toast (it stays) and a success toast (it fades after 6 s).
@@ -1032,13 +1081,17 @@ The route list always includes `/dev/kit`. It renders every vendored story with 
   - From FinaOps, copy `shiftMonth` (`domain/months.ts`).
   - The import commit names the two source commits.
 - **L3 Decouple.** Apply §7, one commit per row, so the review is mechanical.
-- **L4 Styles, strings and types.** Write §8.1–8.2 and `config/strings.ts` (`EN_STRINGS` = WFO en `common`), and `types.ts`.
+- **L4 Styles, strings and types.** Write §8.1–8.2 and `config/strings.ts` (`EN_STRINGS` = WFO en `common`), and `types.ts`. Also `DESIGN.md`, the shared doctrine moved out of WFO's DESIGN.md with the app examples removed (written in the L6 review round; `TOKENS.md` holds the token contract), and `CHANGELOG.md` with its `## 1.0.0` section.
 - **L5 Tests, stories and baselines.** Build §11.1–11.2, and accept the baselines for 35 components × 3 brands × 2 widths.
 - **L6 Extraction proof.** Run `node tools/diff-against-app.mjs --app ../fina-ops` and `--app ../workforce-ops`.
   - For each component, it prints the diff against the app copy. It ignores import lines and the mechanical substitutions (`useDict()` → `useOpsUi()`, `t.common.x` → `strings.x`, `localizeMessage(t, s)` → `localize(s)`).
   - Against FinaOps, the diff must show only the changes named in the §9 "Change" column.
   - Against WFO, it may additionally show the FinaOps-side changes (rows 1, 9, 26, 32).
-- **L7** `pnpm release 1.0.0`.
+- **L7a Release and visual tooling.** Nothing after L6 can run without these, and no earlier step builds them.
+  - `tools/release.mjs` and the `release` package script (§4.2): the refusals, the gates, the semver classification from the diff since the previous release (changed baselines, api-surface, new required brand variables, `Breaking:`), the CHANGELOG checks, the two-file `release: vX.Y.Z` commit and the `release/vX.Y.Z` branch. Tests against temporary git repositories, like the sync's: each refusal, each classification, a bump below the required level refused, `--compatible` recorded.
+  - `tools/app-shots.mjs` (§11.4): `capture` (login, routes × widths + 375-touch, masks, the token dump with declared/undeclared names) and `compare` (the exact pixel comparison of `gallery/shot-options.ts`, the G3 rules for names present on `main` and Expected new tokens, new routes, `--expect`). Tests on synthetic captures: identical passes; one changed pixel fails; a new token passes only when expected with its value; a vanished token fails; a new route passes only when expected.
+  - README and CLAUDE.md name the commands.
+- **L7b** `pnpm release 1.0.0`: after L7a and after the §12.4 decision "Found while proving 1.0 (L6)" is recorded (whatever it re-imports comes first). The release dates the CHANGELOG's `## 1.0.0` section.
 
 **Gate:**
 - library `pnpm typecheck && pnpm lint && pnpm test && pnpm shots` green;
@@ -1053,11 +1106,12 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
   - Set up the local fixtures: `pnpm db:fixtures`, with `WFO_API_URL`/`PREFAB_API_URL` commented out so no sync replaces them.
   - Run `app-shots capture --label main` on `main`.
 - **F1 Align `--color-info`.** Change it from 245 to 240 (and `-subtle`) in globals.css.
-  - **Expected:** info-toned Callouts, Badges and toasts shift 5° in hue. Nothing else changes.
+  - In the same `@theme` block, remove the double quotes from the palette comment (globals.css line 8: `(Saša, 2026-09-30: "a colour swap, to reflect finances more …")`, reworded without quote characters). It is harmless in Tailwind 4.3.3, but the sync pre-flight's theme-gotcha scanner (§5.2 step 4, §8.5 check 6) cannot know that and refuses it, so F2's first sync, and `--dry-run`, would be refused. It is a precondition of the first sync; the comment change alone renders nothing.
+  - **Expected:** info-toned Callouts, Badges and toasts shift 5° in hue. Nothing else changes (the comment edit: 0 pixels, identical token dump).
   - Gates: G1, G2 (expected). Merge.
 - **F2 Vendor only.**
   - Add `.gitattributes`, `ops-ui.config.json` and the ESLint ignore for `src/vendor/**`.
-  - Copy `scripts/sync-ops-ui.mjs` from the library once by hand, then run `node scripts/sync-ops-ui.mjs --version 1.0.0`.
+  - Copy `scripts/sync-ops-ui.mjs` from the library once by hand, then run `node scripts/sync-ops-ui.mjs --version 1.0.0` (it refuses while any `@theme` comment in globals.css holds a double quote: F1 removed FinaOps' one).
   - Add `@source "../vendor/ops-ui";` to globals.css.
   - Nothing imports the vendor folder yet.
   - Gates: G1, G2 zero.
@@ -1065,7 +1119,8 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
   - globals.css gets the §8.4 imports.
   - Add `brand.css` with the §8.4 FinaOps values.
   - Delete FinaOps' own `@theme` block (it has no extensions), its `@keyframes toast-in`, and its body/cursor/selection/motion/print/touch rules, which now come from `kit.css`, `base.css` and `app-feel.css`.
-  - Gates: G1, G2 zero, G3 identical.
+  - **Expected new tokens** (on every comparison against a `main` that does not have them yet, so F3 and, while unmerged, F4–F5): `--color-external` = the computed colour of FinaOps' accent `oklch(0.77 0.13 86)` (the vendored Monogram's `*-external` classes make Tailwind emit it, and `tokens.css` defaults it to the accent), and `--ops-toast-offset` = `3.75rem` (brand.css, until F7 a). Every token `main` declares stays identical.
+  - Gates: G1, G2 zero, G3 identical (plus the two expected new tokens).
 - **F4 Bridge and read-only.**
   - Wrap `I18nProvider` as in §6.3, and add `kit-contract.ts`.
   - Rewrite `permissions-provider.tsx` as in §6.3. The local kit files are still in place, and their `useReadOnlyScope` import now resolves to the library's context.
@@ -1079,8 +1134,8 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
      - If they match, `domain/search` re-exports `matchesAllWords`.
      - If a case differs, it is written into the commit message as "FinaOps pickers now match like Workforce Ops' pickers: <cases>", and it is accepted **only if no case makes a picker miss a row it finds today**. A narrowing stops the step for a decision.
   5. Add `tests/ops-ui/vendor.test.ts`.
-  6. Add the `/dev/kit` route.
-  - Gates: G1, G2 zero, G3 identical, G4 complete (fixtures provide the owner, editor and read-only users). Merge.
+  6. Add the `/dev/kit` route (§3.2: the page's first statement is `await requireSession()`, then `notFound()` in production, then the client `KitView` with `StoryHost pageToaster`).
+  - Gates: G1, G2 zero (`/dev/kit` listed as a **new route**: branch only), G3 identical (plus F3's expected new tokens while main lacks them), G4 complete (fixtures provide the owner, editor and read-only users). Merge.
 - **F6 Docs** (can ride with F5).
   - CLAUDE.md: replace the kit freeze with the standing rule: "`src/vendor/ops-ui` is GENERATED from @latro/ops-ui by `scripts/sync-ops-ui.mjs`; never edit it (`pnpm test` fails). `src/components/ui/*` are this app's kit names: re-exports plus the `record-tab` binding. A kit change = ops-ui PR → release → sync on a branch → G1–G4 → merge. Brand colours live in `src/app/brand.css`."
   - DESIGN.md keeps FinaOps' palette, mark and app sections, and points to `src/vendor/ops-ui/DESIGN.md` for the doctrine.
@@ -1114,7 +1169,7 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
   - **Expected:** zero changes. Icons appear on exactly the same routes; spot-check `/settings`, `/compliance`, `/hours`, `/whiteboard` and `/login`.
   - Gates: G1, G2 zero. Merge.
 - **W3 Vendor only**, as F2, with `extensions` and `local` set as in §3.3. Gates: G1, G2 zero.
-- **W4 Tokens**, as F3, with the §8.4 WFO `brand.css`. globals.css keeps its extension `@theme` (`tool`, `sick`, `sick-subtle`) and the gotcha comment. Gates: G1, G2 zero, G3 identical.
+- **W4 Tokens**, as F3, with the §8.4 WFO `brand.css`. globals.css keeps its extension `@theme` (`tool`, `sick`, `sick-subtle`) and the gotcha comment. **Expected new tokens** (as F3, until merged): `--color-external` = the computed colour of WFO's accent `oklch(0.64 0.13 60)`, and `--ops-toast-offset` = `3.75rem`. Gates: G1, G2 zero, G3 identical (plus the two expected new tokens).
 - **W5 Bridge and read-only**, as F4.
   - WFO keeps `GrantsContext`, `adminTools` and `useAdminTools`.
   - Because the bridge sits inside `I18nProvider`, it covers `(app)`, the whiteboard page, wall pairing and `(auth)/password`.
@@ -1124,7 +1179,8 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
   - `domain/hours-periods` re-exports `shiftMonth`, and `domain/compliance`'s type import moves to vendor types.
   - `tests/ui/toast.test.tsx` and `tests/ui/file-link.test.tsx` are deleted, because the library owns them now.
   - No text-parity test: WFO is the source of `lib/text`.
-  - Gates: G1 including `RUN_DATABASE_TESTS=1`, G2 zero, G3 identical, G4 complete. Then merge `--no-ff`, push, and G5.
+  - `/dev/kit` as in F5 (WFO's `RouteActionIconScope` switches ActionIcon off on `/dev`; `StoryHost` turns it back on for the stories).
+  - Gates: G1 including `RUN_DATABASE_TESTS=1`, G2 zero (`/dev/kit` a **new route**), G3 identical (plus W4's expected new tokens while main lacks them), G4 complete. Then merge `--no-ff`, push, and G5.
 - **W7 Docs.**
   - CLAUDE.md gets the standing rule of F6, with the bindings `record-tab` and `RouteActionIconScope`.
   - DESIGN.md's stale Components section (it lists 10 of 34 files) becomes a pointer to the vendored doctrine. Brand, mark, registers and the app sections stay.
@@ -1158,7 +1214,7 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
 **Found while building 1.0 (L5), not in 1.0** (1.0 renders and behaves exactly like the apps today):
 - **DateInput keyboard entry under reduced motion.** `base.css`'s `prefers-reduced-motion` rule gives every element `transition-duration: 0.01ms` while `transition-property` stays at its default `all`, so the calendar panel's `visibility: hidden → visible` is itself a transition: when the kit focuses the day, the panel is still hidden and the first ↓ (or the ▾ button) leaves focus in the field. Both apps behave this way today for anyone with reduced motion on. The gallery's keyboard-walk test runs with motion on (`gallery/tests/behaviour.spec.ts`). Candidate fix: focus the day once the panel is visible (a frame later), or scope the reduced-motion rule to elements that declare a transition. It changes CSS or timing, so it waits for the next planned release that may change them.
 
-**Found while proving 1.0 (L6), not in 1.0: Workforce Ops moved its kit after the survey. DECISION OPEN; it blocks L7 and W6.** On 2026-09-30, after the survey and before any kit-freeze note (F0/W0 have not run), four Workforce Ops commits changed three files §9 lists as **Same**. 1.0.0 is FinaOps' copy (the pure-extraction rule), so it carries none of them. `tools/diff-against-app.mjs` proves the rest of the extraction against both apps and names these three files as "Workforce Ops ahead" (`WFO_AHEAD`, with their line counts); it exits 1 until this entry records a decision. The output is in `docs/extraction-proof-1.0.0.md`.
+**Found while proving 1.0 (L6), not in 1.0: Workforce Ops moved its kit after the survey. DECISION OPEN; it blocks L7b and W6.** (§9 marks the three rows **WFO ahead**.) On 2026-09-30, after the survey and before any kit-freeze note (F0/W0 have not run), four Workforce Ops commits changed three files §9 lists as **Same**. 1.0.0 is FinaOps' copy (the pure-extraction rule), so it carries none of them. `tools/diff-against-app.mjs` proves the rest of the extraction against both apps and names these three files as "Workforce Ops ahead" (`WFO_AHEAD`, with their line counts); it exits 1 until this entry records a decision. The output is in `docs/extraction-proof-1.0.0.md`.
 - `button.tsx` (ce53be0): `ExternalButtonLink`, a button-styled plain `<a>` for `tel:`/`sms:`/`mailto:`/WhatsApp/Viber links (a Next Link would try to route them); read-only-safe. Additive: FinaOps' pixels are untouched by it. Used by WFO `components/recruiting/candidate-sheet.tsx`.
 - `date-input.tsx` (f364bd5, ae37fb7, ff90dde): the calendar stays whole on screen on phones (new `lib/floating-place.ts` `floatingTop`, with `maxHeight` + scroll; WFO test `tests/lib/floating-place.test.ts`), and on coarse pointers it opens as a bottom sheet: its own modal `<dialog>` in the top layer, full width, finger-sized Today/Clear, rising in via the new `lib/sheet-motion.ts` `riseSheet` (Saša on his iPhone: "the clear click doesn't register").
 - `dialog.tsx` (ff90dde): below `sm` every Dialog is a bottom sheet (docked, full width, rounded top corners, safe-area padding, `riseSheet`); from `sm` the centred card as before. WFO's DESIGN.md gained the rule.
@@ -1166,11 +1222,11 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
 Consequence: Workforce Ops cannot take 1.0.0 as written. At W6 the `button` wrapper would lack `ExternalButtonLink` (the build breaks), and G2 would show every phone Dialog and the touch calendar going back to the centred/floating versions (non-zero at 375 and 375-touch). It is not an extraction bug: the library matches its source.
 
 Options (for Saša; recommendation first):
-1. **Align FinaOps, then re-import before L7 (recommended).** A FinaOps commit before F2, in the F1 idiom, takes the four changes (`button.tsx`, `date-input.tsx`, `dialog.tsx`, `lib/floating-place.ts`, `lib/sheet-motion.ts`). **Expected:** Dialogs become bottom sheets at 375, the calendar opens as a sheet on touch and stays on screen; desktop unchanged. The library then re-imports the three files at FinaOps' new `main`, adds `lib/floating-place.ts` and `lib/sheet-motion.ts` (and ports the floating-place test), adds an `ExternalButtonLink` story, re-accepts the 375 baselines that change (Dialog, ConfirmDialog, DateInput open, and any story that opens a Dialog) and re-runs L6, with `WFO_AHEAD` emptied. The library is still 0.0.0, so this costs no semver level, and 1.0.0 equals both kits again (spec goal 4).
-2. **Release 1.0.0 as it is and carry them later.** `ExternalButtonLink` is additive (a 1.1.0 minor), but the bottom sheets change existing 375 baselines, so they need a major (2.0.0). Both would have to ship before W6, which reverses §0's order (1.1 after W6), or W6 takes `KIT-OVERRIDE` wrappers for `button`, `dialog` and `date-input` until they ship.
+1. **Align FinaOps, then re-import before L7b (recommended).** A FinaOps commit before F2, in the F1 idiom, takes the four changes (`button.tsx`, `date-input.tsx`, `dialog.tsx`, `lib/floating-place.ts`, `lib/sheet-motion.ts`). **Expected:** Dialogs become bottom sheets at 375, the calendar opens as a sheet on touch and stays on screen; desktop unchanged. The library then re-imports the three files at FinaOps' new `main`, adds `lib/floating-place.ts` and `lib/sheet-motion.ts` (and ports the floating-place test), adds an `ExternalButtonLink` story, re-accepts the 375 baselines that change (Dialog, ConfirmDialog, DateInput open, and any story that opens a Dialog) and re-runs L6, with `WFO_AHEAD` emptied. The library is still 0.0.0, so this costs no semver level, and 1.0.0 equals both kits again (spec goal 4).
+2. **Release 1.0.0 as it is and carry them later.** `ExternalButtonLink` is additive (a 1.1.0 minor), but the bottom sheets change existing 375 baselines, so they need a major (2.0.0). Both would have to ship before W6, which reverses §0's order (1.1 after W6), or W6 takes `KIT-OVERRIDE` wrappers until they ship. Those cannot stop at `button`, `dialog` and `date-input`: vendored modules render each other through relative imports (§6.4), so every `ConfirmDialog` would keep the centred vendored Dialog at 375. The override set is `button`, `dialog`, `date-input`, `confirm-dialog`, `record-tab` and `row-menu`: six local kit copies, close to forking the kit.
 3. Revert them in Workforce Ops (a W1-style align to the 1.0 source). It undoes phone fixes Saša asked for on 2026-09-30, so it is not recommended.
 
-Whatever is decided, the kit-freeze notes (F0/W0) should land in both apps' CLAUDE.md now, so the gap stops growing.
+Whatever is decided, the kit-freeze notes (F0/W0) should land in both apps' CLAUDE.md now, so the gap stops growing. `tools/diff-against-app.mjs` keeps the three files in `WFO_AHEAD` (exit 1 against Workforce Ops) until the decision is recorded here and applied.
 
 **Upgrade steps for 2.0:**
 - Remove `locale` from the bridge.
@@ -1239,7 +1295,7 @@ Whatever is decided, the kit-freeze notes (F0/W0) should land in both apps' CLAU
   - `error` → `danger`, which stays until dismissed. The adapter keeps Prefab's clear-on-route-change by dismissing the ids it raised.
   - `success` → `success`, which fades after 6 s.
   - `info` → `info`, which now stays until dismissed. This is an accepted change for 3 calls.
-- On phones (≤768px), `--ops-toast-offset: calc(var(--tab-bar-h, 64px) + var(--safe-bottom))`. While a Dialog is open, toasts draw inside it (the kit host rule), which replaces Prefab's "move to top while a sheet is open".
+- On phones (≤768px), `--ops-toast-offset: calc(var(--tab-bar-h, 64px) + var(--safe-bottom))`, set inside `@media (max-width: 768px) { :root { … } }` in `app.css`: a brand file may hold no at-rule (§8.5 check 1), so a responsive offset never goes into `brand.css`. While a Dialog is open, toasts draw inside it (the kit host rule), which replaces Prefab's "move to top while a sheet is open".
 - `FloatingPromptBridge` is deleted; only a test uses it.
 - **Gates:** notify tests updated; harness diff limited to toasts.
 
@@ -1316,7 +1372,7 @@ The alternative stays open. If Saša asks later, a library minor `styles/dark.cs
 | 7 | Brand variables set on a subtree | `:root`-only rule checked by the contract. The gallery sets `data-brand` on `<html>`. |
 | 8 | A release is spoofed, moved or ambiguous | Exactly one `release: vX` commit on `main`. The `release/vX` branch must agree. The lock pins the commit, and "release moved" is refused. |
 | 9 | The proxy refuses the `release/vX` push | The commit marker alone is enough. Tags are never used. |
-| 10 | Screenshot flakiness | Same container. Pinned Chromium. Reduced motion, fixed clock, local fonts. Probe-normalised token dump. Pure rebaseline commits are exempt from the semver rule. |
+| 10 | Screenshot flakiness | Same container. Pinned Chromium. Reduced motion, fixed clock with the page's timers paused once a story is ready, local fonts checked to have loaded. Probe-normalised token dump. Pure rebaseline commits are exempt from the semver rule. The comparison stays exact (threshold 0): flakiness is fixed at its cause, never by a tolerance that also hides one-step colour changes. |
 | 11 | A release is classified at the wrong semver level | Mechanical checks: baselines, api-surface, required brand variables. CHANGELOG `Visible:` and `Upgrade steps:` required for majors. `--compatible` is explicit and recorded. |
 | 12 | Friction: every kit fix needs a release | A patch release plus a sync takes minutes. `KIT-OVERRIDE` with an expiry version for emergencies. |
 | 13 | A session lacks the ops-ui repo | Exit 2 with the `add_repo` hint. The vendored copy, its DESIGN.md and its CHANGELOG stay readable in the app. |
@@ -1330,7 +1386,7 @@ The alternative stays open. If Saša asks later, a library minor `styles/dark.cs
 | 21 | PrefabOps: Tailwind generates utilities that match legacy class names | `source(none)` with explicit `@source` per migrated area, and the collision gate on every merge. |
 | 22 | PrefabOps: 5 `!important` legacy rules outrank kit `!` utilities (lower layer wins for important) | Listed at P2. Each is removed or scoped when its area migrates. |
 | 23 | PrefabOps: dark mode, toast timing, Escape-to-close, date format | Decided in §1.3 and §13.3. Each lands in the named step with its intended harness change. |
-| 24 | Security | No secrets or env reads in the library (boundary test). `/dev/kit` returns `notFound()` in production and sits under the authenticated `(app)` layout. No new credentials anywhere (§1.1). |
+| 24 | Security | No secrets or env reads in the library (boundary test). The `/dev/kit` page's first statement is `await requireSession()` (the apps' page-guard tests require a data-layer guard in every page; the `(app)` layout's check does not count), then it returns `notFound()` in production (§3.2). No new credentials anywhere (§1.1). |
 | 25 | Downtime | None (§0). Source-only atomic deploys. Rollback is a revert. |
 
 ---

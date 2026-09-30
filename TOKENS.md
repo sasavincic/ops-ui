@@ -116,6 +116,10 @@ uses). The kit reads it with a `var()` fallback.
 |---|---|---|
 | `--ops-toast-offset` | `0px` | the toast viewport: `bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + var(--ops-toast-offset, 0px))` |
 
+A fixed offset goes into `brand.css` (Workforce Ops' 3.75rem for its assistant bubble). An offset
+that changes with the screen (PrefabOps' phone tab bar, spec §13.2 P3) needs a media query, which
+a brand file may not hold (rule 1): it goes into the app's own stylesheet, never `brand.css`.
+
 ## App extensions
 
 | App | Tokens |
@@ -146,6 +150,16 @@ The fixed status pairs are the library's own colours, checked once by the librar
 | `--color-admin` | `--color-admin-subtle` | 6.54 |
 | `--color-info` | `--color-info-subtle` | 5.84 |
 | `white` | `--color-danger` | 6.81 |
+
+## Browser floor
+
+`color-mix()` (Safari 16.2, Chrome 111, Firefox 113). The brand tokens are `var()` indirections,
+so Tailwind cannot precompute an opacity-modified brand colour (`bg-primary/10`,
+`ring-primary/25`, `bg-ink/40`, the external Monogram's `bg-external/10`) for a browser without
+`color-mix()`: its fallback there is the opaque token (a solid focus ring, a solid backdrop),
+where a literal token degraded to a translucent tint. Tailwind v4's own floor (Safari 16.4,
+Chrome 111, Firefox 128) already lies above it, so no browser the apps support sees the
+difference; it is recorded here and in the 1.0.0 CHANGELOG, not worked around.
 
 ## Not tokens
 

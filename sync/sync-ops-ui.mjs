@@ -1473,6 +1473,75 @@ export function moduleExports(source) {
   return { runtime, types };
 }
 
+/**
+ * The kit's internal runtime imports: for every component module in `sources` (name -> source),
+ * the sibling components it imports at run time (`import type` and all-type specifier lists
+ * left out: they vanish at compile time). Kit files import each other RELATIVELY, so a wrapper
+ * cannot re-route them: ConfirmDialog always renders the vendored Dialog.
+ * @param {Map<string, string>} sources
+ * @returns {Map<string, string[]>}
+ */
+export function kitImportGraph(sources) {
+  /** @type {Map<string, string[]>} */
+  const graph = new Map();
+  for (const [name, source] of sources) {
+    /** @type {Set<string>} */
+    const deps = new Set();
+    for (const m of source.matchAll(/^import\s+(type\s+)?([^;]*?)\s*from\s*["']\.\/([a-z0-9-]+)["']/gm)) {
+      if (m[1]) continue;
+      const clause = m[2].trim();
+      const named = clause.match(/\{([^}]*)\}/);
+      const outside = clause.replace(/\{[^}]*\}/, "").replace(/,/g, "").trim();
+      const runtimeNamed = named
+        ? named[1].split(",").map((e) => e.trim()).filter((e) => e && !/^type\s/.test(e))
+        : [];
+      if (outside || runtimeNamed.length > 0) deps.add(m[3]);
+    }
+    graph.set(name, [...deps].filter((dep) => sources.has(dep)).sort());
+  }
+  return graph;
+}
+
+/**
+ * Every component that renders `name` at run time, directly or through another component: what a
+ * KIT-OVERRIDE of `name` must override too (spec §6.4), or those modules keep the vendored one.
+ * @param {Map<string, string[]>} graph from kitImportGraph
+ * @param {string} name
+ * @returns {string[]}
+ */
+export function kitDependents(graph, name) {
+  /** @type {Set<string>} */
+  const found = new Set();
+  const visit = (/** @type {string} */ target) => {
+    for (const [module, deps] of graph) {
+      if (deps.includes(target) && !found.has(module)) {
+        found.add(module);
+        visit(module);
+      }
+    }
+  };
+  visit(name);
+  found.delete(name);
+  return [...found].sort();
+}
+
+/**
+ * kitImportGraph of the vendored components of an app (for its vendor test's KIT-OVERRIDE check).
+ * @param {string} appRoot
+ */
+export function vendoredKitGraph(appRoot) {
+  const config = readConfig(appRoot);
+  const dir = path.join(appRoot, config.vendorDir, "components");
+  /** @type {Map<string, string>} */
+  const sources = new Map();
+  if (existsSync(dir)) {
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".tsx")).sort()) {
+      sources.set(file.slice(0, -4), readFileSync(path.join(dir, file), "utf8"));
+    }
+  }
+  return kitImportGraph(sources);
+}
+
 /** The import path of the vendor folder from the wrappers: the `@/` alias for src/, else relative. */
 function vendorImport(/** @type {AppConfig} */ config) {
   if (config.vendorDir.startsWith("src/")) return `@/${config.vendorDir.slice(4)}`;

@@ -80,7 +80,7 @@ The consequence: Workforce Ops cannot take 1.0.0 as written.
 - `ExternalButtonLink` is imported by `components/recruiting/candidate-sheet.tsx`.
 - The phone dialogs and the touch calendar would revert at W6.
 
-Spec §12.4 ("Found while proving 1.0 (L6)") gives three options. The recommendation is to align FinaOps first and re-import before L7. `tools/diff-against-app.mjs` records the three files in `WFO_AHEAD`, with their line counts, and exits 1 against Workforce Ops until that entry records a decision. **L7 (`pnpm release 1.0.0`) waits for it.**
+Spec §12.4 ("Found while proving 1.0 (L6)") gives three options. The recommendation is to align FinaOps first and re-import before L7b. `tools/diff-against-app.mjs` records the three files in `WFO_AHEAD`, with their line counts, and exits 1 against Workforce Ops until that entry records a decision. **L7b (`pnpm release 1.0.0`) waits for it** (and for L7a, the release and app-shots tooling).
 
 ## Output against FinaOps (verbatim)
 

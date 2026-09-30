@@ -24,9 +24,13 @@ describe("manifest", () => {
 
   it("ships the sync script and its declarations to scripts/, the docs beside the vendored code, and nothing else", () => {
     const outside = plan.filter((e) => !e.src.startsWith("src/") && !e.src.startsWith("styles/"));
-    expect(outside.map((e) => e.src).sort()).toEqual(
-      ["CHANGELOG.md", "DESIGN.md", "TOKENS.md", "sync/sync-ops-ui.d.mts", "sync/sync-ops-ui.mjs"].filter((f) => tracked.includes(f)).sort(),
-    );
+    // Every one of them must exist: the sync skips a single-file rule whose source is absent, so
+    // a missing DESIGN.md would ship silently and leave the apps' pointers to it dangling.
+    const required = ["CHANGELOG.md", "DESIGN.md", "TOKENS.md", "sync/sync-ops-ui.d.mts", "sync/sync-ops-ui.mjs"];
+    for (const file of required) expect(tracked, `${file} is committed`).toContain(file);
+    expect(outside.map((e) => e.src).sort()).toEqual(required.sort());
+    expect(plan.find((e) => e.src === "DESIGN.md")?.dest).toBe(`${VENDOR}/DESIGN.md`);
+    expect(plan.find((e) => e.src === "CHANGELOG.md")?.dest).toBe(`${VENDOR}/CHANGELOG.md`);
     expect(plan.find((e) => e.src === "sync/sync-ops-ui.mjs")?.dest).toBe(SYNC_DEST);
     expect(plan.find((e) => e.src === "sync/sync-ops-ui.d.mts")?.dest).toBe(SYNC_TYPES_DEST);
     expect(plan.find((e) => e.src === "TOKENS.md")?.dest).toBe(`${VENDOR}/TOKENS.md`);

@@ -187,7 +187,7 @@ export const LIBRARY_CHANGES = {
  * Workforce-Ops-only lines (removed) and FinaOps-only lines (added) in that file's app-kit diff,
  * so a further change in the app shows up again as unexplained. `decided` names the spec's
  * decision once there is one; until then the run fails (exit 1), because releasing 1.0.0 as it
- * is would foreclose the recommended option (align FinaOps, re-import before L7).
+ * is would foreclose the recommended option (align FinaOps, re-import before L7b).
  */
 export const WFO_AHEAD = {
   "button.tsx": {

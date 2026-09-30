@@ -262,6 +262,28 @@ export function moduleExports(source: string): {
     types: string[];
 };
 /**
+ * The kit's internal runtime imports: for every component module in `sources` (name -> source),
+ * the sibling components it imports at run time (`import type` and all-type specifier lists
+ * left out: they vanish at compile time). Kit files import each other RELATIVELY, so a wrapper
+ * cannot re-route them: ConfirmDialog always renders the vendored Dialog.
+ * @param {Map<string, string>} sources
+ * @returns {Map<string, string[]>}
+ */
+export function kitImportGraph(sources: Map<string, string>): Map<string, string[]>;
+/**
+ * Every component that renders `name` at run time, directly or through another component: what a
+ * KIT-OVERRIDE of `name` must override too (spec §6.4), or those modules keep the vendored one.
+ * @param {Map<string, string[]>} graph from kitImportGraph
+ * @param {string} name
+ * @returns {string[]}
+ */
+export function kitDependents(graph: Map<string, string[]>, name: string): string[];
+/**
+ * kitImportGraph of the vendored components of an app (for its vendor test's KIT-OVERRIDE check).
+ * @param {string} appRoot
+ */
+export function vendoredKitGraph(appRoot: string): Map<string, string[]>;
+/**
  * Creates a pure wrapper for every vendored component without one; never overwrites.
  * @param {string} appRoot
  * @param {(line: string) => void} log

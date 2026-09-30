@@ -17,6 +17,8 @@ import {
   blankNonCode,
   changelogBetween,
   checkVendor,
+  kitDependents,
+  kitImportGraph,
   moduleExports,
   satisfies,
   sha256,
@@ -640,6 +642,29 @@ describe("sync helpers", () => {
     expect(found).toEqual({ runtime, types });
     const mod = await import(path.join(ROOT, file));
     expect([...found.runtime].sort()).toEqual(Object.keys(mod).sort());
+  });
+
+  it("the kit's internal runtime imports, and what a KIT-OVERRIDE must override with it (spec §6.4)", () => {
+    const sources = new Map(components.map((file) => [path.basename(file, ".tsx"), readSource(file)]));
+    const graph = kitImportGraph(sources);
+    expect(graph.get("confirm-dialog")).toEqual(["button", "dialog"]);
+    expect(graph.get("dialog")).toEqual(["button", "toast"]); // its `import type` of action-icon is not a runtime edge
+    expect(graph.get("date-input")).toEqual(["field"]);
+    // The overrides §12.4 option 2 would need: each drags its importers along.
+    expect(kitDependents(graph, "dialog")).toEqual(["confirm-dialog"]);
+    expect(kitDependents(graph, "button")).toEqual(["confirm-dialog", "dialog", "record-tab", "row-menu"]);
+    expect(kitDependents(graph, "date-input")).toEqual([]);
+    expect(kitDependents(graph, "field")).toEqual(["combobox", "date-input", "search-form", "search-input", "url-select"]);
+    const synthetic = kitImportGraph(
+      new Map([
+        ["a", 'import { B } from "./b";\nimport type { C } from "./c";\n'],
+        ["b", 'import {\n  type T,\n  helper,\n} from "./c";\n'],
+        ["c", ""],
+        ["d", 'import { type OnlyAType } from "./a";\n'],
+      ]),
+    );
+    expect(Object.fromEntries(synthetic)).toEqual({ a: ["b"], b: ["c"], c: [], d: [] });
+    expect(kitDependents(synthetic, "c")).toEqual(["a", "b"]);
   });
 
   it("the CHANGELOG between two versions", () => {

@@ -9,9 +9,11 @@ keeps its own brand colour; everything else looks and behaves the same.
 - Spec (source of truth): [`docs/superpowers/specs/2026-09-30-ops-ui-library.md`](docs/superpowers/specs/2026-09-30-ops-ui-library.md)
 - Kit survey it was built from: [`docs/superpowers/specs/kit-inventory.md`](docs/superpowers/specs/kit-inventory.md)
 - Tokens and the brand contract an app's `brand.css` must meet: [`TOKENS.md`](TOKENS.md)
+- The shared design doctrine (actions, statuses, alerts, records, lists): [`DESIGN.md`](DESIGN.md)
+- What each release changed, and the upgrade steps: [`CHANGELOG.md`](CHANGELOG.md)
 - Working rules for contributors and Claude sessions: [`CLAUDE.md`](CLAUDE.md)
 
-**Status:** pre-1.0, being built in steps L1–L7 (spec §12.1). **1.0.0 is a
+**Status:** pre-1.0, being built in steps L1–L7b (spec §12.1). **1.0.0 is a
 pure extraction** of the FinaOps kit (`fina-ops/src/components/ui`, which is
 Workforce Ops' kit plus three small fixes) plus a few named Workforce Ops
 modules: it renders identically to today's kits.
@@ -92,8 +94,8 @@ fixture from `gallery/brands/`.
 ```
 src/            the library (relative imports only): components/, config/, lib/, navigation/, stories/, types.ts, version.ts
 styles/         tokens.css (@theme contract), kit.css, base.css, app-feel.css
-sync/           sync-ops-ui.mjs, shipped to each app as scripts/sync-ops-ui.mjs
-tools/          api-surface, pull-brands (L5), diff-against-app (L6); release, app-shots arrive with L7
+sync/           sync-ops-ui.mjs + its generated .d.mts, shipped to each app as scripts/sync-ops-ui.{mjs,d.mts}
+tools/          api-surface, pull-brands (L5), diff-against-app (L6); release, app-shots are built in L7a
 ship.json       what a release ships to an app, and where (read by the sync from the release commit)
 gallery/        Next app for stories and screenshots (brands/, tests/, __screenshots__/)
 tests/          vitest (node environment, renderToStaticMarkup)
