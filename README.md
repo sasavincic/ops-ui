@@ -8,6 +8,7 @@ keeps its own brand colour; everything else looks and behaves the same.
 
 - Spec (source of truth): [`docs/superpowers/specs/2026-09-30-ops-ui-library.md`](docs/superpowers/specs/2026-09-30-ops-ui-library.md)
 - Kit survey it was built from: [`docs/superpowers/specs/kit-inventory.md`](docs/superpowers/specs/kit-inventory.md)
+- Tokens and the brand contract an app's `brand.css` must meet: [`TOKENS.md`](TOKENS.md)
 - Working rules for contributors and Claude sessions: [`CLAUDE.md`](CLAUDE.md)
 
 **Status:** pre-1.0, being built in steps L1–L7 (spec §12.1). **1.0.0 is a

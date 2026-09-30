@@ -164,5 +164,31 @@ or scratch exports.
   literal `"Close"`/`"Open"`/`"Tabs"` defaults stay (§7 "Unchanged in 1.0").
   Nothing is excluded from `tsconfig.json` or the ESLint import boundary any
   more; `tests/no-app-alias.test.ts` fails on any `@/` text under `src/`.
-- L4 Styles, strings and types · L5 Tests, stories and baselines · L6
-  Extraction proof · L7 `pnpm release 1.0.0`: pending (spec §12.1).
+- **L4 Styles, strings and types** (2026-09-30): `styles/tokens.css` = spec
+  §8.2 verbatim (15 fixed, 10 required, 1 role, 7 tint, 2 tunable);
+  `styles/kit.css` (`@keyframes toast-in`), `styles/base.css` (body, cursor,
+  `::selection`, reduced motion, the `[data-print-root]` print sheet) and
+  `styles/app-feel.css` (`html, body` touch-action, coarse-pointer overscroll)
+  are the apps' non-theme globals.css rules word for word (identical in both
+  apps at origin/main; only the `html`/`body` touch-action pair was merged
+  into one rule). The gallery imports the four in the app order (§8.4).
+  `TOKENS.md` is the contract table; `tests/tokens.test.ts` fails when it and
+  tokens.css disagree. The contract checks (§8.5 checks 1-4: brand.css shape,
+  required variables, tint/tunable bounds, contrast via OKLCH to sRGB) and the
+  theme-gotcha scanner (check 6) live in `sync/sync-ops-ui.mjs` as exports
+  (`parseTokenContract`, `checkBrandCss`, `themeGotchas`, ...): that file so
+  far carries ONLY the contract; the §5 commands land on top of it in L5
+  (running it directly exits 2 saying so). The tokens test also compiles
+  tokens.css with the pinned Tailwind and requires every declaration back,
+  value for value, and reproduces the spec's contrast numbers (7.44, 9.32...).
+  `pnpm shots` gained a per-brand smoke check that the tokens resolve through
+  the brand in the built gallery (colours compared as painted pixels: the
+  build writes oklch() as hex + lab(), and Chromium serialises lab as lab).
+  `config/strings.ts`, `config/provider.tsx`, `config/read-only.tsx` and
+  `types.ts` (from L3) were checked against spec §6 and WFO origin/main
+  `common` (identical); `tests/config.test.tsx` and `tests/types.test.ts`
+  cover them (keys, English defaults, provider defaults and partials,
+  localize, nested read-only scopes, Button/Input/DateInput in a scope, the
+  seven React-free types re-exported by their components).
+- L5 Tests, stories and baselines · L6 Extraction proof · L7
+  `pnpm release 1.0.0`: pending (spec §12.1).
