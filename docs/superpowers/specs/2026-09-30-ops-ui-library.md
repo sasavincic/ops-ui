@@ -1155,6 +1155,9 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
 - GlanceCard's default label becomes `strings.open`, and the toast and field "Close" fallbacks become `strings.close`.
 - The Dialog and Sheet discard guards match only the `data-ops-*` markers and ask through the kit `ConfirmDialog` instead of `window.confirm`.
 
+**Found while building 1.0 (L5), not in 1.0** (1.0 renders and behaves exactly like the apps today):
+- **DateInput keyboard entry under reduced motion.** `base.css`'s `prefers-reduced-motion` rule gives every element `transition-duration: 0.01ms` while `transition-property` stays at its default `all`, so the calendar panel's `visibility: hidden → visible` is itself a transition: when the kit focuses the day, the panel is still hidden and the first ↓ (or the ▾ button) leaves focus in the field. Both apps behave this way today for anyone with reduced motion on. The gallery's keyboard-walk test runs with motion on (`gallery/tests/behaviour.spec.ts`). Candidate fix: focus the day once the panel is visible (a frame later), or scope the reduced-motion rule to elements that declare a transition. It changes CSS or timing, so it waits for the next planned release that may change them.
+
 **Upgrade steps for 2.0:**
 - Remove `locale` from the bridge.
 - `rg -n 't\.common\.cancel' src` finds hand-built Cancel buttons inside a Dialog or Sheet. Add `data-ops-dismiss` to each.

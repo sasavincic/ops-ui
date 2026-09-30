@@ -1,4 +1,39 @@
 import type { ReactNode } from "react";
+import { stories as actionIcon } from "./action-icon.stories";
+import { stories as attentionList } from "./attention-list.stories";
+import { stories as backLink } from "./back-link.stories";
+import { stories as badge } from "./badge.stories";
+import { stories as button } from "./button.stories";
+import { stories as callout } from "./callout.stories";
+import { stories as card } from "./card.stories";
+import { stories as combobox } from "./combobox.stories";
+import { stories as confirmDialog } from "./confirm-dialog.stories";
+import { stories as copyValue } from "./copy-value.stories";
+import { stories as dateInput } from "./date-input.stories";
+import { stories as descriptionList } from "./description-list.stories";
+import { stories as dialog } from "./dialog.stories";
+import { stories as emptyState } from "./empty-state.stories";
+import { stories as field } from "./field.stories";
+import { stories as formActions } from "./form-actions.stories";
+import { stories as glanceCard } from "./glance-card.stories";
+import { stories as kicker } from "./kicker.stories";
+import { stories as monogram } from "./monogram.stories";
+import { stories as monthNav } from "./month-nav.stories";
+import { stories as pageHeader } from "./page-header.stories";
+import { stories as pageHelp } from "./page-help.stories";
+import { stories as recordTab } from "./record-tab.stories";
+import { stories as rowMenu } from "./row-menu.stories";
+import { stories as searchForm } from "./search-form.stories";
+import { stories as searchInput } from "./search-input.stories";
+import { stories as segmented } from "./segmented.stories";
+import { stories as sheet } from "./sheet.stories";
+import { stories as stateMark } from "./state-mark.stories";
+import { stories as statusIcon } from "./status-icon.stories";
+import { stories as table } from "./table.stories";
+import { stories as tabs } from "./tabs.stories";
+import { stories as tag } from "./tag.stories";
+import { stories as toast } from "./toast.stories";
+import { stories as urlSelect } from "./url-select.stories";
 
 /**
  * One rendered state of a component, shot by the gallery (every story x brand x
@@ -11,8 +46,48 @@ export type Story = { name: string; render: () => ReactNode; open?: string };
 /** The stories of one component module (`<component>.stories.tsx`). */
 export type StoryGroup = { component: string; stories: readonly Story[] };
 
-/** The registry. Each `<component>.stories.tsx` is listed here. */
-export const STORY_GROUPS: readonly StoryGroup[] = [];
+/**
+ * The registry: one group per kit component, in file order. Each story module is a client
+ * module, so read the registry from a client component (a server component cannot iterate a
+ * client module's exports) - the gallery's StoryIndex / StoryView, an app's /dev/kit view.
+ */
+export const STORY_GROUPS: readonly StoryGroup[] = [
+  { component: "action-icon", stories: actionIcon },
+  { component: "attention-list", stories: attentionList },
+  { component: "back-link", stories: backLink },
+  { component: "badge", stories: badge },
+  { component: "button", stories: button },
+  { component: "callout", stories: callout },
+  { component: "card", stories: card },
+  { component: "combobox", stories: combobox },
+  { component: "confirm-dialog", stories: confirmDialog },
+  { component: "copy-value", stories: copyValue },
+  { component: "date-input", stories: dateInput },
+  { component: "description-list", stories: descriptionList },
+  { component: "dialog", stories: dialog },
+  { component: "empty-state", stories: emptyState },
+  { component: "field", stories: field },
+  { component: "form-actions", stories: formActions },
+  { component: "glance-card", stories: glanceCard },
+  { component: "kicker", stories: kicker },
+  { component: "monogram", stories: monogram },
+  { component: "month-nav", stories: monthNav },
+  { component: "page-header", stories: pageHeader },
+  { component: "page-help", stories: pageHelp },
+  { component: "record-tab", stories: recordTab },
+  { component: "row-menu", stories: rowMenu },
+  { component: "search-form", stories: searchForm },
+  { component: "search-input", stories: searchInput },
+  { component: "segmented", stories: segmented },
+  { component: "sheet", stories: sheet },
+  { component: "state-mark", stories: stateMark },
+  { component: "status-icon", stories: statusIcon },
+  { component: "table", stories: table },
+  { component: "tabs", stories: tabs },
+  { component: "tag", stories: tag },
+  { component: "toast", stories: toast },
+  { component: "url-select", stories: urlSelect },
+];
 
 /** URL-safe id of a story: `button--matrix`, `dialog--open-with-error`. */
 export function storyId(component: string, name: string): string {

@@ -43,6 +43,7 @@ export default defineConfig({
     cwd: repoRoot,
     url: `http://127.0.0.1:${PORT}/workforce`,
     reuseExistingServer: false,
+    stdout: "pipe",
     timeout: 240_000,
   },
 });

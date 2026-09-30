@@ -74,16 +74,17 @@ for (const brand of BRANDS) {
     expect(read.touchAction).toBe("pan-x pan-y");
   });
 
+  // The matrix (spec §11.2): every story x 3 brands x {1440, 375}, 0 changed pixels.
   for (const group of STORY_GROUPS) {
     for (const story of group.stories) {
       const id = storyId(group.component, story.name);
       test(`${brand}/${id}`, async ({ page }) => {
         await page.goto(`/${brand}/${id}`);
-        const frame = page.locator(`[data-story="${id}"]`);
-        await expect(frame).toBeVisible();
+        // Hydrated: the story's own mount effects (showModal, toasts pushed on mount) have run.
+        await page.locator(`[data-story="${id}"][data-ready]`).waitFor();
         await page.evaluate(() => document.fonts.ready);
         if (story.open) await page.locator(story.open).first().click();
-        await expect(page).toHaveScreenshot(`${brand}/${id}.png`, { fullPage: true });
+        await expect(page).toHaveScreenshot([brand, `${id}.png`], { fullPage: true });
       });
     }
   }

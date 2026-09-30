@@ -675,6 +675,74 @@ export declare function startTrail(url: string): NavTrailState;
 export declare function navigateTrail(state: NavTrailState, url: string, mode: "push" | "replace"): NavTrailState;
 export declare function backTarget(state: NavTrailState | null, path: string, fallback: string): BackDestination;
 
+// src/stories/action-icon.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/attention-list.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/back-link.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/badge.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/button.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/callout.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/card.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/combobox.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/confirm-dialog.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/copy-value.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/date-input.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/description-list.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/dialog.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/empty-state.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/field.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/form-actions.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/glance-card.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
 // src/stories/index.d.ts
 import type { ReactNode } from "react";
 export type Story = {
@@ -692,6 +760,89 @@ export declare function findStory(id: string): {
     group: StoryGroup;
     story: Story;
 } | null;
+
+// src/stories/kicker.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/monogram.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/month-nav.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/page-header.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/page-help.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/record-tab.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/row-menu.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/search-form.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/search-input.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/segmented.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/sheet.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/state-mark.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/status-icon.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/story-layout.d.ts
+export declare function Stack({ children, className }: {
+    children: React.ReactNode;
+    className?: string;
+}): import("react").JSX.Element;
+export declare function Row({ label, children, className, }: {
+    label: string;
+    children: React.ReactNode;
+    className?: string;
+}): import("react").JSX.Element;
+
+// src/stories/table.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/tabs.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/tag.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/toast.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/url-select.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
 
 // src/types.d.ts
 export type BadgeVariant = "neutral" | "success" | "warning" | "danger" | "info";
