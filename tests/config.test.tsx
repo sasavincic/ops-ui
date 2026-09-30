@@ -2,17 +2,13 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Button } from "../src/components/button";
 import { CopyValue } from "../src/components/copy-value";
-import { DateInput } from "../src/components/date-input";
-import { Input } from "../src/components/field";
 import { OpsUiProvider, useOpsUi } from "../src/config/provider";
-import { ReadOnlyScope, useReadOnlyScope } from "../src/config/read-only";
 import { EN_STRINGS, type OpsUiStrings } from "../src/config/strings";
 
-// The runtime contract (spec §6): the words the kit says (OpsUiStrings / EN_STRINGS), the
-// provider an app mounts inside its own I18nProvider (strings, localize, locale), and the one
-// read-only scope the app's WriteScope renders.
+// The runtime contract (spec §6.1): the words the kit says (OpsUiStrings / EN_STRINGS) and the
+// provider an app mounts inside its own I18nProvider (strings, localize, locale). The read-only
+// scope the app's WriteScope renders (§6.2) is tests/read-only.test.tsx.
 
 const root = path.resolve(__dirname, "..");
 const read = (rel: string) => readFileSync(path.join(root, rel), "utf8");
@@ -85,9 +81,13 @@ describe("config/strings (spec §6.1)", () => {
   });
 
   it("the English fallbacks hard-coded in the kit say what EN_STRINGS says", () => {
-    // Unchanged in 1.0 on purpose (spec §7): the toast's "Close" and GlanceCard's "Open".
+    // Unchanged in 1.0 on purpose (spec §7): the toast's and useAnchoredToast's "Close" (which
+    // Field passes through) and GlanceCard's "Open".
     expect(read("src/components/toast.tsx")).toContain(`closeLabel = "${EN_STRINGS.close}"`);
     expect(read("src/components/glance-card.tsx")).toContain(`openLabel = "${EN_STRINGS.open}"`);
+    expect(read("src/components/toast.tsx")).toMatch(new RegExp(`closeLabel = "${EN_STRINGS.close}"[^]*closeLabel = "${EN_STRINGS.close}"`));
+    // "Tabs" has no EN_STRINGS key in 1.0: it becomes the optional strings.tabs (default "Tabs") in 1.1.
+    expect(read("src/components/tabs.tsx")).toContain('aria-label="Tabs"');
   });
 
   it("every string the kit reads is a key of OpsUiStrings", () => {
@@ -172,63 +172,5 @@ describe("OpsUiProvider / useOpsUi (spec §6.1)", () => {
     );
     expect(html).toContain('title="Kopiraj"');
     expect(html).toContain('aria-label="Kopiraj: LM-2026-001"');
-  });
-});
-
-function ScopeProbe() {
-  return <i>{String(useReadOnlyScope())}</i>;
-}
-
-describe("ReadOnlyScope / useReadOnlyScope (spec §6.2)", () => {
-  it("defaults to writable outside a scope", () => {
-    expect(renderToStaticMarkup(<ScopeProbe />)).toBe("<i>false</i>");
-  });
-
-  it("provides its value, and a nested readOnly={false} re-opens a subtree", () => {
-    expect(
-      renderToStaticMarkup(
-        <ReadOnlyScope readOnly>
-          <ScopeProbe />
-          <ReadOnlyScope readOnly={false}>
-            <ScopeProbe />
-          </ReadOnlyScope>
-        </ReadOnlyScope>,
-      ),
-    ).toBe("<i>true</i><i>false</i>");
-  });
-
-  it("a Button inside a read-only scope renders nothing unless it is readOnlySafe", () => {
-    expect(
-      renderToStaticMarkup(
-        <ReadOnlyScope readOnly>
-          <Button>Save</Button>
-        </ReadOnlyScope>,
-      ),
-    ).toBe("");
-    expect(
-      renderToStaticMarkup(
-        <ReadOnlyScope readOnly>
-          <Button readOnlySafe>Show all</Button>
-        </ReadOnlyScope>,
-      ),
-    ).toContain(">Show all</button>");
-    expect(
-      renderToStaticMarkup(
-        <ReadOnlyScope readOnly>
-          <ReadOnlyScope readOnly={false}>
-            <Button>Save</Button>
-          </ReadOnlyScope>
-        </ReadOnlyScope>,
-      ),
-    ).toContain(">Save</button>");
-  });
-
-  it("fields and the date input come up disabled inside a read-only scope", () => {
-    const inScope = (node: React.ReactNode) => renderToStaticMarkup(<ReadOnlyScope readOnly>{node}</ReadOnlyScope>);
-    expect(renderToStaticMarkup(<Input name="a" />)).not.toMatch(/ disabled=""/);
-    expect(inScope(<Input name="a" />)).toMatch(/<input[^>]* disabled=""/);
-    expect(inScope(<Input name="a" readOnlySafe />)).not.toMatch(/ disabled=""/);
-    expect(renderToStaticMarkup(<DateInput name="d" />)).not.toMatch(/<input[^>]* disabled=""/);
-    expect(inScope(<DateInput name="d" />)).toMatch(/<input[^>]* disabled=""/);
   });
 });
