@@ -67,10 +67,13 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm shots
 ```
 
 Never commit red. `pnpm shots` builds the gallery, compares every story ×
-3 brands × {1440, 375} against `gallery/__screenshots__/` with 0 changed
-pixels at a per-pixel threshold of 0 (`gallery/shot-options.ts`; never widen
-it: `tests/shot-comparator.test.ts` proves one token step is refused), and runs
-the browser behaviour tests (`gallery/tests/behaviour.spec.ts`).
+3 brands × {1440, 375} against `gallery/__screenshots__/` byte for byte
+(`gallery/shot-options.ts`: `toHaveScreenshot` at 0 changed pixels and a
+per-pixel threshold of 0, then `exactDiff` on every RGBA byte, because
+Playwright's comparator skips anti-aliased edge pixels at any threshold; never
+widen either: `tests/shot-comparator.test.ts` proves one token step and an
+edge-only change are refused), and runs the browser behaviour tests
+(`gallery/tests/behaviour.spec.ts`).
 `pnpm test` includes the api-surface check: after changing a declaration under
 `src/` or the sync script's JSDoc, run `pnpm api-surface` and commit
 `api-surface.d.txt` and `sync/sync-ops-ui.d.mts` (the sync script's

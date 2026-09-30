@@ -3,14 +3,16 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { PNG } from "pngjs";
 import { describe, expect, it } from "vitest";
-import { SHOT_COMPARISON } from "../gallery/shot-options";
+import { SHOT_COMPARISON, exactDiff } from "../gallery/shot-options";
 import { parseColour } from "../sync/sync-ops-ui.mjs";
 import { ROOT, readSource } from "./source-files";
 
-// The shot gate's own tolerance, proved (spec §11.2): Playwright's comparator, with the options
-// `pnpm shots` uses, must refuse a baseline repainted by ONE token step. With pixelmatch's
-// threshold 0.1 every case below passed as "0 changed pixels", so a kit edit that swapped
-// bg-primary for bg-primary-hover (or dropped a tint) would have shipped as a patch.
+// The shot gate's own tolerance, proved (spec §11.2). Both layers of gallery/shot-options.ts must
+// refuse a baseline repainted by ONE token step: Playwright's comparator with the options
+// `pnpm shots` gives `toHaveScreenshot` (with pixelmatch's threshold 0.1 every step below passed
+// as "0 changed pixels"), and `exactDiff`, the gate itself. Playwright's comparator skips every
+// pixel it takes for anti-aliasing at any threshold, so an edge-only change (a corner radius, a
+// font weight) passes it: `exactDiff`, run after every toHaveScreenshot, is what refuses that.
 
 const require = createRequire(import.meta.url);
 const testPkg = path.dirname(require.resolve("@playwright/test/package.json"));
@@ -62,9 +64,18 @@ describe("the shot comparison is exact", () => {
     expect(config.replace(/\/\/[^\n]*/g, "")).not.toMatch(/threshold|maxDiffPixel|comparator/);
   });
 
+  it("the shot matrix runs the exact comparison after every toHaveScreenshot", () => {
+    const spec = readSource("gallery/tests/shots.spec.ts");
+    const shots = spec.match(/await expect\(page\)\.toHaveScreenshot\(([^,]+), [^\n]*\n\s*await expectExactShot\(page, testInfo, ([^)]+)\)/g) ?? [];
+    expect(shots.length).toBe((spec.match(/toHaveScreenshot\(/g) ?? []).length);
+    expect(shots.length).toBeGreaterThan(0);
+    expect(spec).toMatch(/const result = exactDiff\(actual, baseline\);/);
+  });
+
   it("an unchanged baseline passes", () => {
     const png = baseline("1440/workforce/button--matrix.png");
     expect(compare(png, png, SHOT_COMPARISON)).toBeNull();
+    expect(exactDiff(png, png)).toEqual({ changed: 0, sizeMismatch: null, diff: null });
   });
 
   const steps: { name: string; file: string; from: [number, number, number]; to: [number, number, number] }[] = [
@@ -79,5 +90,83 @@ describe("the shot comparison is exact", () => {
     expect(count, "the baseline holds pixels of the token").toBeGreaterThan(20);
     const result = compare(buffer, baseline(file), SHOT_COMPARISON);
     expect(result?.errorMessage).toMatch(/pixels .* are different/);
+    expect(exactDiff(buffer, baseline(file)).changed).toBe(count);
+  });
+
+  it.each(["1440/workforce/button--matrix.png", "375/finaops/dialog--form.png"])(
+    "%s with every glyph and corner edge lightened: Playwright's comparator lets it through, exactDiff refuses it",
+    (file) => {
+      const { count, buffer } = lightenEdges(file);
+      expect(count, "the baseline has anti-aliased edges").toBeGreaterThan(500);
+      // The construction is edge-only: Playwright's comparator, with the options toHaveScreenshot
+      // gets, reports nothing. This is why the exact comparison runs after it.
+      expect(compare(buffer, baseline(file), SHOT_COMPARISON)).toBeNull();
+      const exact = exactDiff(buffer, baseline(file));
+      expect(exact.changed).toBe(count);
+      expect(exact.sizeMismatch).toBeNull();
+      expect(exact.diff).not.toBeNull();
+    },
+  );
+
+  it("a size change is refused", () => {
+    const png = PNG.sync.read(baseline("1440/workforce/button--matrix.png"));
+    const taller = new PNG({ width: png.width, height: png.height + 1 });
+    png.data.copy(taller.data);
+    const exact = exactDiff(PNG.sync.write(taller), baseline("1440/workforce/button--matrix.png"));
+    expect(exact.sizeMismatch).toBe(`expected ${png.width}x${png.height}, received ${png.width}x${png.height + 1}`);
+    expect(exact.changed).toBeGreaterThan(0);
   });
 });
+
+/**
+ * A baseline with its anti-aliased edges lightened, and nothing else: every pixel lying between a
+ * darker and a lighter neighbour (a glyph or corner edge) is raised by 12 levels, then any pixel
+ * Playwright's comparator counts as a real difference is put back, until it counts none. What is
+ * left is the kind of change a corner radius or a thinner font makes.
+ */
+function lightenEdges(file: string) {
+  const expected = baseline(file);
+  const base = PNG.sync.read(expected);
+  const edited = PNG.sync.read(expected);
+  const { width, height } = base;
+  const lum = (i: number) => 0.299 * base.data[i] + 0.587 * base.data[i + 1] + 0.114 * base.data[i + 2];
+  const touched = new Set<number>();
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = (y * width + x) * 4;
+      let darker = 0;
+      let lighter = 0;
+      let same = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const n = lum(((y + dy) * width + x + dx) * 4);
+          if (n < lum(i)) darker += 1;
+          else if (n > lum(i)) lighter += 1;
+          else same += 1;
+        }
+      }
+      if (darker && lighter && same <= 2) {
+        for (let c = 0; c < 3; c++) edited.data[i + c] = Math.min(255, base.data[i + c] + 12);
+        touched.add(i);
+      }
+    }
+  }
+  for (let round = 0; round < 10; round++) {
+    const result = compare(PNG.sync.write(edited), expected, SHOT_COMPARISON) as { diff?: Buffer } | null;
+    if (!result) break;
+    const diff = PNG.sync.read(result.diff as Buffer);
+    for (const i of touched) {
+      // Playwright's diff paints a counted pixel red and a skipped (anti-aliased) one yellow.
+      if (diff.data[i] === 255 && diff.data[i + 1] === 0 && diff.data[i + 2] === 0) {
+        for (let c = 0; c < 3; c++) edited.data[i + c] = base.data[i + c];
+        touched.delete(i);
+      }
+    }
+  }
+  let count = 0;
+  for (let i = 0; i < base.data.length; i += 4) {
+    if ([0, 1, 2, 3].some((c) => edited.data[i + c] !== base.data[i + c])) count += 1;
+  }
+  return { count, buffer: PNG.sync.write(edited) };
+}

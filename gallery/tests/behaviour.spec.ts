@@ -164,14 +164,40 @@ test.describe("desktop behaviour", () => {
     await withDate.fill("5.6.84");
     await withDate.blur();
     await expect(withDate).toHaveValue("05-06-1984");
-    const posted = page.locator('input[type="hidden"][name="startDate"]');
-    await expect(posted).toHaveValue("1989-11-23");
     const beforeMin = page.getByLabel("Before its minimum");
     await expect(beforeMin).toHaveAttribute("aria-invalid", "true");
     expect(await beforeMin.evaluate((el: HTMLInputElement) => el.validationMessage)).toBe(
       EN_STRINGS.datePicker.earliest.replace("{date}", "01-10-2026"),
     );
     await expect(page.getByLabel("In a read-only scope")).toBeDisabled();
+  });
+
+  test("DateInput: the named field posts the ISO date it shows, typed, picked or cleared", async ({ page }) => {
+    await open(page, "date-input--states");
+    // The uncontrolled field under `name` is the one a form posts. Every step writes a date other
+    // than its default, so a hidden input stuck on defaultValue cannot pass.
+    const field = page.getByLabel("Uncontrolled, posting its ISO value");
+    const posted = page.locator('input[type="hidden"][name="startDate"]');
+    await expect(posted).toHaveCount(1);
+    await expect(posted).toHaveValue("1989-11-23");
+
+    await field.fill("05061984");
+    await field.blur();
+    await expect(field).toHaveValue("05-06-1984");
+    await expect(posted).toHaveValue("1984-06-05");
+
+    await field.click();
+    const calendar = page.getByRole("dialog", { name: EN_STRINGS.datePicker.openCalendar });
+    await expect(calendar.getByRole("button", { name: "June 1984" })).toBeVisible();
+    await calendar.getByRole("button", { name: "12-06-1984" }).click();
+    await expect(calendar).toBeHidden();
+    await expect(field).toHaveValue("12-06-1984");
+    await expect(posted).toHaveValue("1984-06-12");
+
+    await field.click();
+    await calendar.getByRole("button", { name: EN_STRINGS.datePicker.clear }).click();
+    await expect(field).toHaveValue("");
+    await expect(posted).toHaveValue("");
   });
 
   test("DateInput: the calendar goes year → month → day, walks with the keyboard, Today and Clear", async ({ page }) => {

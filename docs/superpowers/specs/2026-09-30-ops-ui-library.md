@@ -172,7 +172,7 @@ ops-ui/
     api-surface.mjs       regenerates api-surface.d.txt and sync/sync-ops-ui.d.mts
   gallery/                Next 16 app: app/[brand]/layout.tsx sets <html data-brand>, app/[brand]/[story]/page.tsx
     brands/workforce.css finaops.css prefab.css    (html[data-brand=x] { --brand-*: … })
-    shot-options.ts       the comparison: { maxDiffPixels: 0, threshold: 0 } (§11.2)
+    shot-options.ts       the comparison: SHOT_COMPARISON { maxDiffPixels: 0, threshold: 0 } for toHaveScreenshot + exactDiff, the byte-for-byte gate (§11.2)
     tests/shots.spec.ts   Playwright; __screenshots__/ baselines
   tests/                  vitest (node environment, renderToStaticMarkup)
 ```
@@ -941,7 +941,7 @@ export function AppSwitcher(p: {
   - every destination is on the allow-list;
   - `version.ts` equals `package.json`;
   - `api-surface.d.txt` and `sync/sync-ops-ui.d.mts` are current.
-- **`shot-comparator`:** Playwright's own comparator, with the options `pnpm shots` uses (`gallery/shot-options.ts`), refuses a baseline repainted by one token step (primary → primary-hover, bg → surface, surface → surface-raised, one lightness hundredth), so the gate's tolerance can never silently widen again.
+- **`shot-comparator`:** both layers of `gallery/shot-options.ts` refuse a baseline repainted by one token step (primary → primary-hover, bg → surface, surface → surface-raised, one lightness hundredth): Playwright's own comparator with the options `toHaveScreenshot` gets, and `exactDiff`. A baseline whose anti-aliased edges alone are lightened (what a corner radius or a font weight changes) passes Playwright's comparator, which skips every pixel it takes for anti-aliasing at any threshold, and is refused by `exactDiff`. The shot matrix must run `exactDiff` after every `toHaveScreenshot`. So the gate's tolerance can never silently widen again.
 - **`sync`:** runs the real `sync/sync-ops-ui.mjs` against temporary git repos (a fake library plus a fake app). It covers:
   - first pin;
   - an idempotent re-run (no diff);
@@ -979,7 +979,8 @@ export function AppSwitcher(p: {
   - the page's timers paused (`page.clock.pauseAt`) the moment the story is ready, so a toast's 6 s fade never races a slow runner;
   - Geist from the `geist` package, and a smoke check that GeistSans and GeistMono really load (a computed `font-family` names Geist even when only the fallback paints);
   - the Playwright Chromium version pinned in `gallery/playwright.config.ts`;
-  - `toHaveScreenshot` with `maxDiffPixels: 0` and a per-pixel `threshold: 0` (`gallery/shot-options.ts`). Rendering is fully pinned, so any tolerance only hides real changes: at 0.1 a whole-page swap of one token for its neighbour counted as 0 changed pixels (the `shot-comparator` test, §11.1).
+  - `toHaveScreenshot` with `maxDiffPixels: 0` and a per-pixel `threshold: 0` (`SHOT_COMPARISON`, `gallery/shot-options.ts`): it waits for a stable page, writes baselines under `shots:accept` and reports a diff. Rendering is fully pinned, so any tolerance only hides real changes: at 0.1 a whole-page swap of one token for its neighbour counted as 0 changed pixels (the `shot-comparator` test, §11.1).
+  - then the gate itself, `exactDiff` (`gallery/shot-options.ts`): the page is shot once more and compared with the baseline byte for byte (decoded RGBA). Playwright calls pixelmatch without `includeAA`, so at any threshold it skips every pixel it classifies as anti-aliased: a filled control's corner radius 6px → 7px changed 51 raw pixels and counted 0 (a browser test in `shots.spec.ts` renders exactly that).
 - **Baselines** live in `gallery/__screenshots__/`, and only `pnpm shots:accept` writes them. That commit is then either part of a major, or a pure `shots: rebaseline (…)` commit (§4.1).
 
 ### 11.3 App tests (app-owned; `tests/ops-ui/`, PrefabOps `src/components/ui/*.test.ts`)
@@ -1025,7 +1026,7 @@ node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file: 
 - An undeclared name has no value: its colour probe would only read the inherited colour, and `getComputedStyle` gives `""`. It is recorded as undeclared, never compared as a value.
 
 **`compare`:**
-- Counts changed pixels per page with the same comparison as the gallery (`gallery/shot-options.ts`: pixelmatch per-pixel threshold 0, 0 changed pixels) and writes red-overlay diff PNGs.
+- Counts changed pixels per page with the gallery's gate, `exactDiff` from `gallery/shot-options.ts` (every RGBA byte; Playwright's comparator alone skips anti-aliased pixels), requires 0, and writes its red-overlay diff PNGs.
 - **Tokens (G3):** every name declared on `main` must be declared on the branch with an identical value. A name declared **only on the branch** passes only when the `--expect` file lists it as a new token with its value (for example `token --ops-toast-offset = 3.75rem`, `token --color-external = <the accent's computed colour>`), and the value matches; a name that disappears is a failure unless listed. New names are reported separately from changed ones.
 - **Routes:** a route that does not exist on `main` (a 404 there) is captured on the branch only and passes only when `--expect` lists it as a new route; it is reported as new, not diffed. From the next capture of `main` it is compared like any other route.
 - Exits 1 on any difference outside `--expect`.
@@ -1047,7 +1048,7 @@ The route list always includes `/dev/kit`. It renders every vendored story with 
 - **Parallel sessions.** Other sessions edit these repos. The wrappers keep every import site, and the swap branches live hours, not days. Before merging, rebase and re-run G1–G3.
 - **Gates:**
   - **G1 code:** `pnpm typecheck && pnpm test && pnpm lint <changed files>` and `pnpm build`. WFO adds `RUN_DATABASE_TESTS=1 pnpm test` on local Postgres at the swap step. PrefabOps runs `npx tsc --noEmit && npm test` and `npm run build` in `apps/web`.
-  - **G2 pixels:** `app-shots` main vs branch, with 0 changed pixels (threshold 0) on every route at 1440, 375 and 375-touch, including the read-only routes. Only the pages a step lists as **Expected** may differ, and only in the way it says; a route a step adds (`/dev/kit`) is listed as a **new route**, captured on the branch only.
+  - **G2 pixels:** `app-shots` main vs branch, with 0 changed pixels (`exactDiff`, byte for byte) on every route at 1440, 375 and 375-touch, including the read-only routes. Only the pages a step lists as **Expected** may differ, and only in the way it says; a route a step adds (`/dev/kit`) is listed as a **new route**, captured on the branch only.
   - **G3 tokens:** every token declared on `main` identical on the branch (§11.4). A token that exists only on the branch must be listed by the step as an **Expected new token** with its value.
   - **G4 by hand** (browser, 1440 and 375):
     1. A Dialog: type into a field, then Cancel. The discard prompt appears. Then ✕.
@@ -1089,7 +1090,7 @@ The route list always includes `/dev/kit`. It renders every vendored story with 
   - Against WFO, it may additionally show the FinaOps-side changes (rows 1, 9, 26, 32).
 - **L7a Release and visual tooling.** Nothing after L6 can run without these, and no earlier step builds them.
   - `tools/release.mjs` and the `release` package script (§4.2): the refusals, the gates, the semver classification from the diff since the previous release (changed baselines, api-surface, new required brand variables, `Breaking:`), the CHANGELOG checks, the two-file `release: vX.Y.Z` commit and the `release/vX.Y.Z` branch. Tests against temporary git repositories, like the sync's: each refusal, each classification, a bump below the required level refused, `--compatible` recorded.
-  - `tools/app-shots.mjs` (§11.4): `capture` (login, routes × widths + 375-touch, masks, the token dump with declared/undeclared names) and `compare` (the exact pixel comparison of `gallery/shot-options.ts`, the G3 rules for names present on `main` and Expected new tokens, new routes, `--expect`). Tests on synthetic captures: identical passes; one changed pixel fails; a new token passes only when expected with its value; a vanished token fails; a new route passes only when expected.
+  - `tools/app-shots.mjs` (§11.4): `capture` (login, routes × widths + 375-touch, masks, the token dump with declared/undeclared names) and `compare` (`exactDiff` of `gallery/shot-options.ts`, the G3 rules for names present on `main` and Expected new tokens, new routes, `--expect`). Tests on synthetic captures: identical passes; one changed pixel fails, an anti-aliased edge pixel included; a new token passes only when expected with its value; a vanished token fails; a new route passes only when expected.
   - README and CLAUDE.md name the commands.
 - **L7b** `pnpm release 1.0.0`: after L7a and after the §12.4 decision "Found while proving 1.0 (L6)" is recorded (whatever it re-imports comes first). The release dates the CHANGELOG's `## 1.0.0` section.
 
@@ -1372,7 +1373,7 @@ The alternative stays open. If Saša asks later, a library minor `styles/dark.cs
 | 7 | Brand variables set on a subtree | `:root`-only rule checked by the contract. The gallery sets `data-brand` on `<html>`. |
 | 8 | A release is spoofed, moved or ambiguous | Exactly one `release: vX` commit on `main`. The `release/vX` branch must agree. The lock pins the commit, and "release moved" is refused. |
 | 9 | The proxy refuses the `release/vX` push | The commit marker alone is enough. Tags are never used. |
-| 10 | Screenshot flakiness | Same container. Pinned Chromium. Reduced motion, fixed clock with the page's timers paused once a story is ready, local fonts checked to have loaded. Probe-normalised token dump. Pure rebaseline commits are exempt from the semver rule. The comparison stays exact (threshold 0): flakiness is fixed at its cause, never by a tolerance that also hides one-step colour changes. |
+| 10 | Screenshot flakiness | Same container. Pinned Chromium. Reduced motion, fixed clock with the page's timers paused once a story is ready, local fonts checked to have loaded. Probe-normalised token dump. Pure rebaseline commits are exempt from the semver rule. The comparison stays exact (`exactDiff`, byte for byte; Playwright's threshold 0 alone still skips anti-aliased edges): flakiness is fixed at its cause, never by a tolerance that also hides one-step colour changes or a moved edge. |
 | 11 | A release is classified at the wrong semver level | Mechanical checks: baselines, api-surface, required brand variables. CHANGELOG `Visible:` and `Upgrade steps:` required for majors. `--compatible` is explicit and recorded. |
 | 12 | Friction: every kit fix needs a release | A patch release plus a sync takes minutes. `KIT-OVERRIDE` with an expiry version for emergencies. |
 | 13 | A session lacks the ops-ui repo | Exit 2 with the `add_repo` hint. The vendored copy, its DESIGN.md and its CHANGELOG stay readable in the app. |

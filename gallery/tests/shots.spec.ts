@@ -1,6 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import path from "node:path";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { STORY_GROUPS, storyId } from "../../src/stories";
 import { BRANDS, REQUIRED_BRAND_VARIABLES } from "../brands";
+import { CHROMIUM_REVISION } from "../playwright.config";
+import { SHOT_COMPARISON, exactDiff } from "../shot-options";
 
 // A fixed clock: DateInput's today, MonthNav's month and every relative date
 // render the same on every run. setFixedTime freezes Date only; the page's
@@ -9,6 +14,57 @@ const FIXED_NOW = new Date("2026-09-30T10:00:00");
 
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(FIXED_NOW);
+});
+
+/**
+ * The gate (gallery/shot-options.ts): `toHaveScreenshot` has waited for a stable page, compared
+ * with Playwright's comparator and, under `shots:accept`, written the baseline. That comparator
+ * skips every pixel it takes for anti-aliasing, so the same page is shot once more and compared
+ * with the baseline byte for byte: a corner radius or a glyph edge that moved is a changed pixel.
+ */
+async function expectExactShot(page: Page, testInfo: TestInfo, name: [string, string]) {
+  const actual = await page.screenshot({ fullPage: true, animations: "disabled", caret: "hide", scale: "css" });
+  // The path toHaveScreenshot used. Playwright 1.56 takes (...name, { kind }) at runtime, but
+  // types the kind option for a single name only.
+  const snapshotPath = testInfo.snapshotPath.bind(testInfo) as (...args: [...string[], { kind: "screenshot" }]) => string;
+  const baseline = readFileSync(snapshotPath(...name, { kind: "screenshot" }));
+  const result = exactDiff(actual, baseline);
+  if (result.changed === 0) return;
+  await testInfo.attach(`${name[1]} (exact: actual)`, { body: actual, contentType: "image/png" });
+  if (result.diff) await testInfo.attach(`${name[1]} (exact: diff)`, { body: result.diff, contentType: "image/png" });
+  expect(
+    result.changed,
+    result.sizeMismatch ??
+      `${result.changed} pixels differ from the baseline byte for byte (edges Playwright's comparator takes for anti-aliasing included)`,
+  ).toBe(0);
+}
+
+test("the shots run in the pinned Chromium", async ({ browser, browserName }) => {
+  expect(browserName).toBe("chromium");
+  expect(browser.browserType().executablePath()).toMatch(new RegExp(`[/\\\\]chromium(?:_headless_shell)?-${CHROMIUM_REVISION}[/\\\\]`));
+});
+
+test("the gate sees a filled control's corner radius move 6px → 7px; Playwright's comparator does not", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "1440", "once is enough");
+  // Playwright's own comparator, loaded the way tests/shot-comparator.test.ts loads it.
+  const require = createRequire(__filename);
+  const testPkg = path.dirname(require.resolve("@playwright/test/package.json"));
+  const playwright = path.dirname(require.resolve("playwright/package.json", { paths: [testPkg] }));
+  const core = path.dirname(require.resolve("playwright-core/package.json", { paths: [playwright] }));
+  const { getComparator } = require(path.join(core, "lib/server/utils/comparators.js")) as {
+    getComparator: (mime: string) => (actual: Buffer, expected: Buffer, options?: object) => { errorMessage: string } | null;
+  };
+  // A primary Button's fill (no border), as the kit paints it, at two radii.
+  const shot = async (radius: number) => {
+    await page.setContent(
+      `<body style="margin:0;background:#fff"><div style="margin:12px;width:120px;height:36px;border-radius:${radius}px;background:oklch(0.45 0.12 250)"></div></body>`,
+    );
+    return page.screenshot({ clip: { x: 0, y: 0, width: 144, height: 60 } });
+  };
+  const six = await shot(6);
+  const seven = await shot(7);
+  expect(getComparator("image/png")(seven, six, SHOT_COMPARISON)).toBeNull();
+  expect(exactDiff(seven, six).changed).toBeGreaterThan(20);
 });
 
 for (const brand of BRANDS) {
@@ -102,7 +158,7 @@ for (const brand of BRANDS) {
   for (const group of STORY_GROUPS) {
     for (const story of group.stories) {
       const id = storyId(group.component, story.name);
-      test(`${brand}/${id}`, async ({ page }) => {
+      test(`${brand}/${id}`, async ({ page }, testInfo) => {
         await page.goto(`/${brand}/${id}`);
         // Hydrated: the story's own mount effects (showModal, toasts pushed on mount) have run.
         await page.locator(`[data-story="${id}"][data-ready]`).waitFor();
@@ -114,6 +170,7 @@ for (const brand of BRANDS) {
         await page.evaluate(() => document.fonts.ready);
         if (story.open) await page.locator(story.open).first().click();
         await expect(page).toHaveScreenshot([brand, `${id}.png`], { fullPage: true });
+        await expectExactShot(page, testInfo, [brand, `${id}.png`]);
       });
     }
   }
