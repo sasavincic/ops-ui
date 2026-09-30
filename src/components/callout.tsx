@@ -1,5 +1,5 @@
 import { StatusIcon, type StatusIconName } from "./status-icon";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * THE alert surface (redesigned 2026-09-28, Saša: "can we redesign them to

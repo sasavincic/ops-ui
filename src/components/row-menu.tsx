@@ -5,7 +5,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { ActionIcon, type ActionIconName } from "./action-icon";
 import { Button } from "./button";
 import { useDismissable } from "@/lib/use-dismissable";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * The row kebab (⋯): the secondary and destructive actions of ONE row,

@@ -17,7 +17,7 @@ import { formatDate, shiftDay } from "@/domain/dates";
 import { useDict } from "@/i18n/client";
 import { fmt } from "@/i18n/locales";
 import { useDismissable } from "@/lib/use-dismissable";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * The house date input (2026-09-28, Saša: "we shouldn't rely on the browser

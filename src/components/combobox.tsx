@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Input } from "./field";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 import { Monogram } from "./monogram";
 import { useDict } from "@/i18n/client";
 import { matchesAllWords } from "@/domain/search";

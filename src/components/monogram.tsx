@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * The company chip (2026-09-09, one device with one meaning): a short code

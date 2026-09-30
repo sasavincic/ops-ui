@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 // Workforce Ops rolled action icons out route by route; FinaOps starts with
 // them everywhere. The scope stays so a surface can opt out (the wall-style

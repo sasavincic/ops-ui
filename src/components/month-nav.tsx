@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { shiftMonth } from "@/domain/months";
 import { useDict, useLocale } from "@/i18n/client";
 import { useDismissable } from "@/lib/use-dismissable";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * The ONE month navigator (Saša, 2026-09-07: "anywhere we use a month

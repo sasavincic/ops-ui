@@ -1,7 +1,7 @@
 "use client";
 
 import { Input } from "./field";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * The page's search field (2026-09-05): a kit primitive so the decision is

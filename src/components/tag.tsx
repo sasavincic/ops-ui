@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * A tag: a fact about the record that is not a status (Saša, 2026-09-07:

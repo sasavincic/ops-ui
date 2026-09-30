@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * One small line-icon vocabulary for read-only state indicators — ONE

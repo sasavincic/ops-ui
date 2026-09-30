@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useRef, useSyncExternalStore } from "rea
 import { CALLOUT_TONE, Callout } from "./callout";
 import { useMaybeDict } from "@/i18n/client";
 import { localizeMessage } from "@/i18n/messages";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * Alerts as toasts (Saša, 2026-09-25: "any error, any alert, should open as

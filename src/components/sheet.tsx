@@ -2,7 +2,7 @@
 
 import { useId, useRef } from "react";
 import { useDict } from "@/i18n/client";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 import { useErrorToast } from "./toast";
 
 /**

@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 import { StatusIcon, type StatusIconName } from "./status-icon";
 
 const badgeVariants = cva(

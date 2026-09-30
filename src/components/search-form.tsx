@@ -1,5 +1,5 @@
 import { SearchInput } from "./search-input";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * A list's search box as a plain GET form: Enter submits, the query lands

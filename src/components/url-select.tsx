@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Select } from "./field";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * A filter that lives in the URL: picking a value rewrites one query

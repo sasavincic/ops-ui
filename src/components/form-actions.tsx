@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * One set of record actions, two placements (DESIGN.md, 2026-07-15): render

@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * A section or direction label (status doctrine 2026-09-25): uppercase

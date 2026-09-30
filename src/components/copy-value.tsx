@@ -3,7 +3,7 @@
 import { ActionIcon } from "./action-icon";
 import { pushToast } from "./toast";
 import { useDict } from "@/i18n/client";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/cn";
 
 /**
  * A value that copies itself (2026-09-11, Saša: document numbers). The
