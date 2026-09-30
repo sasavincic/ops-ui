@@ -14,6 +14,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "api-surface": "node tools/api-surface.mjs",
+    "release": "node tools/release.mjs",
     "gallery": "next dev gallery --port 3300",
     "gallery:build": "next build gallery",
     "gallery:start": "next start gallery --port 3300",

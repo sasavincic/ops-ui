@@ -115,24 +115,39 @@ declarations, shipped beside it as `scripts/sync-ops-ui.d.mts` so an app with
 - **Never push tags**: the session git proxy refuses tag refs. A release is a
   commit plus a branch (below).
 
-## Release procedure (`pnpm release X.Y.Z [--compatible <name>]`, spec §4.2)
+## Release procedure (`pnpm release X.Y.Z [--compatible <name>]… [--trailer <line>]… [--dry-run]`, spec §4.2)
 
-1. Refuses unless on `main`, the tree is clean, `HEAD == origin/main` after a
-   fetch, and `X.Y.Z` is the next patch/minor/major after `package.json`.
-2. Runs the gates above.
-3. Computes the required semver level from the diff since the previous
-   `release: v<current>` commit (changed baselines, api-surface changes, new
-   required brand variables, `Breaking:` lines) and refuses a lower bump.
-4. Requires `## X.Y.Z` in `CHANGELOG.md` (Added / Changed / Fixed / Visible /
-   Breaking / Upgrade steps; a major needs `Visible:` and `Upgrade steps:`).
+`tools/release.mjs` (tested end to end in `tests/release.test.ts` against temporary repositories):
+
+1. Refuses unless on `main`, the tree is clean, `git fetch origin` worked and
+   `HEAD == origin/main`, `X.Y.Z` is the next patch/minor/major after
+   `package.json`, and no `release/vX.Y.Z` branch exists yet.
+2. Finds the previous release P (the one commit titled `release: v<current>`)
+   and computes the required level from P..HEAD: a baseline that existed at P
+   modified or deleted outside a pure `shots: rebaseline (<reason>)` commit, a
+   removed or changed line of `api-surface.d.txt` (its declaration named by
+   `--compatible` only with a `Compatible: <name> - <reason>` line in the
+   section), a new required brand variable, a removed or changed token, a
+   changed peer range or a `Breaking:` line → major; added surface lines, new
+   baselines or new tokens → minor. It refuses a lower bump. A changed `src/`
+   line with an interaction-only class (`hover:`, `focus-visible:`, `focus:`,
+   `active:`, `focus-within:`, `group-hover:`, `pointer-coarse:`,
+   `pointer-fine:`) or `matchMedia(` needs a `Reviewed: <Component> - …` line.
+   The first release has no P and skips this step.
+3. Requires `## X.Y.Z — YYYY-MM-DD` in `CHANGELOG.md` (dated: date it in its own
+   commit before the release); a major needs `Visible:` and `Upgrade steps:`.
+4. Runs `pnpm typecheck && pnpm lint && pnpm test && pnpm shots`.
 5. Writes the version into `package.json` and `src/version.ts` and commits
-   exactly those two files as **`release: vX.Y.Z`**.
-6. Creates branch **`release/vX.Y.Z`** at that commit and pushes `main` and the
-   branch (a refused branch push is only a warning: the commit marker is
-   enough). No tags.
+   exactly those two files as **`release: vX.Y.Z`** (body: the level, the
+   `--compatible` names, then each `--trailer` line, e.g. the session's
+   `Co-Authored-By:`). The committer is git's: run it as
+   `GIT_AUTHOR_NAME="Saša Vinčić" GIT_AUTHOR_EMAIL=77722684+sasavincic@users.noreply.github.com GIT_COMMITTER_NAME="Saša Vinčić" GIT_COMMITTER_EMAIL=77722684+sasavincic@users.noreply.github.com pnpm release …`.
+6. Creates branch **`release/vX.Y.Z`** at that commit and pushes `main`, then
+   the branch (a refused branch push is only a warning: the commit marker is
+   enough; network errors retry 2, 4, 8, 16 s). No tags.
 
-Until `tools/release.mjs` exists (L7a), nothing is released: `version` stays
-`0.0.0`.
+`--dry-run` runs every check and the gates and writes nothing. Nothing is
+released until L7b (below): `version` stays `0.0.0`.
 
 ## How an app takes a release (spec §5.5; done in the app's own session)
 
@@ -151,6 +166,15 @@ Until `tools/release.mjs` exists (L7a), nothing is released: `version` stays
 The library session never writes into an app repo; it may run
 `tools/app-shots.mjs` and `tools/diff-against-app.mjs` against app checkouts
 or scratch exports.
+
+**The visual check** (`tools/app-shots.mjs`, spec §11.4, tested in
+`tests/app-shots.test.ts` on synthetic captures and against a local server):
+`node tools/app-shots.mjs capture --app ../fina-ops --label main [--config <file>]`
+(the app's dev server running; credentials in the env variables its config
+names: `OPS_UI_SHOTS_USER` / `_PASSWORD`, `OPS_UI_SHOTS_RO_USER` / `_PASSWORD`),
+the same with `--label branch` on the branch, then
+`node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file>]`.
+Captures go to `$TMPDIR/ops-ui-shots/<app>/<label>/`.
 
 ## Build state (update when a step lands)
 
@@ -343,6 +367,23 @@ or scratch exports.
     test; interaction styles of other controls are hand-reviewed (§4.1: the
     release script asks for `Reviewed:` lines). `updateSnapshots: "none"` and
     `tests/baselines.test.ts` (files = matrix). Existing baselines unchanged.
-- L7a release and visual tooling: pending (spec §12.1).
-- L7b `pnpm release 1.0.0`: pending, after L7a, the §12.4 L6 decision and the
-  §12.4 FinaOps-ahead re-import.
+- **L7a Release and visual tooling** (2026-09-30): `tools/release.mjs` +
+  `pnpm release` (spec §4.2, readings in its "As built" paragraph: the cheap
+  checks run before the gates, `--compatible` needs a hand-written
+  `Compatible:` line and writes nothing, token and peer changes count as
+  majors, `Reviewed:` at every level, `--dry-run` and `--trailer`);
+  `tools/app-shots.mjs` (spec §11.4: `capture` with `--config`, the editor and
+  read-only sign-ins and their landing check, widths + 375-touch, the
+  final-URL check against `redirects`, `/dev/kit` expanded per story with its
+  `open` click, the paused clock, masks, the token dump with declared /
+  undeclared names, `manifest.json`; `compare` with `exactDiff`, the G3 rules
+  and `--expect`, syntax in §11.4). `CHANGELOG.md` `## 1.0.0` gained its
+  `Visible:` line (1.0.0 is a major bump from 0.0.0).
+- **L7b `pnpm release 1.0.0`: BLOCKED** (re-checked 2026-09-30 21:45 UTC with
+  `git ls-remote`): the §12.4 decision "Found while proving 1.0 (L6)" is still
+  open (Saša's; releasing now would decide it for option 2), and the §12.4
+  "FinaOps ahead" re-import cannot happen yet (FinaOps' security branch, now
+  at 0286b33, is not on its `main`, still 80828fc). The re-run L6 proof is in
+  `docs/extraction-proof-1.0.0.md`. Once both are done: re-import, date the
+  `## 1.0.0` section in its own commit, push, then `pnpm release 1.0.0
+  --trailer "Co-Authored-By: …"` with the git identity above.

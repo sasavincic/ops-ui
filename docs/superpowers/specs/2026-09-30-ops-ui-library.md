@@ -321,6 +321,14 @@ A declaration line that changed in a provably compatible way (for example, a wid
 
 The first release (1.0.0) has no P, so step 4 is skipped. Everything else runs.
 
+**As built (L7a, `tools/release.mjs`, tested in `tests/release.test.ts`).** Where the steps above leave a reading open:
+- **Order.** The cheap checks (steps 1, 3, 4, 5) run before the gates (step 2), and every refusal of a step is printed before the script exits, so a refusal never waits for a gallery build.
+- **`--compatible <name>` writes nothing.** The release commit is exactly two files and the tree must be clean, so the reason is written by hand, before the release, as a `Compatible: <name> - <why an unchanged call site renders the same>` line of the section; the flag authorizes it (a missing line, or a name that matches no removed or changed declaration, is refused) and the release commit's body records it. A removed or changed line of `api-surface.d.txt` belongs to the top-level declaration around it (parsed with the TypeScript parser); tsc's empty `export {};` marker is not API.
+- **Also a major, from §4.1's table:** a removed token or a changed token value in `styles/tokens.css` (a new token is a minor), and any change of a `peerDependencies` range.
+- **A pure rebaseline** may also touch `gallery/fonts/**` (the fonts the gallery ships beside Geist, CLAUDE.md), besides the baselines and `gallery/playwright.config.ts`.
+- **`Reviewed:`** is required at every level (§4.1 asks it of a patch or minor, step 4 of any release). A line names a file's component by its file name or its PascalCase name as a whole word (`row-menu` or `RowMenu`).
+- **Additions.** `--dry-run` runs every check and the gates and writes nothing; `--trailer <line>` (repeatable) appends a line to the release commit's body (the session's `Co-Authored-By:`). A local or remote `release/vX.Y.Z` branch left by an earlier run is refused. Pushes retry network errors 4 times (2, 4, 8, 16 s), never a refusal.
+
 ### 4.3 CHANGELOG format
 
 ```
@@ -1065,6 +1073,16 @@ node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file: 
 - **Routes:** a route that does not exist on `main` (a 404 there) is captured on the branch only and passes only when `--expect` lists it as a new route; it is reported as new, not diffed. From the next capture of `main` it is compared like any other route. A story is a route: an id on the branch's index that `main`'s index lacks is a new route (`route /dev/kit/<storyId>` in `--expect`), and an id that vanishes fails unless listed.
 - Exits 1 on any difference outside `--expect`.
 
+**The `--expect` file** (as built in L7a): one entry per line, `#` starts a comment, `*` in a route matches any characters, and a read-only capture is the route `readonly:<route>`:
+```
+route <route>                 a route only the branch has (a 404 or absent on main)
+page <route> [<project>…]     a page allowed to differ (every project when none is named: 1440, 375, 375-touch)
+token <name> = <value>        a token new on the branch, or changed, with its value there
+removed route <route>         a route only main has
+removed token <name>          a token only main declares
+```
+An entry that matched nothing is reported as a note. A route shot on neither side (a 404 on both) fails: its fixture id is wrong. Capture writes `manifest.json` (every route with its user, status and landing, and `complete` = no failure); compare refuses an incomplete capture. Capture hides Next's dev-tools indicator (`nextjs-portal`), which is not the app and whose state is transient, and shoots until two screenshots in a row are identical.
+
 The route list always includes `/dev/kit`, which capture expands into the index and one route per vendored story, each rendered alone with the app's real bridge, providers and brand (inside `StoryHost pageToaster`, §3.2), so a Tailwind class missing from the app's CSS shows up as a pixel diff on that story's route. They are new at the step that adds them (F5, W6) and compared from then on; a later sync that adds stories (1.1.0) adds new routes and leaves every existing story route at 0 changed pixels.
 
 ---
@@ -1126,6 +1144,7 @@ The route list always includes `/dev/kit`, which capture expands into the index 
   - `tools/release.mjs` and the `release` package script (§4.2): the refusals, the gates, the semver classification from the diff since the previous release (changed baselines, api-surface, new required brand variables, `Breaking:`), the CHANGELOG checks, the two-file `release: vX.Y.Z` commit and the `release/vX.Y.Z` branch. Tests against temporary git repositories, like the sync's: each refusal, each classification, a bump below the required level refused, `--compatible` recorded.
   - `tools/app-shots.mjs` (§11.4): `capture` (`--config`, the editor and read-only logins with the landing check, routes × widths + 375-touch, the final-URL check against `redirects`, `/dev/kit` expanded to one route per story with its `open` click, the paused clock, masks, the token dump with declared/undeclared names) and `compare` (`exactDiff` of `gallery/shot-options.ts`, the G3 rules for names present on `main` and Expected new tokens, new routes, `--expect`). Tests on synthetic captures: identical passes; one changed pixel fails, an anti-aliased edge pixel included; a new token passes only when expected with its value; a vanished token fails; a new route (a new story id included) passes only when expected; a vanished story id fails. Tests of `capture` against a small local server: a route redirected to `/login` or `/two-factor/setup` fails, a redirect listed in `redirects` passes, a login that stays on the login page fails, `--config` is read instead of the app's file and a missing one is exit 2.
   - README and CLAUDE.md name the commands.
+  - **Built 2026-09-30** (`tools/release.mjs` with `tests/release.test.ts`, `tools/app-shots.mjs` with `tests/app-shots.test.ts`; readings in §4.2 "As built" and §11.4 "The `--expect` file").
 - **L7b** `pnpm release 1.0.0`: after L7a, after the §12.4 decision "Found while proving 1.0 (L6)" is recorded, and after the §12.4 re-import "FinaOps ahead" (whatever is re-imported comes first). The L6 proof is re-run against FinaOps' `main` of that day (`--ref origin/main` after a fetch), not only against 80828fc, and must say PROVEN with `FINAOPS_AHEAD` empty. The release dates the CHANGELOG's `## 1.0.0` section.
 
 **Gate:**

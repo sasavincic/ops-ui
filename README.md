@@ -82,7 +82,22 @@ pnpm shots                                 # Playwright: every story x 3 brands 
 node tools/diff-against-app.mjs --app ../fina-ops --ref origin/main        # the extraction proof (spec §12.1 L6)
 node tools/diff-against-app.mjs --app ../workforce-ops --ref origin/main   # (reads the apps through git only)
 pnpm shots:accept                          # write baselines (a major, or a pure `shots: rebaseline (…)` commit)
+pnpm release X.Y.Z [--compatible <name>]… [--trailer <line>]… [--dry-run]  # a release (spec §4.2)
 ```
+
+The per-app visual check (gates G2 and G3, spec §11.4) runs from this checkout too, against an app's
+running dev server and its local fixture database (the apps carry no Playwright):
+
+```bash
+OPS_UI_SHOTS_USER=… OPS_UI_SHOTS_PASSWORD=… OPS_UI_SHOTS_RO_USER=… OPS_UI_SHOTS_RO_PASSWORD=… \
+node tools/app-shots.mjs capture --app ../fina-ops --label main [--config <file>]    # on the app's main
+node tools/app-shots.mjs capture --app ../fina-ops --label branch [--config <file>]  # on the branch
+node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file>]     # 0 changed pixels, identical tokens
+```
+
+Captures land in `$TMPDIR/ops-ui-shots/<app>/<label>/` (PNGs per width and 375-touch, `tokens.json`,
+`manifest.json`); `compare` writes red-overlay diffs beside them. The `--expect` syntax (new routes,
+pages allowed to differ, new tokens) is in the spec, §11.4.
 
 Requires Node ≥ 20 and pnpm. The gallery (`gallery/`) is a small Next 16 +
 Tailwind v4 app: `/<brand>` lists the stories, `/<brand>/<story>` renders one,
@@ -95,7 +110,7 @@ fixture from `gallery/brands/`.
 src/            the library (relative imports only): components/, config/, lib/, navigation/, stories/, types.ts, version.ts
 styles/         tokens.css (@theme contract), kit.css, base.css, app-feel.css
 sync/           sync-ops-ui.mjs + its generated .d.mts, shipped to each app as scripts/sync-ops-ui.{mjs,d.mts}
-tools/          api-surface, pull-brands (L5), diff-against-app (L6); release, app-shots are built in L7a
+tools/          api-surface, pull-brands (L5), diff-against-app (L6), release and app-shots (L7a)
 ship.json       what a release ships to an app, and where (read by the sync from the release commit)
 gallery/        Next app for stories and screenshots (brands/, tests/, __screenshots__/)
 tests/          vitest (node environment, renderToStaticMarkup)
