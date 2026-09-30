@@ -77,6 +77,8 @@ pnpm typecheck && pnpm lint && pnpm test   # tsc, eslint (import boundary), vite
 pnpm gallery                               # the story gallery on http://localhost:3300/workforce
 pnpm api-surface                           # regenerate api-surface.d.txt after a declaration change
 pnpm shots                                 # Playwright: every story x 3 brands x {1440, 375}, 0-pixel diffs, + behaviour tests
+node tools/diff-against-app.mjs --app ../fina-ops --ref origin/main        # the extraction proof (spec §12.1 L6)
+node tools/diff-against-app.mjs --app ../workforce-ops --ref origin/main   # (reads the apps through git only)
 pnpm shots:accept                          # write baselines (a major, or a pure `shots: rebaseline (…)` commit)
 ```
 
@@ -91,7 +93,7 @@ fixture from `gallery/brands/`.
 src/            the library (relative imports only): components/, config/, lib/, navigation/, stories/, types.ts, version.ts
 styles/         tokens.css (@theme contract), kit.css, base.css, app-feel.css
 sync/           sync-ops-ui.mjs, shipped to each app as scripts/sync-ops-ui.mjs
-tools/          api-surface, pull-brands (L5); release, app-shots, diff-against-app arrive with L6-L7
+tools/          api-surface, pull-brands (L5), diff-against-app (L6); release, app-shots arrive with L7
 ship.json       what a release ships to an app, and where (read by the sync from the release commit)
 gallery/        Next app for stories and screenshots (brands/, tests/, __screenshots__/)
 tests/          vitest (node environment, renderToStaticMarkup)

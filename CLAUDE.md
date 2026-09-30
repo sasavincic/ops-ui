@@ -221,4 +221,26 @@ or scratch exports.
   stripped, `api-surface.d.txt` committed; stale = red) and
   **`tools/pull-brands.mjs`** (app brand.css → gallery fixture, through git;
   no app has a brand.css yet, so the fixtures stay hand-copied).
-- L6 Extraction proof · L7 `pnpm release 1.0.0`: pending (spec §12.1).
+- **L6 Extraction proof** (2026-09-30): `tools/diff-against-app.mjs --app <tree>
+  [--ref <git ref>] [--source <fina-ops tree>]` diffs every component against
+  the app copy after removing only what the spec calls mechanical (imports, the
+  kit-config hook line, `t.common.x` → `strings.x`, `localizeMessage` →
+  `localize` and their null-dictionary forms when the fallback IS the
+  `EN_STRINGS` word, the seven types that moved to `types.ts`, each proven
+  against the app's definition, blank lines; every normalization is counted in
+  the report). Each remaining line must be named: `LIBRARY_CHANGES` (the §7 /
+  §9 "Change" items) or, against Workforce Ops, a line where the two app kits
+  differ in a file §9 sources from FinaOps. It also compares the `navigation/`
+  and `lib/` modules (whole, or declaration by declaration; FinaOps'
+  `normalizeSearchText` through `names.foldText` and WFO's `shiftMonth` by
+  behaviour) and `EN_STRINGS` with the app's en `common`.
+  `tests/diff-against-app.test.ts` runs it end to end against a tree rebuilt
+  from the L2 import commit (and a planted change must fail it). Result
+  (`docs/extraction-proof-1.0.0.md`): **PROVEN against FinaOps** (30 identical,
+  5 by named rows). Against Workforce Ops the extraction holds too, but WFO
+  changed `button.tsx`, `date-input.tsx` and `dialog.tsx` on 2026-09-30 after
+  the survey (ExternalButtonLink, bottom-sheet dialogs and calendar): not an
+  extraction bug, but 1.0.0 cannot replace them. Spec §12.4 "Found while
+  proving 1.0 (L6)" names them with three options; `WFO_AHEAD` records them and
+  the WFO run exits 1 until the decision is recorded there. **L7 waits for it.**
+- L7 `pnpm release 1.0.0`: pending (spec §12.1), after the §12.4 L6 decision.
