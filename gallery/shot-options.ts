@@ -2,7 +2,7 @@ import { PNG } from "pngjs";
 
 /**
  * How a shot is compared with its baseline (spec §11.2): exactly. Rendering is fully pinned
- * (Chromium 1194, DPR 1, fonts from the geist package, reduced motion, a fixed and paused clock),
+ * (Chromium 1194, DPR 1, only fonts the gallery ships, reduced motion, a fixed and paused clock),
  * so an unchanged story paints the same bytes, and any tolerance only hides real changes.
  *
  * Two layers, because Playwright's comparator alone is not exact:

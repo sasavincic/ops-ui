@@ -17,6 +17,49 @@ test.beforeEach(async ({ page }) => {
 });
 
 /**
+ * Every face a shot may paint with, loaded: Geist, Geist Mono, and the gallery's one-glyph face
+ * for ✕ (gallery/fonts/glyphs.css), which would otherwise load only once a cross is laid out.
+ */
+async function loadGalleryFonts(page: Page) {
+  await page.evaluate(async () => {
+    await document.fonts.load("16px GeistSans", "\u2715");
+    await document.fonts.ready;
+  });
+}
+
+/**
+ * Text the page paints from a font it did not load: a host font Chromium found through
+ * fontconfig for a glyph no loaded face has (the ✕ drew from the container's DejaVu Sans before
+ * gallery/fonts). Such a glyph changes with the image, so the baselines would not be pinned.
+ * Asks Chromium itself (CSS.getPlatformFontsForNode) for every element that paints text,
+ * user-agent shadow trees and pseudo-elements included.
+ */
+async function hostFontGlyphs(page: Page): Promise<string[]> {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send("DOM.enable");
+    await cdp.send("CSS.enable");
+    const { root } = await cdp.send("DOM.getDocument", { depth: -1, pierce: true });
+    const painting: { nodeId: number; text: string }[] = [];
+    const walk = (node: typeof root) => {
+      const children = [...(node.children ?? []), ...(node.shadowRoots ?? []), ...(node.pseudoElements ?? [])];
+      const text = children.filter((child) => child.nodeType === 3).map((child) => child.nodeValue).join("");
+      if (node.nodeType === 1 && (text.trim() !== "" || node.pseudoType)) painting.push({ nodeId: node.nodeId, text: text.trim() });
+      children.forEach(walk);
+    };
+    walk(root);
+    const found: string[] = [];
+    for (const { nodeId, text } of painting) {
+      const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId });
+      for (const font of fonts) if (!font.isCustomFont) found.push(`${font.familyName} paints ${JSON.stringify(text)}`);
+    }
+    return found;
+  } finally {
+    await cdp.detach();
+  }
+}
+
+/**
  * The gate (gallery/shot-options.ts): `toHaveScreenshot` has waited for a stable page, compared
  * with Playwright's comparator and, under `shots:accept`, written the baseline. That comparator
  * skips every pixel it takes for anti-aliasing, so the same page is shot once more and compared
@@ -138,15 +181,16 @@ for (const brand of BRANDS) {
     // the FontFaceSet to load each family and require real, loaded faces back.
     const faces = await page.evaluate(async () => {
       await document.fonts.ready;
-      const load = async (font: string) => {
+      const load = async (font: string, text?: string) => {
         try {
-          const loaded = await document.fonts.load(font);
+          const loaded = await document.fonts.load(font, text);
           return loaded.map((face) => `${face.family.replace(/"/g, "")}:${face.status}`);
         } catch (error) {
           return [`error: ${(error as Error).message}`];
         }
       };
-      return { sans: await load("16px GeistSans"), mono: await load("13px GeistMono") };
+      // The cross comes from the gallery's one-glyph face in the GeistSans family (gallery/fonts).
+      return { sans: await load("16px GeistSans"), mono: await load("13px GeistMono"), cross: await load("16px GeistSans", "\u2715") };
     });
     for (const [family, loaded] of Object.entries(faces)) {
       expect(loaded.length, `${family}: ${loaded.join(", ")}`).toBeGreaterThan(0);
@@ -167,10 +211,12 @@ for (const brand of BRANDS) {
         // nothing a shot shows may depend on how long the steps below take. The kit's only
         // timers are that fade and Combobox's blur close; Date stays at FIXED_NOW.
         await page.clock.pauseAt(FIXED_NOW);
-        await page.evaluate(() => document.fonts.ready);
+        await loadGalleryFonts(page);
         if (story.open) await page.locator(story.open).first().click();
         await expect(page).toHaveScreenshot([brand, `${id}.png`], { fullPage: true });
         await expectExactShot(page, testInfo, [brand, `${id}.png`]);
+        // Glyph coverage does not depend on the brand: asked once per story and width.
+        if (brand === BRANDS[0]) expect(await hostFontGlyphs(page), "text painted from a host font").toEqual([]);
       });
     }
   }

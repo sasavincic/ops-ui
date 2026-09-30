@@ -87,8 +87,14 @@ declarations, shipped beside it as `scripts/sync-ops-ui.d.mts` so an app with
   (`chromium-1194/chrome-linux/chrome`).
 - Only `pnpm shots:accept` writes baselines. A baseline change is either part
   of a major release or a commit titled `shots: rebaseline (<reason>)` that
-  touches only `gallery/__screenshots__/**` and `gallery/playwright.config.ts`
-  (for example a Chromium update).
+  touches only `gallery/__screenshots__/**` and the gallery's pinned rendering
+  environment: `gallery/playwright.config.ts` (the Chromium pin) and
+  `gallery/fonts/**` (the fonts the gallery ships beside Geist), for example a
+  Chromium update. Never `src/`, `styles/` or a story.
+- The shots paint no glyph from the host: a story whose text needs a glyph
+  Geist lacks fails its shot ("text painted from a host font") until
+  `gallery/fonts/` covers it (a subset face joined to the GeistSans family by
+  `unicode-range`, as `glyphs.css` does for ✕; spec §11.2).
 
 ## Commits and pushes
 

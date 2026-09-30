@@ -1,0 +1,15 @@
+/* The one glyph the kit paints that Geist lacks: U+2715, the close cross of Dialog, Sheet, the
+   toasts and a floating Callout. Without this face Chromium takes it from the host through
+   fontconfig (DejaVu Sans 2.37 in this container), so another image or another fonts package
+   would repaint every baseline that shows it. The face is a one-glyph subset of that same DejaVu
+   Sans (LICENSE-DejaVu.txt beside it). It joins the GeistSans family through unicode-range, so the
+   library font stack stays exactly as tokens.css writes it. gallery/tests/shots.spec.ts requires
+   every glyph a story paints to come from a font the gallery ships. Apps keep drawing the cross
+   from the platform, as they do today. Imported by gallery/app/[brand]/layout.tsx. */
+@font-face {
+  font-family: GeistSans;
+  src: url("./dejavu-sans-x.woff2") format("woff2");
+  unicode-range: U+2715;
+  font-weight: 100 900;
+  font-display: block;
+}

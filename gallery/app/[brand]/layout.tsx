@@ -7,6 +7,7 @@ import "../globals.css";
 import "../../brands/workforce.css";
 import "../../brands/finaops.css";
 import "../../brands/prefab.css";
+import "../../fonts/glyphs.css";
 
 export const metadata: Metadata = { title: "@latro/ops-ui gallery" };
 
@@ -20,7 +21,8 @@ export function generateStaticParams() {
  * The root layout. The brand sits on <html> because <html> IS :root, where the
  * apps set their --brand-* variables (custom properties inherit substituted
  * values, so a subtree would not re-theme anything). Geist comes from the geist
- * package through next/font/local, so a shot never fetches a font.
+ * package through next/font/local, and the one glyph Geist lacks from gallery/fonts, so a shot
+ * never fetches a font or paints one from the host.
  */
 export default async function BrandLayout({
   children,
