@@ -43,6 +43,14 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // L2 (spec §12.1): the kit and the two navigation modules are imported
+  // verbatim and still name their app modules (@/lib/utils, @/i18n/client, ...).
+  // Until L3 decouples them they are also left out of tsconfig.json. L3 deletes
+  // this block and those tsconfig excludes; every other rule still applies here.
+  {
+    files: ["src/components/**", "src/navigation/history.ts", "src/navigation/nav-trail.tsx"],
+    rules: { "no-restricted-imports": "off" },
+  },
   globalIgnores([
     ".next/**",
     "gallery/.next/**",

@@ -136,6 +136,20 @@ or scratch exports.
   `workforce`/`finaops` from spec §8.4, `prefab` from the Prefab plan §9.8;
   Geist from the `geist` package), Playwright shots (smoke checks until the
   stories land), README, this file.
-- L2 Import · L3 Decouple · L4 Styles, strings and types · L5 Tests, stories
-  and baselines · L6 Extraction proof · L7 `pnpm release 1.0.0`: pending
+- **L2 Import** (2026-09-30): the 35 FinaOps kit files byte-identical from
+  `fina-ops` 80828fc (`src/components/ui/*` → `src/components/`); from
+  `workforce-ops` cea4928 the whole modules `domain/nav-trail.ts` →
+  `navigation/trail.ts`, `lib/navigation-history.ts` → `navigation/history.ts`,
+  `components/shell/nav-trail.tsx` → `navigation/nav-trail.tsx`,
+  `domain/date-input.ts` → `lib/date-input.ts`, `lib/use-dismissable.ts`, and
+  the verbatim excerpts `lib/cn.ts` (`cn` + its tailwind-merge extension),
+  `lib/fmt.ts`, `lib/text.ts` (three search functions), `lib/dates.ts`
+  (`formatDate`, `shiftDay`); `lib/months.ts` (`shiftMonth`) from `fina-ops`
+  80828fc. Excerpt files carry a one-line provenance comment. The 37 files that
+  still import `@/…` (all components, `navigation/history.ts`,
+  `navigation/nav-trail.tsx`) are excluded from `tsconfig.json` and have
+  `no-restricted-imports` off in `eslint.config.mjs` (every other lint rule
+  applies). **L3 removes both exclusions.**
+- L3 Decouple · L4 Styles, strings and types · L5 Tests, stories and
+  baselines · L6 Extraction proof · L7 `pnpm release 1.0.0`: pending
   (spec §12.1).

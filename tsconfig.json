@@ -20,5 +20,13 @@
     ]
   },
   "include": ["**/*.ts", "**/*.tsx", "**/*.mts"],
-  "exclude": ["node_modules", "gallery/.next", "gallery/next-env.d.ts", "gallery/test-results"]
+  "exclude": [
+    "node_modules",
+    "gallery/.next",
+    "gallery/next-env.d.ts",
+    "gallery/test-results",
+    "src/components/**",
+    "src/navigation/history.ts",
+    "src/navigation/nav-trail.tsx"
+  ]
 }
