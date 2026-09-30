@@ -12,7 +12,7 @@ import {
   shiftDayByMonths,
   shiftMonth,
   withinRange,
-} from "@/domain/date-input";
+} from "../lib/date-input";
 import { formatDate, shiftDay } from "@/domain/dates";
 import { useOpsUi } from "../config/provider";
 import { fmt } from "../lib/fmt";
