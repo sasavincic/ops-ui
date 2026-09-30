@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Input } from "@/components/ui/field";
+import { Input } from "./field";
 import { cn } from "@/lib/utils";
-import { Monogram } from "@/components/ui/monogram";
+import { Monogram } from "./monogram";
 import { useDict } from "@/i18n/client";
 import { matchesAllWords } from "@/domain/search";
 

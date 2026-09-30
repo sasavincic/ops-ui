@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { ActionIconName } from "@/components/ui/action-icon";
-import { Button } from "@/components/ui/button";
+import type { ActionIconName } from "./action-icon";
+import { Button } from "./button";
 import { useDict } from "@/i18n/client";
 import { cn } from "@/lib/utils";
-import { ToastViewport, useErrorToast, useToastHost } from "@/components/ui/toast";
+import { ToastViewport, useErrorToast, useToastHost } from "./toast";
 
 // Deliberately hard to dismiss (Saša, 2026-07-28): no backdrop-click close,
 // no Escape — half-filled forms were getting lost. Only the X (and the

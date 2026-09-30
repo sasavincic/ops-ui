@@ -4,8 +4,8 @@ import { useReadOnlyScope } from "@/components/permissions-provider";
 import { useMaybeDict } from "@/i18n/client";
 import { localizeMessage } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
-import { StatusIcon } from "@/components/ui/status-icon";
-import { useAnchoredToast } from "@/components/ui/toast";
+import { StatusIcon } from "./status-icon";
+import { useAnchoredToast } from "./toast";
 
 export const controlClasses =
   "w-full rounded-control border border-border-strong bg-bg px-3 text-base lg:text-sm text-ink placeholder:text-ink-muted transition-colors duration-150 outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-muted aria-invalid:border-danger aria-invalid:focus-visible:ring-danger/25";

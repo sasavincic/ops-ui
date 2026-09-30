@@ -2,8 +2,8 @@
 
 import { cva, type VariantProps } from "class-variance-authority";
 import Link from "next/link";
-import { ReturnLink } from "@/components/ui/back-link";
-import { ActionIcon, type ActionIconName } from "@/components/ui/action-icon";
+import { ReturnLink } from "./back-link";
+import { ActionIcon, type ActionIconName } from "./action-icon";
 import { useReadOnlyScope } from "@/components/permissions-provider";
 import { cn } from "@/lib/utils";
 

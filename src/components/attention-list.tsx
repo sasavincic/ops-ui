@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { StatusIcon, type StatusIconName } from "@/components/ui/status-icon";
+import { StatusIcon, type StatusIconName } from "./status-icon";
 
 /**
  * The Attention column (2026-09-09, Saša: "something generic, used with all

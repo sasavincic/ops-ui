@@ -1,7 +1,7 @@
 "use client";
 
-import { ActionIcon } from "@/components/ui/action-icon";
-import { pushToast } from "@/components/ui/toast";
+import { ActionIcon } from "./action-icon";
+import { pushToast } from "./toast";
 import { useDict } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 

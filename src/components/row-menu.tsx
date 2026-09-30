@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
-import { ActionIcon, type ActionIconName } from "@/components/ui/action-icon";
-import { Button } from "@/components/ui/button";
+import { ActionIcon, type ActionIconName } from "./action-icon";
+import { Button } from "./button";
 import { useDismissable } from "@/lib/use-dismissable";
 import { cn } from "@/lib/utils";
 

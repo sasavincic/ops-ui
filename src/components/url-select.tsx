@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Select } from "@/components/ui/field";
+import { Select } from "./field";
 import { cn } from "@/lib/utils";
 
 /**

@@ -1,4 +1,4 @@
-import { SearchInput } from "@/components/ui/search-input";
+import { SearchInput } from "./search-input";
 import { cn } from "@/lib/utils";
 
 /**

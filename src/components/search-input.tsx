@@ -1,6 +1,6 @@
 "use client";
 
-import { Input } from "@/components/ui/field";
+import { Input } from "./field";
 import { cn } from "@/lib/utils";
 
 /**

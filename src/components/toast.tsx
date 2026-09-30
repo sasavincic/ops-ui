@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useSyncExternalStore } from "react";
-import { CALLOUT_TONE, Callout } from "@/components/ui/callout";
+import { CALLOUT_TONE, Callout } from "./callout";
 import { useMaybeDict } from "@/i18n/client";
 import { localizeMessage } from "@/i18n/messages";
 import { cn } from "@/lib/utils";

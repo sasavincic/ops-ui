@@ -3,7 +3,7 @@
 import { useId, useRef } from "react";
 import { useDict } from "@/i18n/client";
 import { cn } from "@/lib/utils";
-import { useErrorToast } from "@/components/ui/toast";
+import { useErrorToast } from "./toast";
 
 /**
  * Right-hand slide-over — the desk's second surface next to the Dialog:

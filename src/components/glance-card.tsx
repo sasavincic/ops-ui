@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardBody, CardHeader, CardTitle } from "./card";
 
 /** Overview glance: a tab's key numbers at sight, linking into the tab. */
 export function GlanceCard({

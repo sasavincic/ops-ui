@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
-import { StatusIcon, type StatusIconName } from "@/components/ui/status-icon";
+import { StatusIcon, type StatusIconName } from "./status-icon";
 
 const badgeVariants = cva(
   "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium leading-4 whitespace-nowrap",

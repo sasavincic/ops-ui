@@ -1,4 +1,4 @@
-import { StatusIcon, type StatusIconName } from "@/components/ui/status-icon";
+import { StatusIcon, type StatusIconName } from "./status-icon";
 import { cn } from "@/lib/utils";
 
 /**

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useReadOnlyScope } from "@/components/permissions-provider";
-import { controlClasses } from "@/components/ui/field";
+import { controlClasses } from "./field";
 import {
   isIsoDate,
   localTodayIso,

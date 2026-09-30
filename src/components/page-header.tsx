@@ -1,4 +1,4 @@
-import { BackLink } from "@/components/ui/back-link";
+import { BackLink } from "./back-link";
 import { cn } from "@/lib/utils";
 
 export function PageHeader({

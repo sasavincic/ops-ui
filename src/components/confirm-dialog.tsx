@@ -6,13 +6,13 @@
 // destructive actions fell back to the browser's own confirm(), which
 // cannot be styled, cannot be translated and reads as a bug on touch.
 
-import { Button } from "@/components/ui/button";
+import { Button } from "./button";
 import {
   Dialog,
   DialogBody,
   DialogError,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "./dialog";
 import { useDict } from "@/i18n/client";
 
 /**

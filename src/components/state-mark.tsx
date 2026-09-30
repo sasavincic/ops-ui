@@ -1,5 +1,5 @@
-import { Badge, type BadgeVariant } from "@/components/ui/badge";
-import type { StatusIconName } from "@/components/ui/status-icon";
+import { Badge, type BadgeVariant } from "./badge";
+import type { StatusIconName } from "./status-icon";
 
 /**
  * The outlined status pill: the same status as a Badge, worn where the

@@ -11,7 +11,7 @@ import {
   WriteScope,
   useReadOnlyScope,
 } from "@/components/permissions-provider";
-import { Button } from "@/components/ui/button";
+import { Button } from "./button";
 import type { PermissionArea } from "@/domain/permissions";
 
 export function RecordTab({
