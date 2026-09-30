@@ -2,12 +2,30 @@
 // sync/sync-ops-ui.mjs and every app carries a synced copy as scripts/sync-ops-ui.mjs, so it is
 // ONE self-contained file with no dependency beyond Node's built-ins.
 //
-// Build state: this file so far carries the token and brand contract (spec §8.3, §8.5) and the
-// theme-gotcha scanner, exported for the library's tokens test and, once the commands exist, for
-// the sync pre-flight and checkVendor() (spec §5.2 step 4, §5.4). The commands of spec §5.1
-// (--version, --ref, --check, --write-wrappers) land on top of it in build step L5.
+//   node scripts/sync-ops-ui.mjs --version 1.2.0 [--repo <path>] [--dry-run] [--discard-local-edits] [--allow-downgrade]
+//   node scripts/sync-ops-ui.mjs --ref <sha> [--repo <path>]     local trial only; stamps 1.2.0-dev+<sha7>
+//   node scripts/sync-ops-ui.mjs --check                          verify only (= checkVendor)
+//   node scripts/sync-ops-ui.mjs --write-wrappers                 create missing pure wrappers; never overwrites
+//
+// Exit codes: 0 done or verified, 1 refused (reasons printed one per line), 2 usage or environment.
+// It never commits, never pushes, and writes nothing outside the vendor folder, its own path and
+// ops-ui.lock.json. Importing it runs nothing: the token and brand contract (spec §8.3, §8.5), the
+// theme-gotcha scanner, the ship mapping and checkVendor() are exports (the library's tests and
+// each app's vendor test read them).
 
-import { pathToFileURL } from "node:url";
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 // ---------------------------------------------------------------------------------------------
 // CSS reading. Just enough of a tokenizer for the contract: comments, strings, braces and
@@ -540,13 +558,900 @@ export function checkBrandCss(css, contract, options = {}) {
   return problems;
 }
 
+
 // ---------------------------------------------------------------------------------------------
-// Entry point. Importing this file runs nothing; the commands arrive with build step L5.
+// What a release ships (spec §5.2 steps 3 and 5): ship.json at the release commit maps library
+// paths to app destinations. `{vendorDir}` stands for the app's config.vendorDir.
+//   { "from": "src/**", "to": "{vendorDir}/" }            every file under src/, its path kept
+//   { "from": "styles/*.css", "to": "{vendorDir}/styles/" } files directly in styles/, by name
+//   { "from": "DESIGN.md", "to": "{vendorDir}/DESIGN.md" }  one file (skipped when absent)
 // ---------------------------------------------------------------------------------------------
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  console.error(
-    "sync-ops-ui: the commands (spec §5.1) arrive with ops-ui build step L5; this build carries the brand contract only.",
+/** The one destination outside the vendor folder: this script. */
+export const SYNC_DEST = "scripts/sync-ops-ui.mjs";
+export const LOCK_FILE = "ops-ui.lock.json";
+export const CONFIG_FILE = "ops-ui.config.json";
+
+/**
+ * @typedef {{ from: string, to: string }} ShipRule
+ * @typedef {{ files: ShipRule[] }} ShipManifest
+ * @typedef {{ src: string, dest: string }} ShipEntry
+ */
+
+/**
+ * The files a release ships and where each lands, sorted by destination. Throws on a malformed
+ * manifest (a rule of an unknown shape, two sources for one destination).
+ * @param {ShipManifest} ship
+ * @param {string[]} files every path in the release commit (git ls-tree -r --name-only)
+ * @param {string} vendorDir
+ * @returns {ShipEntry[]}
+ */
+export function shipPlan(ship, files, vendorDir) {
+  if (!ship || !Array.isArray(ship.files)) throw new Error("ship.json: expected { files: [{ from, to }] }");
+  /** @type {Map<string, string>} */
+  const byDest = new Map();
+  const add = (/** @type {string} */ src, /** @type {string} */ dest) => {
+    const previous = byDest.get(dest);
+    if (previous !== undefined && previous !== src) {
+      throw new Error(`ship.json: ${dest} is shipped from both ${previous} and ${src}`);
+    }
+    byDest.set(dest, src);
+  };
+  const target = (/** @type {string} */ to) => to.replaceAll("{vendorDir}", vendorDir);
+  for (const rule of ship.files) {
+    const { from, to } = rule;
+    if (typeof from !== "string" || typeof to !== "string") throw new Error("ship.json: every rule has from and to");
+    if (from.endsWith("/**")) {
+      if (!to.endsWith("/")) throw new Error(`ship.json: ${from} maps to a folder, so its to ends with /`);
+      const prefix = from.slice(0, -2);
+      for (const file of files) if (file.startsWith(prefix)) add(file, target(to) + file.slice(prefix.length));
+    } else if (from.includes("*")) {
+      if (!to.endsWith("/")) throw new Error(`ship.json: ${from} maps to a folder, so its to ends with /`);
+      const pattern = new RegExp(`^${from.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join("[^/]*")}$`);
+      for (const file of files) if (pattern.test(file)) add(file, target(to) + file.split("/").pop());
+    } else if (files.includes(from)) {
+      add(from, target(to));
+    }
+  }
+  return [...byDest.entries()]
+    .map(([dest, src]) => ({ src, dest }))
+    .sort((a, b) => (a.dest < b.dest ? -1 : a.dest > b.dest ? 1 : 0));
+}
+
+/**
+ * The destination allow-list (spec §5.2 step 4): under the vendor folder, or exactly this
+ * script. A release can never write app code.
+ * @param {string} dest
+ * @param {string} vendorDir
+ */
+export function isAllowedDestination(dest, vendorDir) {
+  if (dest === SYNC_DEST) return true;
+  const parts = dest.split("/");
+  if (path.isAbsolute(dest) || dest.includes("\\") || parts.some((p) => p === ".." || p === "." || p === "")) return false;
+  return dest.startsWith(`${vendorDir.replace(/\/+$/, "")}/`);
+}
+
+/**
+ * The first-line header of a shipped file (spec §5.2 step 5). No double quote anywhere, so a
+ * CSS header can never trip the theme gotcha.
+ * @param {string} dest
+ * @param {string} version
+ * @param {string} sha7
+ */
+export function generatedHeader(dest, version, sha7) {
+  const ext = dest.slice(dest.lastIndexOf("."));
+  if ([".ts", ".tsx", ".mts", ".mjs", ".js"].includes(ext)) {
+    return `// GENERATED from @latro/ops-ui v${version} (${sha7}) by scripts/sync-ops-ui.mjs - do not edit; change ops-ui, release, sync.\n`;
+  }
+  if (ext === ".css") return `/* GENERATED from @latro/ops-ui v${version} (${sha7}) - do not edit. */\n`;
+  if (ext === ".md") return `<!-- GENERATED from @latro/ops-ui v${version} (${sha7}) - do not edit. -->\n`;
+  throw new Error(`${dest}: no generated-header form for ${ext} files`);
+}
+
+/** @param {string | Buffer} content */
+export function sha256(content) {
+  return createHash("sha256").update(content).digest("hex");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Versions and peer ranges: a small matcher for ^, >=, >, <=, <, exact, x-ranges and ||.
+// ---------------------------------------------------------------------------------------------
+
+/** @param {string} v @returns {[number, number, number] | null} */
+export function parseVersion(v) {
+  const m = String(v).trim().replace(/^v/, "").match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:[-+].*)?$/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2] ?? 0), Number(m[3] ?? 0)];
+}
+
+/** @param {string} a @param {string} b */
+export function compareVersions(a, b) {
+  const x = parseVersion(a);
+  const y = parseVersion(b);
+  if (!x || !y) throw new Error(`cannot compare versions ${a} and ${b}`);
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
+  return 0;
+}
+
+/**
+ * Does `version` satisfy `range`? Enough of npm's ranges for peerDependencies.
+ * @param {string} version
+ * @param {string} range
+ */
+export function satisfies(version, range) {
+  const v = parseVersion(version);
+  if (!v) return false;
+  return range.split("||").some((alternative) => {
+    const parts = alternative.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return true;
+    return parts.every((part) => {
+      const m = part.match(/^(\^|~|>=|<=|>|<|=)?v?(\d+|x|\*)(?:\.(\d+|x|\*))?(?:\.(\d+|x|\*))?$/);
+      if (!m) throw new Error(`unsupported version range: ${part}`);
+      const op = m[1] ?? "";
+      const given = [m[2], m[3], m[4]];
+      const wild = given.findIndex((g) => g === undefined || g === "x" || g === "*");
+      const base = /** @type {[number, number, number]} */ (given.map((g) => (g === undefined || g === "x" || g === "*" ? 0 : Number(g))));
+      const cmp = (/** @type {number[]} */ a, /** @type {number[]} */ b) => {
+        for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+        return 0;
+      };
+      const upper = (/** @type {number} */ level) =>
+        level === 0 ? [base[0] + 1, 0, 0] : level === 1 ? [base[0], base[1] + 1, 0] : [base[0], base[1], base[2] + 1];
+      if (op === "^") {
+        const level = base[0] > 0 || wild === 1 ? 0 : base[1] > 0 || wild === 2 ? 1 : 2;
+        return cmp(v, base) >= 0 && cmp(v, upper(level)) < 0;
+      }
+      if (op === "~") return cmp(v, base) >= 0 && cmp(v, upper(wild === 1 ? 0 : 1)) < 0;
+      if (op === ">=") return cmp(v, base) >= 0;
+      if (op === ">") return cmp(v, base) > 0;
+      if (op === "<=") return cmp(v, base) <= 0;
+      if (op === "<") return cmp(v, base) < 0;
+      if (wild === 0) return true;
+      if (wild > 0) return cmp(v, base) >= 0 && cmp(v, upper(wild - 1)) < 0;
+      return cmp(v, base) === 0;
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Small helpers.
+// ---------------------------------------------------------------------------------------------
+
+/** A refusal: the sync prints every reason and exits 1. */
+class Refusal extends Error {
+  /** @param {string[]} reasons */
+  constructor(reasons) {
+    super(reasons.join("\n"));
+    this.reasons = reasons;
+  }
+}
+
+/** A usage or environment error: exit 2. */
+class UsageError extends Error {}
+
+/**
+ * @param {string} repo
+ * @param {string[]} args
+ * @returns {string}
+ */
+function git(repo, args) {
+  return execFileSync("git", ["-C", repo, ...args], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 256 * 1024 * 1024,
+  });
+}
+
+/** @param {string} repo @param {string} ref @returns {string | null} */
+function revParse(repo, ref) {
+  try {
+    return git(repo, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** @param {string} repo @param {string} commit @param {string} file @returns {string | null} */
+function showAt(repo, commit, file) {
+  try {
+    return git(repo, ["show", `${commit}:${file}`]);
+  } catch {
+    return null;
+  }
+}
+
+/** Every file under `dir` (relative to `root`, forward slashes). */
+function listFiles(/** @type {string} */ root, /** @type {string} */ dir) {
+  const abs = path.join(root, dir);
+  if (!existsSync(abs)) return [];
+  /** @type {string[]} */
+  const out = [];
+  const walk = (/** @type {string} */ current) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else out.push(path.relative(root, full).split(path.sep).join("/"));
+    }
+  };
+  walk(abs);
+  return out.sort();
+}
+
+/** The JSON of a lock, config or package file, or null when the file is absent. */
+function readJson(/** @type {string} */ file) {
+  if (!existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch (error) {
+    throw new UsageError(`${file} is not valid JSON: ${/** @type {Error} */ (error).message}`);
+  }
+}
+
+/** JSON with sorted keys and a trailing newline: a re-run writes the same bytes. */
+export function stableJson(/** @type {unknown} */ value) {
+  const sort = (/** @type {unknown} */ v) => {
+    if (Array.isArray(v)) return v.map(sort);
+    if (v && typeof v === "object") {
+      return Object.fromEntries(
+        Object.keys(v)
+          .sort()
+          .map((k) => [k, sort(/** @type {Record<string, unknown>} */ (v)[k])]),
+      );
+    }
+    return v;
+  };
+  return `${JSON.stringify(sort(value), null, 2)}\n`;
+}
+
+/**
+ * @typedef {{ source?: string, vendorDir: string, globalsCss: string, brandCss: string, extensions: string[], local: string[], bindings: string[], wrappersDir: string }} AppConfig
+ * @typedef {{ commit: string, files: Record<string, string>, version: string, dev?: boolean }} Lock
+ */
+
+/**
+ * The app's ops-ui.config.json (spec §3.3), with defaults for what a config may leave out.
+ * @param {string} appRoot
+ * @returns {AppConfig}
+ */
+export function readConfig(appRoot) {
+  const raw = readJson(path.join(appRoot, CONFIG_FILE));
+  if (!raw) throw new UsageError(`no ${CONFIG_FILE} in ${appRoot} (run the sync from the app's root)`);
+  for (const key of ["vendorDir", "globalsCss", "brandCss"]) {
+    if (typeof raw[key] !== "string" || !raw[key]) throw new UsageError(`${CONFIG_FILE}: ${key} is required`);
+  }
+  return {
+    source: raw.source,
+    vendorDir: raw.vendorDir.replace(/\/+$/, ""),
+    globalsCss: raw.globalsCss,
+    brandCss: raw.brandCss,
+    extensions: raw.extensions ?? [],
+    local: raw.local ?? [],
+    bindings: raw.bindings ?? [],
+    wrappersDir: (raw.wrappersDir ?? "src/components/ui").replace(/\/+$/, ""),
+  };
+}
+
+/** @param {string} appRoot @returns {Lock | null} */
+function readLock(appRoot) {
+  return readJson(path.join(appRoot, LOCK_FILE));
+}
+
+/** Does the app's globals.css import the vendored tokens (the tokens step, F3/W4)? */
+function importsVendoredTokens(/** @type {string} */ globalsCss) {
+  return /@import\s+["'][^"']*ops-ui\/styles\/tokens\.css["']/.test(globalsCss);
+}
+
+/**
+ * The brand contract and the theme gotcha against the app's own files (spec §8.5 checks 1-4
+ * and 6). A missing brand.css counts only once globals.css imports the vendored tokens: in the
+ * vendor-only step (F2/W3) nothing reads the brand yet.
+ * @param {string} appRoot
+ * @param {AppConfig} config
+ * @param {string} tokensCss the library's tokens.css (at the release, or vendored)
+ * @returns {{ brand: string[], theme: string[], notes: string[] }}
+ */
+export function checkAppStyles(appRoot, config, tokensCss) {
+  /** @type {string[]} */
+  const brand = [];
+  /** @type {string[]} */
+  const theme = [];
+  /** @type {string[]} */
+  const notes = [];
+  const globalsPath = path.join(appRoot, config.globalsCss);
+  const brandPath = path.join(appRoot, config.brandCss);
+  const globals = existsSync(globalsPath) ? readFileSync(globalsPath, "utf8") : null;
+  if (globals === null) theme.push(`${config.globalsCss} (config.globalsCss) does not exist`);
+  else theme.push(...themeGotchas(globals, config.globalsCss));
+  if (existsSync(brandPath)) {
+    const css = readFileSync(brandPath, "utf8");
+    theme.push(...themeGotchas(css, config.brandCss));
+    let contract;
+    try {
+      contract = parseTokenContract(tokensCss);
+    } catch (error) {
+      brand.push(`the library's tokens.css is malformed: ${/** @type {Error} */ (error).message}`);
+    }
+    if (contract) brand.push(...checkBrandCss(css, contract, { file: config.brandCss }));
+  } else if (globals !== null && importsVendoredTokens(globals)) {
+    brand.push(`${config.brandCss} (config.brandCss) does not exist, but ${config.globalsCss} imports the library tokens`);
+  } else {
+    notes.push(`brand contract not checked yet: no ${config.brandCss} and ${config.globalsCss} does not import the library tokens`);
+  }
+  return { brand, theme, notes };
+}
+
+// ---------------------------------------------------------------------------------------------
+// checkVendor (spec §5.4): is the vendored copy exactly what the lock pins?
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * @param {string} appRoot
+ * @returns {Promise<{ ok: boolean, version: string, dev: boolean, edited: string[], missing: string[], unknown: string[], brand: string[], theme: string[] }>}
+ */
+export async function checkVendor(appRoot) {
+  const config = readConfig(appRoot);
+  const lock = readLock(appRoot);
+  if (!lock) {
+    return {
+      ok: false,
+      version: "",
+      dev: false,
+      edited: [],
+      missing: [LOCK_FILE],
+      unknown: listFiles(appRoot, config.vendorDir),
+      brand: [],
+      theme: [],
+    };
+  }
+  /** @type {string[]} */
+  const edited = [];
+  /** @type {string[]} */
+  const missing = [];
+  for (const [file, hash] of Object.entries(lock.files ?? {})) {
+    const abs = path.join(appRoot, file);
+    if (!existsSync(abs)) missing.push(file);
+    else if (sha256(readFileSync(abs)) !== hash) edited.push(file);
+  }
+  const unknown = listFiles(appRoot, config.vendorDir).filter((file) => !(file in (lock.files ?? {})));
+  const versionTs = path.join(appRoot, config.vendorDir, "version.ts");
+  if (!lock.dev && existsSync(versionTs) && !readFileSync(versionTs, "utf8").includes(`"${lock.version}"`)) {
+    // The files match their hashes, so the lock's version was edited by hand.
+    edited.push(LOCK_FILE);
+  }
+  const tokensPath = path.join(appRoot, config.vendorDir, "styles", "tokens.css");
+  const tokensCss = existsSync(tokensPath) ? readFileSync(tokensPath, "utf8") : "";
+  const { brand, theme } = checkAppStyles(appRoot, config, tokensCss);
+  const dev = lock.dev === true;
+  const ok =
+    edited.length === 0 &&
+    missing.length === 0 &&
+    unknown.length === 0 &&
+    !dev &&
+    brand.length === 0 &&
+    theme.length === 0;
+  return { ok, version: lock.version, dev, edited, missing, unknown, brand, theme };
+}
+
+// ---------------------------------------------------------------------------------------------
+// The release: resolve a version (or a dev ref) to one commit, and read what it ships from git
+// objects only (spec §5.2 steps 1-3). The library's working tree is never read.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Where the library repo is: --repo, $OPS_UI_REPO, config.source, ../ops-ui.
+ * @param {string} appRoot
+ * @param {AppConfig} config
+ * @param {string | undefined} flag
+ */
+export function findRepo(appRoot, config, flag) {
+  const candidates = [flag, process.env.OPS_UI_REPO, config.source, "../ops-ui"].filter(
+    (c) => typeof c === "string" && c.length > 0,
   );
-  process.exit(2);
+  for (const candidate of candidates) {
+    const abs = path.resolve(appRoot, /** @type {string} */ (candidate));
+    if (!existsSync(abs)) continue;
+    try {
+      const top = git(abs, ["rev-parse", "--show-toplevel"]).trim();
+      if (top) return top;
+    } catch {
+      // not a git repository: try the next candidate
+    }
+  }
+  throw new UsageError(
+    `the ops-ui library repository was not found (tried ${candidates.join(", ")}). ` +
+      "Clone github.com/sasavincic/ops-ui beside this app, pass --repo <path> or set OPS_UI_REPO; " +
+      "in a cloud session: add_repo sasavincic/ops-ui.",
+  );
+}
+
+/**
+ * The release commit of `version`: exactly one `release: vX.Y.Z` on main, agreeing with the
+ * release/vX.Y.Z branch when that exists, whose package.json and src/version.ts say X.Y.Z.
+ * @param {string} repo
+ * @param {string} version
+ * @returns {string}
+ */
+export function resolveRelease(repo, version) {
+  const main = revParse(repo, "origin/main") ? "origin/main" : "main";
+  if (!revParse(repo, main)) throw new UsageError(`the library repository at ${repo} has no main branch`);
+  const subject = `release: v${version}`;
+  const commits = git(repo, ["log", "--format=%H%x09%s", main])
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.split("\t"))
+    .filter(([, s]) => s === subject)
+    .map(([hash]) => hash);
+  if (commits.length === 0) throw new Refusal([`no release v${version} on ${main} (no commit titled "${subject}")`]);
+  if (commits.length > 1) {
+    throw new Refusal([`release v${version} is ambiguous: ${commits.length} commits titled "${subject}" on ${main}`]);
+  }
+  const [commit] = commits;
+  const branch = revParse(repo, `origin/release/v${version}`) ?? revParse(repo, `release/v${version}`);
+  if (branch && branch !== commit) {
+    throw new Refusal([
+      `release markers disagree: "${subject}" is ${commit.slice(0, 7)} but branch release/v${version} is ${branch.slice(0, 7)}`,
+    ]);
+  }
+  const pkg = JSON.parse(showAt(repo, commit, "package.json") ?? "{}");
+  const versionTs = showAt(repo, commit, "src/version.ts") ?? "";
+  if (pkg.version !== version || !versionTs.includes(`"${version}"`)) {
+    throw new Refusal([
+      `release v${version} (${commit.slice(0, 7)}) is malformed: package.json says ${pkg.version} and src/version.ts must say ${version}`,
+    ]);
+  }
+  return commit;
+}
+
+/**
+ * Everything a sync needs from the release commit.
+ * @param {string} repo
+ * @param {string} commit
+ * @param {string} version
+ * @param {string} vendorDir
+ */
+export function readRelease(repo, commit, version, vendorDir) {
+  const shipText = showAt(repo, commit, "ship.json");
+  if (shipText === null) throw new Refusal([`the release ${commit.slice(0, 7)} has no ship.json`]);
+  const files = git(repo, ["ls-tree", "-r", "--name-only", commit]).split("\n").filter(Boolean);
+  /** @type {ShipEntry[]} */
+  let plan;
+  try {
+    plan = shipPlan(JSON.parse(shipText), files, vendorDir);
+  } catch (error) {
+    throw new Refusal([`the release is malformed: ${/** @type {Error} */ (error).message}`]);
+  }
+  const sha7 = commit.slice(0, 7);
+  /** @type {Map<string, string>} */
+  const contents = new Map();
+  /** @type {string[]} */
+  const malformed = [];
+  for (const { src, dest } of plan) {
+    try {
+      contents.set(dest, generatedHeader(dest, version, sha7) + /** @type {string} */ (showAt(repo, commit, src)));
+    } catch (error) {
+      malformed.push(`the release is malformed: ${/** @type {Error} */ (error).message}`);
+    }
+  }
+  if (malformed.length > 0) throw new Refusal(malformed);
+  return {
+    plan,
+    contents,
+    pkg: JSON.parse(showAt(repo, commit, "package.json") ?? "{}"),
+    tokensCss: showAt(repo, commit, "styles/tokens.css") ?? "",
+    changelog: showAt(repo, commit, "CHANGELOG.md") ?? "",
+  };
+}
+
+/**
+ * The CHANGELOG sections after `from` up to and including `to` (spec §4.3 headings
+ * `## X.Y.Z — date`), newest first as the file holds them.
+ * @param {string} changelog
+ * @param {string | null} from
+ * @param {string} to
+ */
+export function changelogBetween(changelog, from, to) {
+  const sections = changelog.split(/^(?=## \d)/m).filter((s) => /^## \d/.test(s));
+  return sections.filter((section) => {
+    const v = section.match(/^## (\d+\.\d+\.\d+)/)?.[1];
+    if (!v) return false;
+    if (compareVersions(v, to) > 0) return false;
+    return from === null ? compareVersions(v, to) === 0 : compareVersions(v, from) > 0;
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// The sync (spec §5.2).
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * @typedef {{ version?: string, ref?: string, repo?: string, dryRun?: boolean, discardLocalEdits?: boolean, allowDowngrade?: boolean }} SyncOptions
+ */
+
+/**
+ * @param {string} appRoot
+ * @param {SyncOptions} options
+ * @param {(line: string) => void} log
+ * @returns {number} the exit code
+ */
+export function sync(appRoot, options, log) {
+  const config = readConfig(appRoot);
+  const repo = findRepo(appRoot, config, options.repo);
+  try {
+    git(repo, ["fetch", "--quiet", "origin", "main", "refs/heads/release/*:refs/remotes/origin/release/*"]);
+  } catch {
+    // Best effort: offline is fine when the refs exist locally.
+  }
+
+  // Step 2: one commit C.
+  /** @type {string} */
+  let commit;
+  /** @type {string} */
+  let version;
+  const dev = Boolean(options.ref);
+  if (options.ref) {
+    const resolved = revParse(repo, options.ref);
+    if (!resolved) throw new UsageError(`--ref ${options.ref} is not a commit of ${repo}`);
+    commit = resolved;
+    const pkg = JSON.parse(showAt(repo, commit, "package.json") ?? "{}");
+    version = `${pkg.version}-dev+${commit.slice(0, 7)}`;
+  } else {
+    version = /** @type {string} */ (options.version);
+    commit = resolveRelease(repo, version);
+  }
+  const oldLock = readLock(appRoot);
+  if (!dev && oldLock && !oldLock.dev && oldLock.version === version && oldLock.commit !== commit) {
+    throw new Refusal([`release v${version} moved from ${oldLock.commit} to ${commit}`]);
+  }
+
+  // Step 3: read the release from git objects.
+  const release = readRelease(repo, commit, version, config.vendorDir);
+  const newFiles = new Map([...release.contents].map(([dest, content]) => [dest, sha256(content)]));
+
+  // Step 4: pre-flight. Nothing is written until every check has passed.
+  /** @type {string[]} */
+  const problems = [];
+  /** @type {string[]} */
+  const notes = [];
+  const oldFiles = oldLock?.files ?? {};
+  const edited = [];
+  for (const [file, hash] of Object.entries(oldFiles)) {
+    const abs = path.join(appRoot, file);
+    if (!existsSync(abs)) edited.push(`${file} is missing`);
+    else if (sha256(readFileSync(abs)) !== hash) edited.push(`${file} was edited`);
+  }
+  if (edited.length > 0 && !options.discardLocalEdits) {
+    problems.push(...edited.map((e) => `local edit: ${e} (see: git diff -- ${e.split(" ")[0]})`));
+    problems.push("fix it in ops-ui, release, sync - or pass --discard-local-edits to overwrite");
+  }
+  const unknown = listFiles(appRoot, config.vendorDir).filter((file) => !(file in oldFiles));
+  if (unknown.length > 0 && !options.discardLocalEdits) {
+    problems.push(...unknown.map((file) => `unknown file: ${file} is not in ${LOCK_FILE} (--discard-local-edits removes it)`));
+  }
+  for (const dest of newFiles.keys()) {
+    if (!isAllowedDestination(dest, config.vendorDir)) {
+      problems.push(`the release is malformed: ${dest} is outside ${config.vendorDir} and is not ${SYNC_DEST}`);
+    }
+  }
+  for (const dest of newFiles.keys()) {
+    // The running script is the one exception: an app's first sync starts from a hand copy.
+    if (dest !== SYNC_DEST && !(dest in oldFiles) && existsSync(path.join(appRoot, dest))) {
+      problems.push(`collision: ${dest} already exists and is not the library's; move the app's file`);
+    }
+  }
+  if (oldLock && compareVersions(version, oldLock.version) < 0 && !options.allowDowngrade) {
+    problems.push(`downgrade: ${oldLock.version} to ${version} (pass --allow-downgrade to go back)`);
+  }
+  for (const [name, range] of Object.entries(release.pkg.peerDependencies ?? {})) {
+    const installed = readJson(path.join(appRoot, "node_modules", name, "package.json"));
+    if (!installed) problems.push(`peer ${name} is not installed (the library needs ${range})`);
+    else if (!satisfies(installed.version, /** @type {string} */ (range))) {
+      problems.push(`peer ${name} ${installed.version} does not satisfy ${range}`);
+    }
+  }
+  try {
+    const declared = new Set(parseTokenContract(release.tokensCss).tokens.map((t) => t.token));
+    for (const name of config.extensions) {
+      if (declared.has(name)) problems.push(`extension clash: the library now declares ${name}, an app extension (config.extensions)`);
+    }
+  } catch (error) {
+    problems.push(`the release is malformed: ${/** @type {Error} */ (error).message}`);
+  }
+  const styles = checkAppStyles(appRoot, config, release.tokensCss);
+  problems.push(...styles.brand, ...styles.theme);
+  notes.push(...styles.notes);
+  if (problems.length > 0) throw new Refusal(problems);
+
+  const added = [...newFiles.keys()].filter((f) => !(f in oldFiles));
+  const changed = [...newFiles.keys()].filter((f) => f in oldFiles && oldFiles[f] !== newFiles.get(f));
+  const removed = Object.keys(oldFiles).filter((f) => !newFiles.has(f));
+
+  if (oldLock && parseVersion(oldLock.version)?.[0] !== parseVersion(version)?.[0]) {
+    const lower = compareVersions(oldLock.version, version) < 0 ? oldLock.version : version;
+    const higher = lower === version ? oldLock.version : version;
+    const sections = changelogBetween(release.changelog, lower, higher);
+    const crossing = sections.flatMap((s) => majorNotes(s));
+    if (crossing.length > 0) {
+      log(`Crossing a major (${oldLock.version} -> ${version}):`);
+      for (const line of crossing) log(`  ${line}`);
+    }
+  }
+
+  if (options.dryRun) {
+    log(`dry run: ops-ui ${oldLock?.version ?? "(none)"} -> ${version} (${commit.slice(0, 7)})`);
+    for (const f of added) log(`  add     ${f}`);
+    for (const f of changed) log(`  change  ${f}`);
+    for (const f of removed) log(`  remove  ${f}`);
+    log(`${added.length} added, ${changed.length} changed, ${removed.length} removed; nothing written`);
+    return 0;
+  }
+
+  // Steps 5-6: write the vendor folder into a temporary directory, then swap it in.
+  const vendorAbs = path.join(appRoot, config.vendorDir);
+  const needsWrite =
+    added.length + changed.length + removed.length + edited.length + unknown.length > 0 || !existsSync(vendorAbs);
+  if (needsWrite) {
+    const tmp = `${vendorAbs}.ops-ui-tmp`;
+    const old = `${vendorAbs}.ops-ui-old`;
+    rmSync(tmp, { recursive: true, force: true });
+    rmSync(old, { recursive: true, force: true });
+    for (const [dest, content] of release.contents) {
+      if (dest === SYNC_DEST) continue;
+      const file = path.join(tmp, path.relative(config.vendorDir, dest));
+      mkdirSync(path.dirname(file), { recursive: true });
+      writeFileSync(file, content);
+    }
+    mkdirSync(tmp, { recursive: true });
+    const hadVendor = existsSync(vendorAbs);
+    try {
+      if (hadVendor) renameSync(vendorAbs, old);
+      try {
+        renameSync(tmp, vendorAbs);
+      } catch (error) {
+        if (hadVendor) renameSync(old, vendorAbs);
+        throw error;
+      }
+    } catch (error) {
+      rmSync(tmp, { recursive: true, force: true });
+      throw new Refusal([`could not swap ${config.vendorDir}: ${/** @type {Error} */ (error).message}; nothing changed`]);
+    }
+    rmSync(old, { recursive: true, force: true });
+    for (const dest of removed) {
+      if (!dest.startsWith(`${config.vendorDir}/`) && dest !== SYNC_DEST) rmSync(path.join(appRoot, dest), { force: true });
+    }
+  }
+
+  // Step 7: the lock.
+  /** @type {Lock} */
+  const lock = { commit, files: Object.fromEntries(newFiles), version };
+  if (dev) lock.dev = true;
+  writeFileSync(path.join(appRoot, LOCK_FILE), stableJson(lock));
+
+  // Step 9 (printed before step 8 so the self-update notice is the last line).
+  log(`ops-ui ${oldLock?.version ?? "(none)"} -> ${version} (${commit.slice(0, 7)}): ${added.length} added, ${changed.length} changed, ${removed.length} removed`);
+  for (const note of notes) log(`note: ${note}`);
+  const sections = changelogBetween(release.changelog, oldLock && !oldLock.dev ? oldLock.version : null, parseVersionText(version));
+  if (sections.length > 0) {
+    log("CHANGELOG:");
+    for (const section of sections) log(section.trimEnd());
+  }
+  const unwrapped = missingWrappers(appRoot, config);
+  if (unwrapped.length > 0) {
+    log(`components without a wrapper in ${config.wrappersDir}: ${unwrapped.join(", ")} (run: node ${SYNC_DEST} --write-wrappers)`);
+  }
+  log("next: pnpm typecheck && pnpm test, then the visual check (ops-ui tools/app-shots.mjs, spec §11.4)");
+
+  // Step 8: this script, last.
+  const ownContent = release.contents.get(SYNC_DEST);
+  const ownPath = path.join(appRoot, SYNC_DEST);
+  if (ownContent !== undefined) {
+    const current = existsSync(ownPath) ? readFileSync(ownPath, "utf8") : null;
+    if (current !== ownContent) {
+      mkdirSync(path.dirname(ownPath), { recursive: true });
+      writeFileSync(`${ownPath}.ops-ui-tmp`, ownContent);
+      renameSync(`${ownPath}.ops-ui-tmp`, ownPath);
+      log("the sync script was updated - run the same command again");
+    }
+  } else if (SYNC_DEST in oldFiles) {
+    rmSync(ownPath, { force: true });
+  }
+  return 0;
+}
+
+/** X.Y.Z of a version, dropping a -dev+sha suffix. */
+function parseVersionText(/** @type {string} */ version) {
+  const v = parseVersion(version);
+  return v ? v.join(".") : version;
+}
+
+/** The Visible:, Breaking: and Upgrade steps: lines of a CHANGELOG section, with their continuations. */
+function majorNotes(/** @type {string} */ section) {
+  /** @type {string[]} */
+  const out = [];
+  let keep = false;
+  for (const line of section.split("\n")) {
+    if (/^(Visible|Breaking|Upgrade steps):/.test(line)) keep = true;
+    else if (/^[A-Z][A-Za-z ]*:/.test(line) || line.startsWith("## ") || line.trim() === "") keep = false;
+    if (keep) out.push(line);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Wrappers (spec §6.4): src/components/ui/<name>.tsx re-exports the vendored module by name.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The runtime and type exports of a module, in source order, from its export statements.
+ * @param {string} source
+ * @returns {{ runtime: string[], types: string[] }}
+ */
+export function moduleExports(source) {
+  const code = source.replace(/\/\*[^]*?\*\//g, "").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
+  /** @type {{ at: number, name: string, type: boolean }[]} */
+  const found = [];
+  const add = (/** @type {number} */ at, /** @type {string} */ name, /** @type {boolean} */ type) => found.push({ at, name, type });
+  for (const m of code.matchAll(/^export\s+(?:default\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/gm)) add(m.index, m[1], false);
+  for (const m of code.matchAll(/^export\s+(?:const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm)) add(m.index, m[1], false);
+  for (const m of code.matchAll(/^export\s+(?:declare\s+)?(type|interface|enum)\s+([A-Za-z_$][\w$]*)/gm)) {
+    add(m.index, m[2], m[1] !== "enum");
+  }
+  for (const m of code.matchAll(/^export\s+(type\s+)?\{([^}]*)\}/gm)) {
+    for (const entry of m[2].split(",").map((e) => e.trim()).filter(Boolean)) {
+      const typeEntry = Boolean(m[1]) || /^type\s+/.test(entry);
+      const name = entry.replace(/^type\s+/, "").split(/\s+as\s+/).pop()?.trim();
+      if (name) add(m.index, name, typeEntry);
+    }
+  }
+  found.sort((a, b) => a.at - b.at);
+  /** @type {string[]} */
+  const runtime = [];
+  /** @type {string[]} */
+  const types = [];
+  for (const { name, type } of found) {
+    const list = type ? types : runtime;
+    if (!runtime.includes(name) && !types.includes(name)) list.push(name);
+  }
+  return { runtime, types };
+}
+
+/** The import path of the vendor folder from the wrappers: the `@/` alias for src/, else relative. */
+function vendorImport(/** @type {AppConfig} */ config) {
+  if (config.vendorDir.startsWith("src/")) return `@/${config.vendorDir.slice(4)}`;
+  const rel = path.posix.relative(config.wrappersDir, config.vendorDir);
+  return rel.startsWith(".") ? rel : `./${rel}`;
+}
+
+/** Vendored component modules that have no wrapper yet. */
+function missingWrappers(/** @type {string} */ appRoot, /** @type {AppConfig} */ config) {
+  const dir = path.join(appRoot, config.vendorDir, "components");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(".tsx"))
+    .map((f) => f.slice(0, -4))
+    .filter((name) => !existsSync(path.join(appRoot, config.wrappersDir, `${name}.tsx`)))
+    .sort();
+}
+
+/**
+ * Creates a pure wrapper for every vendored component without one; never overwrites.
+ * @param {string} appRoot
+ * @param {(line: string) => void} log
+ * @returns {number}
+ */
+export function writeWrappers(appRoot, log) {
+  const config = readConfig(appRoot);
+  const names = missingWrappers(appRoot, config);
+  if (!existsSync(path.join(appRoot, config.vendorDir, "components"))) {
+    throw new UsageError(`no ${config.vendorDir}/components: sync a release first`);
+  }
+  const from = vendorImport(config);
+  for (const name of names) {
+    const source = readFileSync(path.join(appRoot, config.vendorDir, "components", `${name}.tsx`), "utf8");
+    const { runtime, types } = moduleExports(source);
+    const spec = `${from}/components/${name}`;
+    let text = "";
+    if (runtime.length > 0) text += `export { ${runtime.join(", ")} } from "${spec}";\n`;
+    if (types.length > 0) text += `export type { ${types.join(", ")} } from "${spec}";\n`;
+    const file = path.join(appRoot, config.wrappersDir, `${name}.tsx`);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, text, { flag: "wx" });
+    log(`created ${config.wrappersDir}/${name}.tsx`);
+  }
+  if (names.length === 0) log("every vendored component has a wrapper");
+  return 0;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Command line (spec §5.1).
+// ---------------------------------------------------------------------------------------------
+
+const USAGE = [
+  "usage:",
+  "  node scripts/sync-ops-ui.mjs --version X.Y.Z [--repo <path>] [--dry-run] [--discard-local-edits] [--allow-downgrade]",
+  "  node scripts/sync-ops-ui.mjs --ref <sha> [--repo <path>] [--dry-run]",
+  "  node scripts/sync-ops-ui.mjs --check",
+  "  node scripts/sync-ops-ui.mjs --write-wrappers",
+].join("\n");
+
+/**
+ * @param {string[]} argv
+ * @returns {{ command: "sync" | "check" | "write-wrappers" } & SyncOptions}
+ */
+export function parseArgs(argv) {
+  /** @type {SyncOptions & { command?: "sync" | "check" | "write-wrappers" }} */
+  const out = {};
+  const value = (/** @type {number} */ i, /** @type {string} */ flag) => {
+    const v = argv[i + 1];
+    if (v === undefined || v.startsWith("--")) throw new UsageError(`${flag} needs a value\n${USAGE}`);
+    return v;
+  };
+  const command = (/** @type {"sync" | "check" | "write-wrappers"} */ c) => {
+    if (out.command && out.command !== c) throw new UsageError(`one command at a time\n${USAGE}`);
+    out.command = c;
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--version") {
+      out.version = value(i++, arg);
+      command("sync");
+    } else if (arg === "--ref") {
+      out.ref = value(i++, arg);
+      command("sync");
+    } else if (arg === "--repo") out.repo = value(i++, arg);
+    else if (arg === "--dry-run") out.dryRun = true;
+    else if (arg === "--discard-local-edits") out.discardLocalEdits = true;
+    else if (arg === "--allow-downgrade") out.allowDowngrade = true;
+    else if (arg === "--check") command("check");
+    else if (arg === "--write-wrappers") command("write-wrappers");
+    else throw new UsageError(`unknown argument ${arg}\n${USAGE}`);
+  }
+  if (!out.command) throw new UsageError(USAGE);
+  if (out.version && out.ref) throw new UsageError(`--version and --ref exclude each other\n${USAGE}`);
+  if (out.version && !/^\d+\.\d+\.\d+$/.test(out.version)) throw new UsageError(`--version takes X.Y.Z, got ${out.version}`);
+  return /** @type {{ command: "sync" | "check" | "write-wrappers" } & SyncOptions} */ (out);
+}
+
+/**
+ * @param {string[]} argv
+ * @param {string} appRoot
+ * @returns {Promise<number>}
+ */
+export async function main(argv, appRoot = process.cwd()) {
+  const log = (/** @type {string} */ line) => console.log(line);
+  try {
+    const args = parseArgs(argv);
+    if (args.command === "check") {
+      const result = await checkVendor(appRoot);
+      if (result.ok) {
+        log(`ops-ui ${result.version}: the vendored copy matches ${LOCK_FILE}`);
+        return 0;
+      }
+      console.error(`ops-ui ${result.version || "(no lock)"}: the vendored copy does not match`);
+      if (result.dev) console.error(`dev sync: ${LOCK_FILE} pins a --ref build; sync a release`);
+      for (const f of result.edited) console.error(`edited: ${f}`);
+      for (const f of result.missing) console.error(`missing: ${f}`);
+      for (const f of result.unknown) console.error(`unknown: ${f}`);
+      for (const p of [...result.brand, ...result.theme]) console.error(p);
+      return 1;
+    }
+    if (args.command === "write-wrappers") return writeWrappers(appRoot, log);
+    return sync(appRoot, args, log);
+  } catch (error) {
+    if (error instanceof Refusal) {
+      console.error("sync-ops-ui: refused");
+      for (const reason of error.reasons) console.error(reason);
+      return 1;
+    }
+    if (error instanceof UsageError) {
+      console.error(`sync-ops-ui: ${error.message}`);
+      return 2;
+    }
+    console.error(`sync-ops-ui: ${/** @type {Error} */ (error).stack ?? error}`);
+    return 2;
+  }
+}
+
+// Run only when executed directly, never on import (checkVendor is imported by app tests).
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  process.exit(await main(process.argv.slice(2)));
 }

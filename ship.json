@@ -1,0 +1,10 @@
+{
+  "files": [
+    { "from": "src/**", "to": "{vendorDir}/" },
+    { "from": "styles/*.css", "to": "{vendorDir}/styles/" },
+    { "from": "DESIGN.md", "to": "{vendorDir}/DESIGN.md" },
+    { "from": "TOKENS.md", "to": "{vendorDir}/TOKENS.md" },
+    { "from": "CHANGELOG.md", "to": "{vendorDir}/CHANGELOG.md" },
+    { "from": "sync/sync-ops-ui.mjs", "to": "scripts/sync-ops-ui.mjs" }
+  ]
+}
