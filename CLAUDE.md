@@ -70,7 +70,10 @@ Never commit red. `pnpm shots` builds the gallery, compares every story ×
 3 brands × {1440, 375} against `gallery/__screenshots__/` with 0 changed
 pixels, and runs the browser behaviour tests (`gallery/tests/behaviour.spec.ts`).
 `pnpm test` includes the api-surface check: after changing a declaration under
-`src/`, run `pnpm api-surface` and commit `api-surface.d.txt`.
+`src/` or the sync script's JSDoc, run `pnpm api-surface` and commit
+`api-surface.d.txt` and `sync/sync-ops-ui.d.mts` (the sync script's
+declarations, shipped beside it as `scripts/sync-ops-ui.d.mts` so an app with
+`allowJs` off can type-check its vendor test).
 
 - Playwright is pinned to exactly `@playwright/test` 1.56.1 = Chromium
   revision 1194, preinstalled under `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`.

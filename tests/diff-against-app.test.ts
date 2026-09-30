@@ -141,6 +141,12 @@ function appFromL2(dir: string, name: "fina-ops" | "workforce-ops") {
   };
 }
 
+// The end-to-end proof reads the L2 import commit. In a shallow clone it is missing: that must be
+// red, never a silently skipped proof (the gates need full history).
+it("the L2 import commit is in history (a shallow clone: git fetch --unshallow)", () => {
+  expect(L2, "no commit titled 'L2: import the kit' - the extraction proof cannot run").toMatch(/^[0-9a-f]{40}$/);
+});
+
 describe.skipIf(!L2)("end to end", () => {
   const T = { timeout: 60_000 };
 

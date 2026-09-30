@@ -6,14 +6,15 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
-  statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import ts from "typescript";
 import { afterAll, describe, expect, it } from "vitest";
 import {
+  blankNonCode,
   changelogBetween,
   checkVendor,
   moduleExports,
@@ -21,7 +22,7 @@ import {
   sha256,
   stableJson,
 } from "../sync/sync-ops-ui.mjs";
-import { ROOT, readSource } from "./source-files";
+import { ROOT, filesUnder, readSource } from "./source-files";
 
 // The sync script end to end (spec §5, §11.1 `sync`): the REAL sync/sync-ops-ui.mjs, run with
 // node against temporary git repositories - a fake library that ships the real ship.json,
@@ -82,6 +83,7 @@ function library() {
   write(lib, "CHANGELOG.md", "# Changelog\n\n## 1.0.0 — 2026-09-30\nAdded: the kit.\n");
   write(lib, "ship.json", readSource("ship.json"));
   write(lib, "sync/sync-ops-ui.mjs", readSource("sync/sync-ops-ui.mjs"));
+  write(lib, "sync/sync-ops-ui.d.mts", readSource("sync/sync-ops-ui.d.mts"));
   write(lib, "tests/never-shipped.test.ts", "// not shipped\n");
   git(lib, "add", "-A");
   git(lib, "commit", "-q", "-m", "L1: scaffold");
@@ -150,6 +152,45 @@ function run(a: string, ...args: string[]) {
   return { status: r.status, out: `${r.stdout}${r.stderr}` };
 }
 
+/**
+ * A preload for `node --import` that records every file the sync writes, renames or removes, in
+ * order (one `op<TAB>path` line each, paths relative to the app), into $OPS_UI_FS_LOG. The script
+ * imports its fs functions by name; syncBuiltinESMExports makes those bindings the recorders.
+ */
+const FS_RECORDER = path.join(SANDBOX, "fs-recorder.mjs");
+writeFileSync(
+  FS_RECORDER,
+  `import fs from "node:fs";
+import path from "node:path";
+import { syncBuiltinESMExports } from "node:module";
+const originalWrite = fs.writeFileSync.bind(fs);
+const append = (file, text) => originalWrite(file, text, { flag: "a" });
+const rel = (p) => path.relative(process.cwd(), String(p)).split(path.sep).join("/");
+const record = (op, ...targets) => append(process.env.OPS_UI_FS_LOG, op + "\\t" + targets.map(rel).join(" -> ") + "\\n");
+for (const [name, op] of [["writeFileSync", "write"], ["renameSync", "rename"], ["rmSync", "rm"]]) {
+  const original = fs[name].bind(fs);
+  fs[name] = (target, ...rest) => {
+    record(op, target, ...(op === "rename" ? [rest[0]] : []));
+    return original(target, ...rest);
+  };
+}
+syncBuiltinESMExports();
+`,
+);
+
+/** Runs the sync with FS_RECORDER and returns the ordered file operations. */
+function runRecorded(a: string, ...args: string[]) {
+  const log = path.join(SANDBOX, `fs-log-${++counter}.txt`);
+  writeFileSync(log, "");
+  const r = spawnSync(process.execPath, ["--import", FS_RECORDER, "scripts/sync-ops-ui.mjs", ...args], {
+    cwd: a,
+    encoding: "utf8",
+    env: { ...process.env, OPS_UI_REPO: "", OPS_UI_FS_LOG: log },
+  });
+  const ops = readFileSync(log, "utf8").split("\n").filter(Boolean);
+  return { status: r.status, out: `${r.stdout}${r.stderr}`, ops };
+}
+
 /** Pin v1.0.0 the way F2 does: sync, the script updates itself, run again. */
 function pinned(lib = library(), config: Record<string, unknown> = {}) {
   const a = app(lib, config);
@@ -180,6 +221,7 @@ describe("sync: first pin, idempotence, self-update", () => {
     expect(lock.commit).toBe(commit);
     expect(lock.dev).toBeUndefined();
     expect(Object.keys(lock.files)).toEqual([
+      "scripts/sync-ops-ui.d.mts",
       "scripts/sync-ops-ui.mjs",
       "src/vendor/ops-ui/CHANGELOG.md",
       "src/vendor/ops-ui/TOKENS.md",
@@ -202,6 +244,9 @@ describe("sync: first pin, idempotence, self-update", () => {
     );
     expect(read(a, "src/vendor/ops-ui/TOKENS.md").split("\n")[0]).toBe(`<!-- GENERATED from @latro/ops-ui v1.0.0 (${sha7}) - do not edit. -->`);
     expect(read(a, "scripts/sync-ops-ui.mjs").split("\n")[0]).toContain(`GENERATED from @latro/ops-ui v1.0.0 (${sha7})`);
+    expect(read(a, "scripts/sync-ops-ui.d.mts")).toBe(
+      `// GENERATED from @latro/ops-ui v1.0.0 (${sha7}) by scripts/sync-ops-ui.mjs - do not edit; change ops-ui, release, sync.\n${readSource("sync/sync-ops-ui.d.mts")}`,
+    );
     for (const [file, hash] of Object.entries(lock.files)) expect(sha256(readFileSync(path.join(a, file))), file).toBe(hash);
     expect(existsSync(path.join(a, "src/vendor/ops-ui/tests"))).toBe(false);
     expect(existsSync(path.join(a, "src/vendor/ops-ui.ops-ui-tmp"))).toBe(false);
@@ -238,21 +283,36 @@ describe("sync: first pin, idempotence, self-update", () => {
       },
       "## 1.1.0 — 2026-10-06\nAdded: Tag (components/tag.tsx).\n",
     );
-    const up = run(a, "--version", "1.1.0");
+    const up = runRecorded(a, "--version", "1.1.0");
     expect(up.status, up.out).toBe(0);
     expect(up.out).toContain("ops-ui 1.0.0 -> 1.1.0");
     // Every file changes: its header names the new version and commit.
-    expect(up.out).toContain("1 added, 9 changed, 0 removed");
+    expect(up.out).toContain("1 added, 10 changed, 0 removed");
     expect(up.out).toContain("Added: Tag (components/tag.tsx).");
     expect(up.out).not.toContain("## 1.0.0");
     expect(up.out).toContain("components without a wrapper in src/components/ui: badge, button, tag");
     expect(up.out.trim().split("\n").at(-1)).toBe("the sync script was updated - run the same command again");
     expect(read(a, "scripts/sync-ops-ui.mjs")).toContain("// v1.1.0 of the sync script");
     expect(read(a, "scripts/sync-ops-ui.mjs").split("\n")[0]).toContain(`v1.1.0 (${v11.slice(0, 7)})`);
-    // Written last: after the lock that already pins its new hash.
-    expect(statSync(path.join(a, "scripts/sync-ops-ui.mjs")).mtimeMs).toBeGreaterThanOrEqual(
-      statSync(path.join(a, "ops-ui.lock.json")).mtimeMs,
-    );
+    // Written last, in this order: the vendor swap, the lock (which already pins the script's
+    // new hash), the declarations, and the script itself as the very last file operation.
+    const at = (op: string) => {
+      const index = up.ops.indexOf(op);
+      expect(index, `${op} in\n${up.ops.join("\n")}`).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+    const swap = at("rename\tsrc/vendor/ops-ui.ops-ui-tmp -> src/vendor/ops-ui");
+    const lock = at("write\tops-ui.lock.json");
+    const types = at("rename\tscripts/sync-ops-ui.d.mts.ops-ui-tmp -> scripts/sync-ops-ui.d.mts");
+    const script = at("rename\tscripts/sync-ops-ui.mjs.ops-ui-tmp -> scripts/sync-ops-ui.mjs");
+    expect(swap).toBeLessThan(lock);
+    expect(lock).toBeLessThan(types);
+    expect(types).toBeLessThan(script);
+    expect(script).toBe(up.ops.length - 1);
+    expect(up.ops.filter((op) => op.includes("scripts/sync-ops-ui.mjs"))).toEqual([
+      "write\tscripts/sync-ops-ui.mjs.ops-ui-tmp",
+      "rename\tscripts/sync-ops-ui.mjs.ops-ui-tmp -> scripts/sync-ops-ui.mjs",
+    ]);
     expect(lockOf(a).files["scripts/sync-ops-ui.mjs"]).toBe(sha256(read(a, "scripts/sync-ops-ui.mjs")));
     expect((await checkVendor(a)).ok).toBe(true);
     const rerun = run(a, "--version", "1.1.0");
@@ -317,6 +377,21 @@ describe("sync: refusals", () => {
     expect(run(a, "--version", "1.0.0", "--discard-local-edits").status).toBe(0);
     expect(existsSync(path.join(a, "src/vendor/ops-ui/components/mine.tsx"))).toBe(false);
     expect(clean(a)).toBe(true);
+  });
+
+  it("OS and editor litter in the vendor folder is neither unknown nor refused", T, async () => {
+    const { a } = pinned();
+    for (const litter of [".DS_Store", "components/.DS_Store", "components/._button.tsx", "Thumbs.db", "components/.button.tsx.swp"]) {
+      write(a, `src/vendor/ops-ui/${litter}`, "litter");
+    }
+    const vendor = await checkVendor(a);
+    expect(vendor.unknown).toEqual([]);
+    expect(vendor.ok).toBe(true);
+    const again = run(a, "--version", "1.0.0");
+    expect(again.status, again.out).toBe(0);
+    // A real unknown file beside the litter is still refused.
+    write(a, "src/vendor/ops-ui/components/mine.tsx", "export const mine = 1;\n");
+    expect((await checkVendor(a)).unknown).toEqual(["src/vendor/ops-ui/components/mine.tsx"]);
   });
 
   it("a collision is refused even with --discard-local-edits", T, () => {
@@ -417,7 +492,9 @@ describe("sync: refusals", () => {
     releaseWith(lib, "1.0.1", { "ship.json": JSON.stringify(ship), "evil.ts": "export const x = 1;\n" });
     const refused = run(app(lib), "--version", "1.0.1");
     expect(refused.status).toBe(1);
-    expect(refused.out).toContain("the release is malformed: src/app/page.ts is outside src/vendor/ops-ui and is not scripts/sync-ops-ui.mjs");
+    expect(refused.out).toContain(
+      "the release is malformed: src/app/page.ts is outside src/vendor/ops-ui and is not scripts/sync-ops-ui.mjs or scripts/sync-ops-ui.d.mts",
+    );
   });
 });
 
@@ -508,6 +585,61 @@ describe("sync helpers", () => {
       types: ["CalloutTone"],
     });
     expect(moduleExports(readSource("src/components/toast.tsx")).types).toEqual(["ToastAction", "ToastTone"]);
+  });
+
+  it("module exports: comments and literals never hide or fake an export", () => {
+    const source = [
+      'const accept = "application/pdf,image/*";',
+      "export function Kept() {}",
+      "const url = 'https://example.com'; export const notAtLineStart = 1;",
+      "export const Also = `a ${`nested ${accept}`} /* not a comment`;",
+      "const re = /\\/*x[/*]/g;",
+      "export type Typed = { a: \"*/\" };",
+      "// export function Commented() {}",
+      "/*",
+      "export function InAComment() {}",
+      "*/",
+      "const t = `",
+      "export function InATemplate() {}",
+      "`;",
+      "export { Kept as Renamed, // a comment inside the braces",
+      "  type Typed as TypedToo };",
+    ].join("\n");
+    expect(moduleExports(source)).toEqual({ runtime: ["Kept", "Also", "Renamed"], types: ["Typed", "TypedToo"] });
+    // The blanked text keeps every line, so line numbers and line starts survive.
+    expect(blankNonCode(source).split("\n")).toHaveLength(source.split("\n").length);
+  });
+
+  // Every component, against the TypeScript AST (runtime vs type exports, source order) and the
+  // module's real runtime exports: --write-wrappers builds each wrapper from moduleExports, and a
+  // name it missed (Textarea, lost to the "image/*" in field.tsx) breaks every app that imports it.
+  const components = filesUnder("src/components").filter((file) => file.endsWith(".tsx"));
+  it.each(components)("module exports of %s match the TypeScript AST and the runtime module", async (file) => {
+    const source = readSource(file);
+    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const runtime: string[] = [];
+    const types: string[] = [];
+    const exported = (node: ts.Node) =>
+      ts.canHaveModifiers(node) && (ts.getModifiers(node) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+    for (const statement of ast.statements) {
+      if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+        for (const element of statement.exportClause.elements) {
+          (statement.isTypeOnly || element.isTypeOnly ? types : runtime).push(element.name.text);
+        }
+      } else if (!exported(statement)) {
+        continue;
+      } else if (ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement)) {
+        types.push(statement.name.text);
+      } else if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)) && statement.name) {
+        runtime.push(statement.name.text);
+      } else if (ts.isVariableStatement(statement)) {
+        for (const d of statement.declarationList.declarations) if (ts.isIdentifier(d.name)) runtime.push(d.name.text);
+      }
+    }
+    const found = moduleExports(source);
+    expect(found).toEqual({ runtime, types });
+    const mod = await import(path.join(ROOT, file));
+    expect([...found.runtime].sort()).toEqual(Object.keys(mod).sort());
   });
 
   it("the CHANGELOG between two versions", () => {

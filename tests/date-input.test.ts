@@ -80,10 +80,25 @@ describe("month grid", () => {
 });
 
 describe("the rest of the module the DateInput reads", () => {
-  it("today is the local calendar day, not the UTC one", () => {
-    expect(localTodayIso(new Date(2026, 8, 30, 23, 30))).toBe("2026-09-30");
-    expect(localTodayIso(new Date(2026, 0, 1, 0, 5))).toBe("2026-01-01");
-  });
+  // Run in two zones on opposite sides of UTC (Node honours a TZ change at run time): in the UTC
+  // container the gates run in, a UTC-based implementation would pass a local-only assertion.
+  it.each(["Pacific/Kiritimati", "Pacific/Pago_Pago", "Europe/Ljubljana"])(
+    "today is the local calendar day, not the UTC one (TZ=%s)",
+    (zone) => {
+      const saved = process.env.TZ;
+      process.env.TZ = zone;
+      try {
+        // The zone really applies: 12:00 local is not 12:00 UTC in any of these.
+        expect(new Date(2026, 8, 30, 12).getUTCHours()).not.toBe(12);
+        expect(localTodayIso(new Date(2026, 8, 30, 23, 30))).toBe("2026-09-30");
+        expect(localTodayIso(new Date(2026, 0, 1, 0, 5))).toBe("2026-01-01");
+        expect(localTodayIso(new Date(2026, 1, 28, 23, 59))).toBe("2026-02-28");
+      } finally {
+        if (saved === undefined) delete process.env.TZ;
+        else process.env.TZ = saved;
+      }
+    },
+  );
   it("month grid of a February that starts on a Monday", () => {
     const grid = monthGrid(2027, 2); // 1 Feb 2027 is a Monday
     expect(grid[0]).toBe("2027-02-01");

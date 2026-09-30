@@ -5,6 +5,7 @@
     { "from": "DESIGN.md", "to": "{vendorDir}/DESIGN.md" },
     { "from": "TOKENS.md", "to": "{vendorDir}/TOKENS.md" },
     { "from": "CHANGELOG.md", "to": "{vendorDir}/CHANGELOG.md" },
-    { "from": "sync/sync-ops-ui.mjs", "to": "scripts/sync-ops-ui.mjs" }
+    { "from": "sync/sync-ops-ui.mjs", "to": "scripts/sync-ops-ui.mjs" },
+    { "from": "sync/sync-ops-ui.d.mts", "to": "scripts/sync-ops-ui.d.mts" }
   ]
 }

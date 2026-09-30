@@ -99,7 +99,8 @@ export function themeGotchas(css, file = "css") {
       if (stack.includes(true) && token.text.includes('"')) {
         const excerpt = token.text.replace(/\s+/g, " ").slice(0, 80);
         problems.push(
-          `${file}:${token.line}: a comment inside @theme contains a double quote (Tailwind drops the next declaration): ${excerpt}`,
+          `${file}:${token.line}: a comment inside @theme contains a double quote (Tailwind drops the next declaration): ${excerpt}` +
+            " - fix: remove the double quotes from that comment (or move the comment out of the @theme block)",
         );
       }
     } else if (token.type === "{") {
@@ -567,8 +568,10 @@ export function checkBrandCss(css, contract, options = {}) {
 //   { "from": "DESIGN.md", "to": "{vendorDir}/DESIGN.md" }  one file (skipped when absent)
 // ---------------------------------------------------------------------------------------------
 
-/** The one destination outside the vendor folder: this script. */
+/** The destinations outside the vendor folder: this script and its declarations. */
 export const SYNC_DEST = "scripts/sync-ops-ui.mjs";
+export const SYNC_TYPES_DEST = "scripts/sync-ops-ui.d.mts";
+const SCRIPT_DESTS = [SYNC_DEST, SYNC_TYPES_DEST];
 export const LOCK_FILE = "ops-ui.lock.json";
 export const CONFIG_FILE = "ops-ui.config.json";
 
@@ -620,12 +623,12 @@ export function shipPlan(ship, files, vendorDir) {
 
 /**
  * The destination allow-list (spec §5.2 step 4): under the vendor folder, or exactly this
- * script. A release can never write app code.
+ * script or its declarations. A release can never write app code.
  * @param {string} dest
  * @param {string} vendorDir
  */
 export function isAllowedDestination(dest, vendorDir) {
-  if (dest === SYNC_DEST) return true;
+  if (SCRIPT_DESTS.includes(dest)) return true;
   const parts = dest.split("/");
   if (path.isAbsolute(dest) || dest.includes("\\") || parts.some((p) => p === ".." || p === "." || p === "")) return false;
   return dest.startsWith(`${vendorDir.replace(/\/+$/, "")}/`);
@@ -760,7 +763,20 @@ function showAt(repo, commit, file) {
   }
 }
 
-/** Every file under `dir` (relative to `root`, forward slashes). */
+/**
+ * Files an operating system or an editor leaves in any folder it opens (Finder's .DS_Store and
+ * AppleDouble ._ files, Windows' Thumbs.db and desktop.ini, Vim swap and backup files). They are
+ * never the library's and never an app's edit, so the vendor checks do not count them as
+ * unknown files; they leave with the old folder at the next swap.
+ */
+const OS_LITTER = /^(?:\.DS_Store|\._.+|Thumbs\.db|ehthumbs\.db|desktop\.ini|\..+\.sw[a-p]|.+~)$/i;
+
+/** @param {string} name */
+export function isOsLitter(name) {
+  return OS_LITTER.test(name);
+}
+
+/** Every file under `dir` (relative to `root`, forward slashes), OS litter left out. */
 function listFiles(/** @type {string} */ root, /** @type {string} */ dir) {
   const abs = path.join(root, dir);
   if (!existsSync(abs)) return [];
@@ -770,7 +786,7 @@ function listFiles(/** @type {string} */ root, /** @type {string} */ dir) {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
       const full = path.join(current, entry.name);
       if (entry.isDirectory()) walk(full);
-      else out.push(path.relative(root, full).split(path.sep).join("/"));
+      else if (!isOsLitter(entry.name)) out.push(path.relative(root, full).split(path.sep).join("/"));
     }
   };
   walk(abs);
@@ -1036,7 +1052,9 @@ export function readRelease(repo, commit, version, vendorDir) {
   return {
     plan,
     contents,
-    pkg: JSON.parse(showAt(repo, commit, "package.json") ?? "{}"),
+    pkg: /** @type {{ version?: string, peerDependencies?: Record<string, string> }} */ (
+      JSON.parse(showAt(repo, commit, "package.json") ?? "{}")
+    ),
     tokensCss: showAt(repo, commit, "styles/tokens.css") ?? "",
     changelog: showAt(repo, commit, "CHANGELOG.md") ?? "",
   };
@@ -1129,12 +1147,13 @@ export function sync(appRoot, options, log) {
   }
   for (const dest of newFiles.keys()) {
     if (!isAllowedDestination(dest, config.vendorDir)) {
-      problems.push(`the release is malformed: ${dest} is outside ${config.vendorDir} and is not ${SYNC_DEST}`);
+      problems.push(`the release is malformed: ${dest} is outside ${config.vendorDir} and is not ${SCRIPT_DESTS.join(" or ")}`);
     }
   }
   for (const dest of newFiles.keys()) {
-    // The running script is the one exception: an app's first sync starts from a hand copy.
-    if (dest !== SYNC_DEST && !(dest in oldFiles) && existsSync(path.join(appRoot, dest))) {
+    // The script and its declarations are the exception: an app's first sync starts from a hand
+    // copy of the script (and may have copied its declarations beside it).
+    if (!SCRIPT_DESTS.includes(dest) && !(dest in oldFiles) && existsSync(path.join(appRoot, dest))) {
       problems.push(`collision: ${dest} already exists and is not the library's; move the app's file`);
     }
   }
@@ -1195,7 +1214,7 @@ export function sync(appRoot, options, log) {
     rmSync(tmp, { recursive: true, force: true });
     rmSync(old, { recursive: true, force: true });
     for (const [dest, content] of release.contents) {
-      if (dest === SYNC_DEST) continue;
+      if (SCRIPT_DESTS.includes(dest)) continue;
       const file = path.join(tmp, path.relative(config.vendorDir, dest));
       mkdirSync(path.dirname(file), { recursive: true });
       writeFileSync(file, content);
@@ -1216,7 +1235,7 @@ export function sync(appRoot, options, log) {
     }
     rmSync(old, { recursive: true, force: true });
     for (const dest of removed) {
-      if (!dest.startsWith(`${config.vendorDir}/`) && dest !== SYNC_DEST) rmSync(path.join(appRoot, dest), { force: true });
+      if (!dest.startsWith(`${config.vendorDir}/`) && !SCRIPT_DESTS.includes(dest)) rmSync(path.join(appRoot, dest), { force: true });
     }
   }
 
@@ -1240,20 +1259,22 @@ export function sync(appRoot, options, log) {
   }
   log("next: pnpm typecheck && pnpm test, then the visual check (ops-ui tools/app-shots.mjs, spec §11.4)");
 
-  // Step 8: this script, last.
-  const ownContent = release.contents.get(SYNC_DEST);
-  const ownPath = path.join(appRoot, SYNC_DEST);
-  if (ownContent !== undefined) {
-    const current = existsSync(ownPath) ? readFileSync(ownPath, "utf8") : null;
-    if (current !== ownContent) {
-      mkdirSync(path.dirname(ownPath), { recursive: true });
-      writeFileSync(`${ownPath}.ops-ui-tmp`, ownContent);
-      renameSync(`${ownPath}.ops-ui-tmp`, ownPath);
-      log("the sync script was updated - run the same command again");
+  // Step 8: this script's declarations, then this script, last (each: temp file, then rename).
+  const replace = (/** @type {string} */ dest) => {
+    const content = release.contents.get(dest);
+    const file = path.join(appRoot, dest);
+    if (content === undefined) {
+      if (dest in oldFiles) rmSync(file, { force: true });
+      return false;
     }
-  } else if (SYNC_DEST in oldFiles) {
-    rmSync(ownPath, { force: true });
-  }
+    if (existsSync(file) && readFileSync(file, "utf8") === content) return false;
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(`${file}.ops-ui-tmp`, content);
+    renameSync(`${file}.ops-ui-tmp`, file);
+    return true;
+  };
+  replace(SYNC_TYPES_DEST);
+  if (replace(SYNC_DEST)) log("the sync script was updated - run the same command again");
   return 0;
 }
 
@@ -1280,13 +1301,151 @@ function majorNotes(/** @type {string} */ section) {
 // Wrappers (spec §6.4): src/components/ui/<name>.tsx re-exports the vendored module by name.
 // ---------------------------------------------------------------------------------------------
 
+/** Keywords after which a `/` starts a regular expression, not a division. */
+const REGEX_AFTER_WORD = new Set([
+  "return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await",
+]);
+
 /**
- * The runtime and type exports of a module, in source order, from its export statements.
+ * The source with every comment and the contents of every string, template and regular
+ * expression literal blanked to spaces; newlines stay, so every line keeps its number and a
+ * statement that starts a line still starts it. A small lexer, not a regex: a quoted `image/*`
+ * must not open a comment, and a `//` inside a string must not end its line. Template literals
+ * nest (`${ … }` is code again). A `/` is a regular expression after an operator, an opening
+ * bracket, a keyword or the start of the file, and a division after a value; a would-be regular
+ * expression that reaches the end of its line is read as a division instead, so a misreading
+ * cannot swallow the next line. JSX text is read as code (the library test compares every
+ * component's exports with the TypeScript AST, so a component that confused this lexer would
+ * fail before any release).
+ * @param {string} source
+ * @returns {string}
+ */
+export function blankNonCode(source) {
+  let out = "";
+  let i = 0;
+  /** The last significant (non-space, non-comment) code character: the regex decision. */
+  let last = "";
+  /** The identifier or keyword that ends at `last`, when `last` ends one. */
+  let lastWord = "";
+  /** Was the character just before i part of an identifier? */
+  let inWord = false;
+  /** One entry per open `${`: the brace depth inside that template expression. */
+  const templates = [];
+  const blank = (/** @type {string} */ text) => text.replace(/[^\n]/g, " ");
+  const significant = (/** @type {string} */ ch) => {
+    last = ch;
+    lastWord = "";
+    inWord = false;
+  };
+  /** Scans a template literal's text from i (just after its backtick or its closing `}`). */
+  const templateText = () => {
+    let j = i;
+    while (j < source.length && source[j] !== "`" && !(source[j] === "$" && source[j + 1] === "{")) {
+      j += source[j] === "\\" ? 2 : 1;
+    }
+    out += blank(source.slice(i, Math.min(j, source.length)));
+    if (j >= source.length) {
+      i = source.length;
+    } else if (source[j] === "`") {
+      out += "`";
+      i = j + 1;
+      significant("`");
+    } else {
+      out += "${";
+      i = j + 2;
+      templates.push(0);
+      significant("{");
+    }
+  };
+  const startsRegex = () =>
+    last === "" ||
+    "(,=:[!&|?{;+-*%~^".includes(last) ||
+    (last === ">" && out.trimEnd().endsWith("=>")) ||
+    REGEX_AFTER_WORD.has(lastWord);
+  while (i < source.length) {
+    const ch = source[i];
+    const next = source[i + 1];
+    if (ch === "/" && next === "/") {
+      let j = i;
+      while (j < source.length && source[j] !== "\n") j += 1;
+      out += blank(source.slice(i, j));
+      i = j;
+      inWord = false;
+    } else if (ch === "/" && next === "*") {
+      const end = source.indexOf("*/", i + 2);
+      const stop = end === -1 ? source.length : end + 2;
+      out += blank(source.slice(i, stop));
+      i = stop;
+      inWord = false;
+    } else if (ch === '"' || ch === "'") {
+      let j = i + 1;
+      while (j < source.length && source[j] !== ch && source[j] !== "\n") j += source[j] === "\\" ? 2 : 1;
+      const closed = source[j] === ch;
+      out += ch + blank(source.slice(i + 1, Math.min(j, source.length))) + (closed ? ch : "");
+      i = closed ? j + 1 : j;
+      significant(ch);
+    } else if (ch === "`") {
+      out += "`";
+      i += 1;
+      templateText();
+    } else if (ch === "/" && startsRegex()) {
+      let j = i + 1;
+      let inClass = false;
+      while (j < source.length && source[j] !== "\n") {
+        if (source[j] === "\\") j += 2;
+        else if (source[j] === "/" && !inClass) break;
+        else {
+          if (source[j] === "[") inClass = true;
+          else if (source[j] === "]") inClass = false;
+          j += 1;
+        }
+      }
+      if (source[j] === "/") {
+        let k = j + 1;
+        while (k < source.length && /[a-z]/i.test(source[k])) k += 1;
+        out += `/${blank(source.slice(i + 1, j))}/${source.slice(j + 1, k)}`;
+        i = k;
+      } else {
+        out += ch;
+        i += 1;
+      }
+      significant("/");
+    } else if (ch === "{" && templates.length > 0) {
+      templates[templates.length - 1] += 1;
+      out += ch;
+      i += 1;
+      significant(ch);
+    } else if (ch === "}" && templates.length > 0 && templates[templates.length - 1] === 0) {
+      templates.pop();
+      out += ch;
+      i += 1;
+      templateText();
+    } else {
+      if (ch === "}" && templates.length > 0) templates[templates.length - 1] -= 1;
+      out += ch;
+      i += 1;
+      if (/[A-Za-z0-9_$]/.test(ch)) {
+        lastWord = inWord ? lastWord + ch : ch;
+        last = ch;
+        inWord = true;
+      } else if (/\s/.test(ch)) {
+        inWord = false;
+      } else {
+        significant(ch);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The runtime and type exports of a module, in source order, from its top-level export
+ * statements (read after blankNonCode, so no comment or literal can hide or fake one).
  * @param {string} source
  * @returns {{ runtime: string[], types: string[] }}
  */
 export function moduleExports(source) {
-  const code = source.replace(/\/\*[^]*?\*\//g, "").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
+  const code = blankNonCode(source);
   /** @type {{ at: number, name: string, type: boolean }[]} */
   const found = [];
   const add = (/** @type {number} */ at, /** @type {string} */ name, /** @type {boolean} */ type) => found.push({ at, name, type });

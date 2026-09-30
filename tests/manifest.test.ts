@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { OPS_UI_VERSION } from "../src/version";
-import { SYNC_DEST, generatedHeader, isAllowedDestination, shipPlan } from "../sync/sync-ops-ui.mjs";
+import { SYNC_DEST, SYNC_TYPES_DEST, generatedHeader, isAllowedDestination, shipPlan } from "../sync/sync-ops-ui.mjs";
 import { ROOT, filesUnder } from "./source-files";
 
 // What a release ships (spec §11.1 `manifest`): ship.json maps every library file an app needs
@@ -22,12 +22,13 @@ describe("manifest", () => {
     expect(unshipped).toEqual([]);
   });
 
-  it("ships the sync script to scripts/, the docs beside the vendored code, and nothing else", () => {
+  it("ships the sync script and its declarations to scripts/, the docs beside the vendored code, and nothing else", () => {
     const outside = plan.filter((e) => !e.src.startsWith("src/") && !e.src.startsWith("styles/"));
     expect(outside.map((e) => e.src).sort()).toEqual(
-      ["CHANGELOG.md", "DESIGN.md", "TOKENS.md", "sync/sync-ops-ui.mjs"].filter((f) => tracked.includes(f)).sort(),
+      ["CHANGELOG.md", "DESIGN.md", "TOKENS.md", "sync/sync-ops-ui.d.mts", "sync/sync-ops-ui.mjs"].filter((f) => tracked.includes(f)).sort(),
     );
     expect(plan.find((e) => e.src === "sync/sync-ops-ui.mjs")?.dest).toBe(SYNC_DEST);
+    expect(plan.find((e) => e.src === "sync/sync-ops-ui.d.mts")?.dest).toBe(SYNC_TYPES_DEST);
     expect(plan.find((e) => e.src === "TOKENS.md")?.dest).toBe(`${VENDOR}/TOKENS.md`);
     expect(plan.find((e) => e.src === "styles/tokens.css")?.dest).toBe(`${VENDOR}/styles/tokens.css`);
     expect(plan.find((e) => e.src === "src/components/button.tsx")?.dest).toBe(`${VENDOR}/components/button.tsx`);
@@ -43,6 +44,7 @@ describe("manifest", () => {
     expect(isAllowedDestination("src/components/ui/button.tsx", VENDOR)).toBe(false);
     expect(isAllowedDestination(`${VENDOR}/../app/page.tsx`, VENDOR)).toBe(false);
     expect(isAllowedDestination("scripts/other.mjs", VENDOR)).toBe(false);
+    expect(isAllowedDestination("scripts/sync-ops-ui.d.ts", VENDOR)).toBe(false);
     expect(isAllowedDestination(`${VENDOR}-evil/x.ts`, VENDOR)).toBe(false);
   });
 
