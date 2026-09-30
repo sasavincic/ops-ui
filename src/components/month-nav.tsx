@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { shiftMonth } from "@/domain/months";
 import { useDict, useLocale } from "@/i18n/client";
-import { useDismissable } from "@/lib/use-dismissable";
+import { useDismissable } from "../lib/use-dismissable";
 import { cn } from "../lib/cn";
 
 /**

@@ -16,7 +16,7 @@ import {
 import { formatDate, shiftDay } from "@/domain/dates";
 import { useDict } from "@/i18n/client";
 import { fmt } from "@/i18n/locales";
-import { useDismissable } from "@/lib/use-dismissable";
+import { useDismissable } from "../lib/use-dismissable";
 import { cn } from "../lib/cn";
 
 /**

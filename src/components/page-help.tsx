@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { useDismissable } from "@/lib/use-dismissable";
+import { useDismissable } from "../lib/use-dismissable";
 
 /** Quiet, keyboard-accessible reference help; never changes records. */
 export function PageHelp({ label, children }: { label: string; children: React.ReactNode }) {
