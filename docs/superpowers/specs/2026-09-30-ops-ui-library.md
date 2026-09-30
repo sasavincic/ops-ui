@@ -205,7 +205,7 @@ src/app/brand.css                  app-owned: :root { --brand-* } only
 src/components/ui/<name>.tsx       app-owned wrappers, one per library component (§6.4)
 src/components/ui/kit-contract.ts  app-owned: pickKitStrings + compile-time conformance (§6.3)
 src/app/(app)/dev/kit/[[...story]]/page.tsx   app-owned: the vendored stories with the real providers (below)
-src/app/(app)/dev/kit/kit-view.tsx             app-owned ("use client"): reads STORY_GROUPS, renders each story in <StoryHost pageToaster>
+src/app/(app)/dev/kit/kit-view.tsx             app-owned ("use client"): /dev/kit = links to every story; /dev/kit/<id> = that one story in <StoryHost pageToaster>
 tests/ops-ui/vendor.test.ts        app-owned (§11.3)
 tests/ops-ui/bridge.test.tsx       app-owned (§11.3)
 ```
@@ -228,7 +228,11 @@ export default async function KitPage({ params }: { params: Promise<{ story?: st
 }
 ```
 
-`KitView` (`"use client"`) lists `STORY_GROUPS` (or renders the one story named) inside `<StoryHost pageToaster>` from `@/vendor/ops-ui/stories/story-host`. `StoryHost` turns ActionIcon on for the stories (WFO switches icons off on `/dev`, W2), and `pageToaster` makes the toast stories leave their own `<Toaster />` out, because the app's root layout already mounts one (two viewports over one store would draw every toast twice).
+`KitView` (`"use client"`) reads `STORY_GROUPS` and **never renders two stories on one page**. Six stories open a modal on mount (six top-layer dialogs make the page inert under six backdrops) and several raise toasts into the one global store (four at most; a confirmation fades after 6 s), so a page of every story is neither readable nor repeatable, and a story added by a minor would move every story after it. Its two pages are also the DOM contract `tools/app-shots.mjs` reads (§11.4), the one the gallery keeps (`gallery/components/story-index.tsx`, `story-view.tsx`):
+- **`/dev/kit`, the index: links only.** One `<a href="/dev/kit/<storyId>" data-story-id="<storyId>">` per story, in `STORY_GROUPS` order, with `data-story-open="<selector>"` when the story has an `open` selector.
+- **`/dev/kit/<storyId>`: that story alone.** `<div data-story="<storyId>">` around `<StoryHost pageToaster>{story.render()}</StoryHost>`; an effect sets `data-ready` on that div after hydration, so the story's own mount effects (`showModal`, toasts pushed on mount) have run. An unknown id renders one plain line saying so, as the gallery's `StoryView` does.
+
+`StoryHost` comes from `@/vendor/ops-ui/stories/story-host`. It turns ActionIcon on for the stories (WFO switches icons off on `/dev`, W2), and `pageToaster` makes the toast stories leave their own `<Toaster />` out, because the app's root layout already mounts one (two viewports over one store would draw every toast twice).
 
 ### 3.3 `ops-ui.config.json` (app-owned)
 
@@ -261,6 +265,7 @@ export default async function KitPage({ params }: { params: Promise<{ story?: st
 
 The example shows WFO's values.
 - **FinaOps:** `baseUrl` `http://localhost:3100`, no extensions, no `local`. Its routes: `/`, `/review`, `/transactions`, `/transactions/<id>`, `/reports`, `/close`, `/invoicing`, `/invoicing/new`, `/invoicing/invoices/<id>`, `/statements/new`, `/companies/<id>`, `/settings`, `/insights`, `/analysis`, `/login`, `/read-only`, `/dev/kit`.
+- **`/dev/kit`** in `routes` stands for the story index plus one route per story (`/dev/kit/<storyId>`, §3.2, §11.4).
 - **Route ids** are literal ids from the local fixture database: WFO `scripts/dev-fixtures.ts`, FinaOps `pnpm db:fixtures`. They are re-listed when the fixtures are rebuilt.
 - **`source`:** resolves to `/home/user/ops-ui` from both repo roots. For PrefabOps (`apps/web`) it is `../../../ops-ui`.
 
@@ -1023,6 +1028,8 @@ node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file: 
 **`capture`:**
 - Reads `visual` from the app's `ops-ui.config.json` and logs in with the env-provided fixture credentials (local database only). The `readonlyRoutes` are captured as the read-only user.
 - Takes a full-page PNG per route × width, plus 375 with `hasTouch`/`isMobile` for the coarse-pointer rules.
+- **`/dev/kit` expands to one route per story.** Capture loads the index, reads its `a[data-story-id]` links (§3.2) and shoots every `/dev/kit/<storyId>` as its own route, the way the gallery shoots stories: it waits for `[data-story="<storyId>"][data-ready]`, pauses the clock, clicks the link's `data-story-open` selector when there is one (an open calendar, list, menu or picker needs its CSS too), then shoots. The ids come from the build being captured, so main and branch each list what they vendor. The index page is captured too (it is a plain list).
+- **A paused clock**, as in the gallery: `page.clock.setFixedTime(T)` before every navigation, with `T` the capture's start (so Date agrees with the server's day), and `page.clock.pauseAt(T)` the moment the route is ready (a story: `data-ready`; any other route: the load state), so a toast's 6 s fade, a polling interval or a relative time never depends on how long the steps take.
 - Masks the `mask` selectors, sets reduced motion and hides the caret.
 - Writes to `$TMPDIR/ops-ui-shots/<app>/<label>/`.
 
@@ -1034,10 +1041,10 @@ node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file: 
 **`compare`:**
 - Counts changed pixels per page with the gallery's gate, `exactDiff` from `gallery/shot-options.ts` (every RGBA byte; Playwright's comparator alone skips anti-aliased pixels), requires 0, and writes its red-overlay diff PNGs.
 - **Tokens (G3):** every name declared on `main` must be declared on the branch with an identical value. A name declared **only on the branch** passes only when the `--expect` file lists it as a new token with its value (for example `token --ops-toast-offset = 3.75rem`, `token --color-external = <the accent's computed colour>`), and the value matches; a name that disappears is a failure unless listed. New names are reported separately from changed ones.
-- **Routes:** a route that does not exist on `main` (a 404 there) is captured on the branch only and passes only when `--expect` lists it as a new route; it is reported as new, not diffed. From the next capture of `main` it is compared like any other route.
+- **Routes:** a route that does not exist on `main` (a 404 there) is captured on the branch only and passes only when `--expect` lists it as a new route; it is reported as new, not diffed. From the next capture of `main` it is compared like any other route. A story is a route: an id on the branch's index that `main`'s index lacks is a new route (`route /dev/kit/<storyId>` in `--expect`), and an id that vanishes fails unless listed.
 - Exits 1 on any difference outside `--expect`.
 
-The route list always includes `/dev/kit`. It renders every vendored story with the app's real bridge, providers and brand (inside `StoryHost pageToaster`, §3.2), so a Tailwind class missing from the app's CSS shows up as a pixel diff. It is new at the step that adds it (F5, W6) and compared from then on.
+The route list always includes `/dev/kit`, which capture expands into the index and one route per vendored story, each rendered alone with the app's real bridge, providers and brand (inside `StoryHost pageToaster`, §3.2), so a Tailwind class missing from the app's CSS shows up as a pixel diff on that story's route. They are new at the step that adds them (F5, W6) and compared from then on; a later sync that adds stories (1.1.0) adds new routes and leaves every existing story route at 0 changed pixels.
 
 ---
 
@@ -1054,7 +1061,7 @@ The route list always includes `/dev/kit`. It renders every vendored story with 
 - **Parallel sessions.** Other sessions edit these repos. The wrappers keep every import site, and the swap branches live hours, not days. Before merging, rebase and re-run G1–G3.
 - **Gates:**
   - **G1 code:** `pnpm typecheck && pnpm test && pnpm lint <changed files>` and `pnpm build`. WFO adds `RUN_DATABASE_TESTS=1 pnpm test` on local Postgres at the swap step. PrefabOps runs `npx tsc --noEmit && npm test` and `npm run build` in `apps/web`.
-  - **G2 pixels:** `app-shots` main vs branch, with 0 changed pixels (`exactDiff`, byte for byte) on every route at 1440, 375 and 375-touch, including the read-only routes. Only the pages a step lists as **Expected** may differ, and only in the way it says; a route a step adds (`/dev/kit`) is listed as a **new route**, captured on the branch only.
+  - **G2 pixels:** `app-shots` main vs branch, with 0 changed pixels (`exactDiff`, byte for byte) on every route at 1440, 375 and 375-touch, including the read-only routes. Only the pages a step lists as **Expected** may differ, and only in the way it says; a route a step adds (`/dev/kit`, its story routes) is listed as a **new route**, captured on the branch only.
   - **G3 tokens:** every token declared on `main` identical on the branch (§11.4). A token that exists only on the branch must be listed by the step as an **Expected new token** with its value.
   - **G4 by hand** (browser, 1440 and 375):
     1. A Dialog: type into a field, then Cancel. The discard prompt appears. Then ✕.
@@ -1096,7 +1103,7 @@ The route list always includes `/dev/kit`. It renders every vendored story with 
   - Against WFO, it may additionally show the FinaOps-side changes (rows 1, 9, 26, 32).
 - **L7a Release and visual tooling.** Nothing after L6 can run without these, and no earlier step builds them.
   - `tools/release.mjs` and the `release` package script (§4.2): the refusals, the gates, the semver classification from the diff since the previous release (changed baselines, api-surface, new required brand variables, `Breaking:`), the CHANGELOG checks, the two-file `release: vX.Y.Z` commit and the `release/vX.Y.Z` branch. Tests against temporary git repositories, like the sync's: each refusal, each classification, a bump below the required level refused, `--compatible` recorded.
-  - `tools/app-shots.mjs` (§11.4): `capture` (login, routes × widths + 375-touch, masks, the token dump with declared/undeclared names) and `compare` (`exactDiff` of `gallery/shot-options.ts`, the G3 rules for names present on `main` and Expected new tokens, new routes, `--expect`). Tests on synthetic captures: identical passes; one changed pixel fails, an anti-aliased edge pixel included; a new token passes only when expected with its value; a vanished token fails; a new route passes only when expected.
+  - `tools/app-shots.mjs` (§11.4): `capture` (login, routes × widths + 375-touch, `/dev/kit` expanded to one route per story with its `open` click, the paused clock, masks, the token dump with declared/undeclared names) and `compare` (`exactDiff` of `gallery/shot-options.ts`, the G3 rules for names present on `main` and Expected new tokens, new routes, `--expect`). Tests on synthetic captures: identical passes; one changed pixel fails, an anti-aliased edge pixel included; a new token passes only when expected with its value; a vanished token fails; a new route (a new story id included) passes only when expected; a vanished story id fails.
   - README and CLAUDE.md name the commands.
 - **L7b** `pnpm release 1.0.0`: after L7a and after the §12.4 decision "Found while proving 1.0 (L6)" is recorded (whatever it re-imports comes first). The release dates the CHANGELOG's `## 1.0.0` section.
 
@@ -1142,7 +1149,7 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
      - If a case differs, it is written into the commit message as "FinaOps pickers now match like Workforce Ops' pickers: <cases>", and it is accepted **only if no case makes a picker miss a row it finds today**. A narrowing stops the step for a decision.
   5. Add `tests/ops-ui/vendor.test.ts`.
   6. Add the `/dev/kit` route (§3.2: the page's first statement is `await requireSession()`, then `notFound()` in production, then the client `KitView` with `StoryHost pageToaster`).
-  - Gates: G1, G2 zero (`/dev/kit` listed as a **new route**: branch only), G3 identical (plus F3's expected new tokens while main lacks them), G4 complete (fixtures provide the owner, editor and read-only users). Merge.
+  - Gates: G1, G2 zero (`/dev/kit` and every `/dev/kit/<storyId>` listed as **new routes**: branch only), G3 identical (plus F3's expected new tokens while main lacks them), G4 complete (fixtures provide the owner, editor and read-only users). Merge.
 - **F6 Docs** (can ride with F5).
   - CLAUDE.md: replace the kit freeze with the standing rule: "`src/vendor/ops-ui` is GENERATED from @latro/ops-ui by `scripts/sync-ops-ui.mjs`; never edit it (`pnpm test` fails). `src/components/ui/*` are this app's kit names: re-exports plus the `record-tab` binding. A kit change = ops-ui PR → release → sync on a branch → G1–G4 → merge. Brand colours live in `src/app/brand.css`."
   - DESIGN.md keeps FinaOps' palette, mark and app sections, and points to `src/vendor/ops-ui/DESIGN.md` for the doctrine.
@@ -1187,7 +1194,7 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
   - `tests/ui/toast.test.tsx` and `tests/ui/file-link.test.tsx` are deleted, because the library owns them now.
   - No text-parity test: WFO is the source of `lib/text`.
   - `/dev/kit` as in F5 (WFO's `RouteActionIconScope` switches ActionIcon off on `/dev`; `StoryHost` turns it back on for the stories).
-  - Gates: G1 including `RUN_DATABASE_TESTS=1`, G2 zero (`/dev/kit` a **new route**), G3 identical (plus W4's expected new tokens while main lacks them), G4 complete. Then merge `--no-ff`, push, and G5.
+  - Gates: G1 including `RUN_DATABASE_TESTS=1`, G2 zero (`/dev/kit` and its story routes **new routes**), G3 identical (plus W4's expected new tokens while main lacks them), G4 complete. Then merge `--no-ff`, push, and G5.
 - **W7 Docs.**
   - CLAUDE.md gets the standing rule of F6, with the bindings `record-tab` and `RouteActionIconScope`.
   - DESIGN.md's stale Components section (it lists 10 of 34 files) becomes a pointer to the vendored doctrine. Brand, mark, registers and the app sections stay.
@@ -1205,7 +1212,7 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
 - `data-ops-dismiss` / `data-ops-commit` attributes on the DialogFooter, SheetFooter and ConfirmDialog buttons. They are attributes only, in preparation for 2.0.
 
 **App adoption of 1.1:**
-1. Sync and run `--write-wrappers`.
+1. Sync and run `--write-wrappers`. The new stories (AppSwitcher, ValidityCell) are **new routes** in G2 (`route /dev/kit/<storyId>` in `--expect`); every existing story route stays at 0 changed pixels.
 2. Mount the AppSwitcher in its own commit (expected change: the mark becomes a button).
 3. WFO only:
    - A parity test shows `validityState(d, today, { warnDays: EXPIRY_WARNING_DAYS })` ≡ `documentExpiryStatus` over −400…+400 days, `null` and `noExpiry`.

@@ -32,6 +32,25 @@ test.describe("desktop behaviour", () => {
     await page.clock.setFixedTime(FIXED_NOW);
   });
 
+  test("the story index is links only, one per story, carrying the /dev/kit contract (spec §3.2)", async ({ page }) => {
+    await page.goto("/workforce");
+    const expected = STORY_GROUPS.flatMap((group) =>
+      group.stories.map((story) => {
+        const id = storyId(group.component, story.name);
+        return { id, open: story.open ?? null, href: `/workforce/${id}` };
+      }),
+    );
+    const links = page.locator("a[data-story-id]");
+    await expect(links).toHaveCount(expected.length);
+    const found = await links.evaluateAll((els) =>
+      els.map((el) => ({ id: el.getAttribute("data-story-id"), open: el.getAttribute("data-story-open"), href: el.getAttribute("href") })),
+    );
+    expect(found).toEqual(expected);
+    // Never a story on the index: six open a modal on mount, several raise toasts.
+    await expect(page.locator("[data-story]")).toHaveCount(0);
+    await expect(page.locator("dialog[open], [data-toast]")).toHaveCount(0);
+  });
+
   test("Dialog: ✕ closes a clean dialog at once", async ({ page }) => {
     await open(page, "dialog--form");
     const dialog = page.locator("dialog");

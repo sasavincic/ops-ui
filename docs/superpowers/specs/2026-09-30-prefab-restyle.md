@@ -375,7 +375,7 @@ A family, section or stylesheet is deleted when **both** of these hold:
 
 - **Where they live.** `src/components/prefab-ui/*` holds generic pieces; area folders (`shell/`, `projects/`, `documentation/`, `financial/`, `welding/`, `workshop/`) hold composites.
 - **How they are built.** Only from `@/components/ui/*`, plus Tailwind utilities on kit tokens and the Prefab layout variables. **No CSS files, no raw colours, no `--legacy-*`.** A test from P4.1 forbids hex, `rgb(` and `oklch(` literals in `className`/`style` outside `brand.css`.
-- **`/dev/kit`.** Added at P2 as `src/app/dev/kit/[[...story]]/page.tsx`. It returns `notFound()` in production and sits behind the office proxy. It renders the vendored library stories plus a story for every Prefab-owned component, inside `OpsIsland`. It is in every capture, so a cascade leak from legacy CSS, or a deleted rule a composite depended on, shows up as a pixel diff.
+- **`/dev/kit`.** Added at P2 as `src/app/dev/kit/[[...story]]/page.tsx`. It returns `notFound()` in production and sits behind the office proxy. It renders the vendored library stories plus a story for every Prefab-owned component, inside `OpsIsland`, one story per page with an index of links (library spec §3.2, the DOM contract `app-shots` expands into one route per story, §11.4). It is in every capture, so a cascade leak from legacy CSS, or a deleted rule a composite depended on, shows up as a pixel diff.
 - **Promotion.** When a second app needs a Prefab-owned primitive, it moves into the library in a minor release and Prefab's file becomes a wrapper re-export (library spec §6.4).
 
 ---

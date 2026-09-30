@@ -284,5 +284,25 @@ or scratch exports.
     (`await requireSession()` first) and is a new route at F5/W6, the toast
     offset's responsive form lives outside `brand.css`, L7 split into L7a
     (build `tools/release.mjs` and `tools/app-shots.mjs`) and L7b (release).
+- **L6 review round 2** (2026-09-30), from a second verified review:
+  - shots are exact at last: Playwright's comparator skips anti-aliased
+    pixels at any threshold (a corner radius 6px → 7px counted 0), so
+    `exactDiff` (`gallery/shot-options.ts`, byte for byte) runs after every
+    `toHaveScreenshot`; the comparator test and a browser test prove an
+    edge-only change is refused. The launched Chromium's revision is asserted.
+  - the ✕ glyph (not in Geist) comes from `gallery/fonts/` (a one-glyph
+    DejaVu Sans subset in the GeistSans family), not the host; every shot of
+    the first brand fails on text a host font painted (CDP). 66 baselines
+    rebaselined (each cross moved under a pixel), nothing else.
+  - the DateInput behaviour test types, picks and clears the named field
+    itself (it had read another field's untouched default).
+  - an app's globals.css keeps the shipped docs and sync script out of its
+    Tailwind scan (two `@source not` lines, spec §8.4; `tests/app-scan.test.ts`
+    compiles the spec's template); the gallery scans only what an app scans
+    (`source(none)` + explicit sources).
+  - `/dev/kit` renders one story per page (the index is links carrying
+    `data-story-id` / `data-story-open`); `app-shots` captures each story as
+    its own route with a paused clock, and a new story id is a new route
+    (spec §3.2, §11.4; the gallery's index keeps the same contract).
 - L7a release and visual tooling: pending (spec §12.1).
 - L7b `pnpm release 1.0.0`: pending, after L7a and the §12.4 L6 decision.
