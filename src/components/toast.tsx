@@ -214,9 +214,10 @@ export function ToastViewport() {
   if (items.length === 0) return null;
   return (
     <div
-      // Above the assistant bubble (bottom-right, 3rem tall) so neither
+      // Lifted by --ops-toast-offset (a plain :root variable, default 0px):
+      // an app with a bottom-right bubble of its own sets it so neither
       // hides the other; full width minus the gutter on phones.
-      className="pointer-events-none fixed right-4 bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))+3.75rem)] z-[60] flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 sm:right-5"
+      className="pointer-events-none fixed right-4 bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))+var(--ops-toast-offset,0px))] z-[60] flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 sm:right-5"
       aria-live="assertive"
       role="region"
     >
