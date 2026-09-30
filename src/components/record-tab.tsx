@@ -7,10 +7,8 @@
 // a line saying what the tab is for, its single create action, then the
 // content.
 
-import {
-  WriteScope,
-  useReadOnlyScope,
-} from "@/components/permissions-provider";
+import { WriteScope } from "@/components/permissions-provider";
+import { useReadOnlyScope } from "../config/read-only";
 import { Button } from "./button";
 import type { PermissionArea } from "@/domain/permissions";
 

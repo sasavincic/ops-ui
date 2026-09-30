@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import Link from "next/link";
 import { ReturnLink } from "./back-link";
 import { ActionIcon, type ActionIconName } from "./action-icon";
-import { useReadOnlyScope } from "@/components/permissions-provider";
+import { useReadOnlyScope } from "../config/read-only";
 import { cn } from "../lib/cn";
 
 const buttonVariants = cva(

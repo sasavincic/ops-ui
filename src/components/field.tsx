@@ -1,6 +1,6 @@
 "use client";
 
-import { useReadOnlyScope } from "@/components/permissions-provider";
+import { useReadOnlyScope } from "../config/read-only";
 import { useMaybeDict } from "@/i18n/client";
 import { localizeMessage } from "@/i18n/messages";
 import { cn } from "../lib/cn";

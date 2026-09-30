@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { useReadOnlyScope } from "@/components/permissions-provider";
+import { useReadOnlyScope } from "../config/read-only";
 import { controlClasses } from "./field";
 import {
   isIsoDate,
