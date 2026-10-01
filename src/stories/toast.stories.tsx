@@ -58,6 +58,23 @@ function FieldMessage() {
   );
 }
 
+/** 1.7.0: under [data-ops-touch] on a phone each toast's ✕ is 44 x 44. */
+function TouchFloorToasts() {
+  useEffect(() => {
+    const ids = [
+      pushToast("danger", "End its active worksites first.", "Close"),
+      pushToast("success", "Saved"),
+    ];
+    return () => ids.forEach(dismissToast);
+  }, []);
+  return (
+    <div data-ops-touch="" className="min-h-96">
+      <p className="text-sm text-ink-secondary">The stack under the touch floor.</p>
+      <StoryToaster />
+    </div>
+  );
+}
+
 // An app's localize, as a stub dictionary: the server refuses in English and the sentence is the
 // key (each app passes its own through OpsUiProvider). The hooks must show the translation.
 const SL: Record<string, string> = {
@@ -127,4 +144,5 @@ export const stories: Story[] = [
   { name: "A field's message", render: () => <FieldMessage /> },
   { name: "Raised by components, localized", render: () => <RaisedByComponents /> },
   { name: "Field messages, localized", render: () => <FieldMessages /> },
+  { name: "Under the touch floor", render: () => <TouchFloorToasts /> },
 ];

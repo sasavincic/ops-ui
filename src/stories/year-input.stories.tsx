@@ -56,4 +56,15 @@ export const stories: Story[] = [
   },
   { name: "Picker", render: () => <Picker initial="2024" />, open: OPEN },
   { name: "Picker with limits", render: () => <Picker initial="" min={2019} max={2027} />, open: OPEN },
+  // 1.7.0: under [data-ops-touch] on a phone the field's button, the arrows and This year / Clear
+  // are at least 44px (the year cells already were).
+  {
+    name: "Picker under the touch floor",
+    render: () => (
+      <div data-ops-touch="">
+        <Picker initial="2024" />
+      </div>
+    ),
+    open: OPEN,
+  },
 ];

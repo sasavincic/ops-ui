@@ -39,6 +39,7 @@ import { riseSheet } from "../lib/sheet-motion";
  * Something outside the component that writes the hidden input dispatches an `input` event on it
  * and the field follows (DateInput's contract).
  */
+
 export type YearInputChange = { target: { value: string; name?: string } };
 
 function subscribeCoarse(onChange: () => void) {
@@ -48,6 +49,12 @@ function subscribeCoarse(onChange: () => void) {
 }
 const coarseNow = () => window.matchMedia("(pointer: coarse)").matches;
 const thisYear = () => Number(localTodayIso().slice(0, 4));
+
+/**
+ * 1.7.0: under the touch floor the calendar button is 44 x 44 at the field's right edge (4px in),
+ * so the text keeps 48px clear of it instead of 36px. Nothing changes without the floor.
+ */
+const ROOM_FOR_TOUCH_BUTTON = "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:pr-12";
 
 export function YearInput({
   id,
@@ -240,7 +247,7 @@ export function YearInput({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className="flex size-8 items-center justify-center rounded-control text-ink-secondary hover:bg-surface-raised hover:text-ink"
+      className={cn("flex size-8 items-center justify-center rounded-control text-ink-secondary hover:bg-surface-raised hover:text-ink", TOUCH_FLOOR.height, TOUCH_FLOOR.width)}
     >
       <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -309,7 +316,7 @@ export function YearInput({
         required={required}
         disabled={off}
         value={text}
-        className={cn(controlClasses, CONTROL_SIZE_CLASS[size], "pr-9 tabular-nums", TOUCH_FLOOR.height, TOUCH_FLOOR.text)}
+        className={cn(controlClasses, CONTROL_SIZE_CLASS[size], "pr-9 tabular-nums", TOUCH_FLOOR.height, TOUCH_FLOOR.text, ROOM_FOR_TOUCH_BUTTON)}
         onClick={() => {
           if (!open) openPicker(false);
         }}
@@ -356,7 +363,7 @@ export function YearInput({
           aria-label={yp.openPicker}
           title={yp.openPicker}
           onClick={() => (open ? close(true) : openPicker(true))}
-          className="absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-control text-ink-muted hover:bg-surface-raised hover:text-ink"
+          className={cn("absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-control text-ink-muted hover:bg-surface-raised hover:text-ink", TOUCH_FLOOR.height, TOUCH_FLOOR.width)}
         >
           <svg aria-hidden="true" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
             strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -440,7 +447,7 @@ export function YearInput({
               type="button"
               disabled={!yearWithin(today, min, max)}
               onClick={() => pick(String(today))}
-              className={cn("rounded-control font-medium text-primary hover:bg-primary-subtle disabled:cursor-not-allowed disabled:text-ink-muted disabled:hover:bg-transparent", coarse ? "px-4 py-2.5 text-sm" : "px-2 py-1 text-detail")}
+              className={cn("rounded-control font-medium text-primary hover:bg-primary-subtle disabled:cursor-not-allowed disabled:text-ink-muted disabled:hover:bg-transparent", coarse ? "px-4 py-2.5 text-sm" : "px-2 py-1 text-detail", TOUCH_FLOOR.height)}
             >
               {yp.thisYear}
             </button>
@@ -448,7 +455,7 @@ export function YearInput({
               <button
                 type="button"
                 onClick={() => pick("")}
-                className={cn("rounded-control font-medium text-ink-secondary hover:bg-surface-raised hover:text-ink", coarse ? "px-4 py-2.5 text-sm" : "px-2 py-1 text-detail")}
+                className={cn("rounded-control font-medium text-ink-secondary hover:bg-surface-raised hover:text-ink", coarse ? "px-4 py-2.5 text-sm" : "px-2 py-1 text-detail", TOUCH_FLOOR.height)}
               >
                 {dp.clear}
               </button>

@@ -5,6 +5,7 @@ import type { ActionIconName } from "./action-icon";
 import { Button } from "./button";
 import { useOpsUi } from "../config/provider";
 import { cn } from "../lib/cn";
+import { TOUCH_FLOOR } from "../lib/touch";
 import { ToastViewport, useErrorToast, useToastHost } from "./toast";
 import { riseSheet } from "../lib/sheet-motion";
 
@@ -124,7 +125,8 @@ export function Dialog({
         <button
           type="button"
           aria-label={strings.close}
-          className="rounded-control p-2.5 text-sm leading-none text-ink-muted transition-colors duration-150 hover:bg-surface hover:text-ink"
+          // 1.7.0: 44 x 44 under the touch floor (34 x 32 otherwise, unchanged).
+          className={cn("rounded-control p-2.5 text-sm leading-none text-ink-muted transition-colors duration-150 hover:bg-surface hover:text-ink", TOUCH_FLOOR.height, TOUCH_FLOOR.width)}
           onClick={closeFromX}
         >
           ✕

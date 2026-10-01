@@ -391,6 +391,8 @@ export function FileInput({
         "w-full rounded-control border border-border-strong bg-bg px-2 py-1.5 text-base text-ink-secondary lg:text-sm",
         "file:mr-3 file:rounded-control file:border file:border-border-strong file:bg-surface file:px-3 file:py-1 file:text-detail file:font-medium file:text-ink hover:file:bg-surface-raised",
         "outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-muted",
+        // 1.7.0: 44px tall under the touch floor (43.x px otherwise, unchanged).
+        TOUCH_FLOOR.height,
         className
       )}
       {...props}
@@ -413,6 +415,17 @@ export function Textarea({
     />
   );
 }
+
+/**
+ * 1.7.0: under the touch floor the 40 x 24 track gets an invisible ::after that reaches 12px above
+ * and below and 8px to each side, a 54 x 46 target (the pseudo-element is part of the button, so a
+ * tap on it toggles). Nothing paints: the track looks the same at every pointer.
+ */
+const SWITCH_HIT_AREA = [
+  "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:after:absolute",
+  "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:after:-inset-x-2",
+  "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:after:-inset-y-3",
+];
 
 /**
  * A boolean that changes how the record reads — "never expires", "mobile
@@ -449,6 +462,9 @@ export function Switch({
     <div
       className={cn(
         "flex min-w-0 items-center justify-between gap-3",
+        // 1.7.0: the row is at least 44px tall under the touch floor, so the switch's
+        // hit area below stays inside it.
+        TOUCH_FLOOR.height,
         disabled && "text-ink-muted",
         className
       )}
@@ -471,6 +487,7 @@ export function Switch({
         className={cn(
           "relative h-6 w-10 shrink-0 rounded-full border transition-colors duration-150 outline-none",
           "focus-visible:ring-2 focus-visible:ring-primary/25",
+          SWITCH_HIT_AREA,
           checked
             ? "border-primary bg-primary"
             : "border-border-strong bg-surface",

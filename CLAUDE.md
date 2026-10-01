@@ -520,3 +520,14 @@ name changes its CSS with a docs commit: `@source not` them (spec §8.4).
   rectangles in one frame (was flaky under load). 8 stories (98), 72 new baselines only. Released
   with `--compatible Checkbox --compatible Text --compatible textClasses`. The CHANGELOG lists each
   app's second-sweep codemods.
+- **1.7.0** (2026-10-01, styling programme §4.7; PrefabOps restyle plan §10.2's P4.3 / P4.4a
+  candidates): the touch floor reaches the kit's own targets. Under `data-ops-touch` on
+  `(hover: none) and (pointer: coarse)`: Dialog ✕ and toast ✕ 44 x 44 (the toast keeps its height,
+  `-my-3.5`), DateInput / YearInput field button 44 x 44 (+ `pr-12` on the field) and the calendar's
+  arrows / title / day cells / Today / Clear (YearInput: arrows, This year / Clear) 44, FileInput 44,
+  RowMenu items 44, Switch = row ≥ 44 + an invisible `::after` around the unchanged 40 x 24 track
+  (54 x 46 target). `Grid` with `cols` + `from` adds `grid-cols-1` below the breakpoint (the implicit
+  `auto` track let a scrolling Segmented push WFO's /workers/new 9px wide at 375). No API change.
+  `tests/touch-floor-1-7.test.tsx` + behaviour "touch floor (1.7.0)" (375 / 375-touch). 7 stories
+  (105), new baselines only; `button--touch-floor` 375-touch ×3 rebaselined in a pure
+  `shots: rebaseline` commit (its DateInput button sits in `data-ops-touch`).

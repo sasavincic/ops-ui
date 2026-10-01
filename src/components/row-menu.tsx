@@ -130,7 +130,7 @@ export function RowMenu({
         <Link
           role="menuitem"
           href={item.href}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-ink hover:bg-surface"
+          className={cn("flex items-center gap-1.5 px-3 py-1.5 text-sm text-ink hover:bg-surface", TOUCH_FLOOR.height)}
           onClick={() => setOpen(false)}
         >
           <ActionIcon name={item.icon} />
@@ -143,7 +143,9 @@ export function RowMenu({
           disabled={item.disabled}
           className={cn(
             "flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm hover:bg-surface disabled:opacity-50",
-            item.danger ? "text-danger hover:bg-danger/10" : "text-ink"
+            item.danger ? "text-danger hover:bg-danger/10" : "text-ink",
+            // 1.7.0: items are 44px tall under the touch floor (32px otherwise, unchanged).
+            TOUCH_FLOOR.height
           )}
           onClick={() => {
             setOpen(false);

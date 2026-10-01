@@ -99,7 +99,10 @@ describe("Combobox and DateInput", () => {
     const combo = html(<Combobox value="a" options={options} onChange={() => {}} />);
     expect(sorted(classesOf(combo, "input"))).toEqual(sorted(classesOf(html(<Input />), "input")));
     const date = html(<DateInput defaultValue="2026-10-01" />);
-    expect(sorted(classesOf(date, "input"))).toEqual(sorted([...cn(controlClasses, "h-9 pr-9 tabular-nums").split(" "), ...FLOOR]));
+    // 1.7.0: plus the room the floored calendar button needs (pr-12 behind the same floor).
+    expect(sorted(classesOf(date, "input"))).toEqual(
+      sorted([...cn(controlClasses, "h-9 pr-9 tabular-nums").split(" "), ...FLOOR, "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:pr-12"]),
+    );
   });
 
   it('size="lg" reaches the field', () => {

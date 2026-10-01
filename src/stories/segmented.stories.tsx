@@ -2,9 +2,39 @@
 
 import { useState } from "react";
 import { ActionIcon } from "../components/action-icon";
+import { Grid } from "../components/grid";
 import { Segmented } from "../components/segmented";
+import { Stack as KitStack } from "../components/stack";
 import type { Story } from "./index";
 import { Row, Stack } from "./story-layout";
+
+/**
+ * 1.7.0: Workforce Ops' new-worker form. The control sits in a one-column form Grid on a phone,
+ * whose automatic track grew to the control's whole width (the page scrolled sideways by 9px at
+ * 375); the control now stays inside its row and scrolls inside itself.
+ */
+function InAFormGrid() {
+  const [mode, setMode] = useState<"own" | "subcontractor" | "none">("own");
+  return (
+    <Grid as="form" gap={4} cols={2} from="sm" className="max-w-2xl">
+      <div className="space-y-1.5 sm:col-span-2">
+        <KitStack gap={2} className="min-w-0">
+          <Segmented
+            label="Employer"
+            value={mode}
+            onValueChange={setMode}
+            options={[
+              { value: "own", label: "Own employee" },
+              { value: "subcontractor", label: "Subcontractor" },
+              { value: "none", label: "Not employed yet, papers pending" },
+            ]}
+            className="mb-2 max-w-full"
+          />
+        </KitStack>
+      </div>
+    </Grid>
+  );
+}
 
 function Controlled({ disabled }: { disabled?: boolean }) {
   const [value, setValue] = useState<"day" | "direction" | "site">("direction");
@@ -65,4 +95,5 @@ export const stories: Story[] = [
       </div>
     ),
   },
+  { name: "In a form grid", render: () => <InAFormGrid /> },
 ];

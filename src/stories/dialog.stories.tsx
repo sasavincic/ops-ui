@@ -94,8 +94,29 @@ function Footers() {
   );
 }
 
+/** 1.7.0: under [data-ops-touch] on a phone the ✕ is 44 x 44 (and the header row grows with it). */
+function TouchFloorDialog() {
+  const [open, setOpen] = useState(true);
+  return (
+    <div data-ops-touch="">
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        Rename
+      </Button>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Rename worksite">
+        <DialogBody>
+          <Field label="Name" htmlFor="story-touch-name">
+            <Input id="story-touch-name" defaultValue="Augsburg" />
+          </Field>
+          <DialogFooter onClose={() => setOpen(false)} onSubmit={() => setOpen(false)} submitLabel="Save" />
+        </DialogBody>
+      </Dialog>
+    </div>
+  );
+}
+
 export const stories: Story[] = [
   { name: "Form", render: () => <FormDialog /> },
   { name: "Pinned footer and a long body", render: () => <PinnedFooterDialog /> },
   { name: "Footers", render: () => <Footers /> },
+  { name: "Under the touch floor", render: () => <TouchFloorDialog /> },
 ];

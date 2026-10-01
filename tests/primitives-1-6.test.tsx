@@ -228,6 +228,10 @@ describe("Checkbox without a label: the bare selection box", () => {
   });
 });
 
+// 1.7.0: a Grid with `from` adds grid-cols-1 below its breakpoint (an explicit minmax(0, 1fr)
+// column instead of the implicit auto track), so each `from` recipe below carries it. Where the
+// content fits, the column is as wide as before (every grid baseline unchanged); where a child's
+// content was wider than the phone, the page no longer scrolls sideways.
 describe("SplitLayout and Grid", () => {
   it.each([
     pair("WFO worksite-form etc. (exact, 7)", <SplitLayout>m</SplitLayout>, <div className="grid items-start gap-6 lg:grid-cols-[1fr_minmax(20rem,26rem)]">m</div>),
@@ -237,12 +241,12 @@ describe("SplitLayout and Grid", () => {
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_minmax(20rem,28rem)]">m</div>,
     ),
     pair("as a form", <SplitLayout as="form">m</SplitLayout>, <form className="grid items-start gap-6 lg:grid-cols-[1fr_minmax(20rem,26rem)]">m</form>),
-    pair("gap-3 sm:grid-cols-2 (34 / 10)", <Grid gap={3} cols={2} from="sm">x</Grid>, <div className="grid gap-3 sm:grid-cols-2">x</div>),
-    pair("gap-4 sm:grid-cols-2 (21 / 3)", <Grid gap={4} cols={2} from="sm">x</Grid>, <div className="grid gap-4 sm:grid-cols-2">x</div>),
-    pair("+ max-w-2xl (5 / 3)", <Grid gap={4} cols={2} from="sm" className="max-w-2xl">x</Grid>, <div className="grid max-w-2xl gap-4 sm:grid-cols-2">x</div>),
+    pair("gap-3 sm:grid-cols-2 (34 / 10)", <Grid gap={3} cols={2} from="sm">x</Grid>, <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">x</div>),
+    pair("gap-4 sm:grid-cols-2 (21 / 3)", <Grid gap={4} cols={2} from="sm">x</Grid>, <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">x</div>),
+    pair("+ max-w-2xl (5 / 3)", <Grid gap={4} cols={2} from="sm" className="max-w-2xl">x</Grid>, <div className="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2">x</div>),
     pair("gap-3 grid-cols-2 (7 / 2)", <Grid gap={3} cols={2}>x</Grid>, <div className="grid grid-cols-2 gap-3">x</div>),
-    pair("gap-6 items-start lg:grid-cols-2 (6 / 5)", <Grid gap={6} cols={2} from="lg" align="start">x</Grid>, <div className="grid items-start gap-6 lg:grid-cols-2">x</div>),
-    pair("gap-3 sm:grid-cols-3", <Grid as="section" gap={3} cols={3} from="sm">x</Grid>, <section className="grid gap-3 sm:grid-cols-3">x</section>),
+    pair("gap-6 items-start lg:grid-cols-2 (6 / 5)", <Grid gap={6} cols={2} from="lg" align="start">x</Grid>, <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">x</div>),
+    pair("gap-3 sm:grid-cols-3", <Grid as="section" gap={3} cols={3} from="sm">x</Grid>, <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">x</section>),
     pair("no prop, just grid", <Grid>x</Grid>, <div className="grid">x</div>),
   ])("%s", (_name, primitive, recipe) => same(primitive, recipe));
 });

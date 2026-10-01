@@ -570,3 +570,66 @@ until the menu has followed (it measured between the scroll and the menu's re-re
 use, the target call). New stories: `text-button--variants`, `radio--group`,
 `radio--choice-tiles`, `field--bare-checkbox`, `split-layout--main-and-side`, `grid--templates`,
 `tag-remove--in-a-tag`, `text--nowrap-and-tabular`.
+
+### 4.7 Library 1.7.0 as specified
+
+**Status: SPECIFIED 2026-10-01** (measured, then built as 1.7.0). The subject is the coarse-pointer
+touch floor (1.3.0, opt-in through `data-ops-touch`): the targets the kit draws itself, which an app
+cannot size from outside, plus one layout leak the Workforce Ops restyle found. The findings come
+from the app restyles: PrefabOps restyle plan §10.2 ("Candidates found at P4.3" and "at P4.4a") and
+Workforce Ops' `/workers/new` at 375. No API change (`api-surface.d.txt` unchanged).
+
+**How it was measured.** In the gallery at 375-touch (Playwright: `hasTouch`, `isMobile`, so
+`(hover: none) and (pointer: coarse)` match), with `data-ops-touch` on `<html>` over the 1.6 stories
+for "before" and on the new stories' wrappers for "after"; bounding boxes, the smallest of a set
+(42 day cells, 2 arrows, 4 menu items); the Switch's target by `elementFromPoint` around the
+track's centre. Scratch: `/tmp/claude-0/s17/` (`floor.mjs`).
+
+| Component | Target | 1.6.0 | 1.7.0 (under the floor) | How |
+|---|---|---|---|---|
+| `Dialog` | ✕ | 31.7 x 34 | 44 x 44 | `TOUCH_FLOOR.height` + `.width`; the header row grows to 60 |
+| toast (`Toaster` / `ToastViewport`) | ✕ | 23.7 x 26 | 44 x 44 | floor + `-my-3.5` under the floor: the toast keeps its height, the target reaches past it |
+| `DateInput` | field button | 28 x 28 | 44 x 44 | floor; the field's `pr-12` under the floor (text 48px clear of the button, was 36) |
+| `DateInput` calendar | day cells | 36 tall | 44 | `TOUCH_FLOOR.height` |
+| | month arrows | 32 x 32 | 44 x 44 | floor both sides |
+| | month title | 28 tall | 44 | `TOUCH_FLOOR.height` |
+| | Today / Clear | 40 tall | 44 | `TOUCH_FLOOR.height` (the coarse branch's `px-4 py-2.5` stays) |
+| `YearInput` | field button, arrows, This year / Clear | 28 x 28, 32 x 32, 40 | 44 x 44, 44 x 44, 44 | as DateInput (its year cells were `h-11` already) |
+| `FileInput` | the field | 43.5 tall | 44 | `TOUCH_FLOOR.height` |
+| `RowMenu` | items (link and button) | 32 tall | 44 | `TOUCH_FLOOR.height` |
+| `Switch` | the track's target | 40 x 24, no row target | 54 x 46 | the row `TOUCH_FLOOR.height`; the track's invisible `::after`, `-inset-x-2 -inset-y-3` under the floor (the track itself stays 40 x 24 at every pointer) |
+
+**The Segmented overflow (Workforce Ops `/workers/new`, 9px at 375).** Not Segmented's fault:
+it already is `w-fit max-w-full overflow-x-auto` and scrolls inside itself. It sits in the form's
+kit `Grid cols={2} from="sm"`, which below `sm` had no template: its one implicit column was an
+`auto` track, whose grid items keep their content's min-content width as a minimum (the app's
+`div` around the employer picker has no `min-w-0`), and a scroll container's content still counts
+towards that min-content. The item grew wider than the phone and `max-w-full` was measured against
+it. Fix in the kit's `Grid`: with `cols` and `from`, `grid-cols-1` below the breakpoint, an explicit
+`minmax(0, 1fr)` column (a track whose minimum is 0 gives its items no automatic minimum). Where
+the content fits, an `auto` single column and a `1fr` one are the same width, so every grid
+baseline keeps 0 changed pixels; only an overflowing page changes. The 1.6 recipe table's `from`
+rows each gain `grid-cols-1`. A hand-written grid holding a scrolling control should do the same
+or give the item `min-w-0` (DESIGN.md → Responsive).
+
+**Rules.** Fine pointers stay pixel-identical: every new class is behind the floor's media query
+and `[data-ops-touch]` (tests/touch-floor-1-7.test.tsx compiles them and requires every selector
+inside that block), except `grid-cols-1`, which changes layout only where content overflowed. The
+1440 and 375 shots of every story stay byte-identical to 1.6.0. At 375-touch only stories whose
+controls sit inside `data-ops-touch` can change: of the existing ones that is
+`button--touch-floor` (its DateInput's button, three brands), rebaselined in a pure
+`shots: rebaseline (…)` commit and named under `Visible:` in the CHANGELOG.
+
+**Stories** (new baselines only): `dialog--under-the-touch-floor`, `toast--under-the-touch-floor`,
+`date-input--calendar-under-the-touch-floor`, `year-input--picker-under-the-touch-floor`,
+`field--under-the-touch-floor` (FileInput + two Switches), `row-menu--open-below-under-the-touch-floor`,
+`segmented--in-a-form-grid`. **Behaviour** (`gallery/tests/behaviour.spec.ts`, "touch floor
+(1.7.0)", 375 and 375-touch): every target above ≥ 44 (icon-only 44 x 44) at 375-touch and the 1.6
+size at 375; the Switch's reach and a tap 20px above its track toggling it; the Segmented story
+inside 375 with the control scrolling inside itself.
+
+**Not in 1.7.0.** Other kit targets under 44 that no app reported (Combobox options, AppSwitcher
+entries, CopyValue, TagRemove, the PageHelp trigger already has its own `pointer-coarse:` 44):
+the rule in DESIGN.md ("whatever a finger can press carries `TOUCH_FLOOR` or an invisible target")
+applies to them when they are measured; `Text` without `size` inheriting an island's 16px (plan
+§10.2, P4.3) is an island matter, not a floor one.

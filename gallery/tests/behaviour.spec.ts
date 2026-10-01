@@ -728,6 +728,165 @@ test.describe("shell behaviour (1.5.0)", () => {
   });
 });
 
+/**
+ * 1.7.0: the touch floor's promise for the kit's own small targets. Each story wraps its controls in
+ * [data-ops-touch]; on the phone (touch, coarse pointer, no hover) every one is at least 44px tall
+ * and the icon-only ones 44px wide, the Switch's track keeps its 40 x 24 look inside a 54 x 46
+ * target. On the 375 window (a fine pointer that hovers) the same stories keep the 1.6 sizes: the
+ * floor paints nothing there.
+ */
+test.describe("touch floor (1.7.0)", () => {
+  test.beforeEach(({}, info) => {
+    test.skip(!info.project.name.startsWith("375"), "the floor is a phone matter: 375 (off) and 375-touch (on)");
+  });
+
+  type Size = { width: number; height: number };
+  const sizeOf = (page: Page, selector: string) =>
+    page.locator(selector).first().evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { width: r.width, height: r.height };
+    });
+  const smallest = (page: Page, selector: string) =>
+    page.locator(selector).evaluateAll((els) => ({
+      count: els.length,
+      width: Math.min(...els.map((el) => el.getBoundingClientRect().width)),
+      height: Math.min(...els.map((el) => el.getBoundingClientRect().height)),
+    }));
+  /** On the phone: at least 44 (both sides when `square`); on the window: exactly the 1.6 size. */
+  function floor(size: Size, touch: boolean, before: { height: number; width?: number }, square = false) {
+    if (touch) {
+      expect(size.height).toBeGreaterThanOrEqual(44);
+      if (square) expect(size.width).toBeGreaterThanOrEqual(44);
+    } else {
+      expect(size.height).toBeCloseTo(before.height, 0);
+      if (before.width !== undefined) expect(size.width).toBeCloseTo(before.width, 0);
+    }
+  }
+  const tapOrClick = async (page: Page, selector: string, touch: boolean) =>
+    touch ? page.locator(selector).first().tap() : page.locator(selector).first().click();
+
+  test("Dialog: the ✕ is 44 x 44", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "dialog--under-the-touch-floor");
+    floor(await sizeOf(page, `dialog[open] button[aria-label="${EN_STRINGS.close}"]`), touch, { height: 34 }, true);
+  });
+
+  test("toast: the ✕ is 44 x 44 and the toast keeps its height", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "toast--under-the-touch-floor");
+    floor(await sizeOf(page, `[data-toast] button[aria-label="Close"]`), touch, { height: 26 }, true);
+    const toast = await sizeOf(page, "[data-toast]");
+    await open(page, "toast--stack");
+    expect(toast.height).toBe((await sizeOf(page, '[data-toast="success"]')).height);
+  });
+
+  test("DateInput: the calendar button, the arrows, the title, the days and Today / Clear", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "date-input--calendar-under-the-touch-floor");
+    floor(await sizeOf(page, `[data-story] button[aria-label="${EN_STRINGS.datePicker.openCalendar}"]`), touch, { height: 28, width: 28 }, true);
+    // The text keeps clear of the larger button.
+    const field = page.locator("[data-story] input[role=combobox]");
+    const padding = await field.evaluate((el) => parseFloat(getComputedStyle(el).paddingRight));
+    expect(padding).toBe(touch ? 48 : 36);
+    await tapOrClick(page, "[data-story] input[role=combobox]", touch);
+    const days = await smallest(page, "[data-day]");
+    expect(days.count).toBe(42);
+    floor(days, touch, { height: 36 });
+    const arrows = await smallest(
+      page,
+      `button[aria-label="${EN_STRINGS.datePicker.previousMonth}"], button[aria-label="${EN_STRINGS.datePicker.nextMonth}"]`,
+    );
+    expect(arrows.count).toBe(2);
+    floor(arrows, touch, { height: 32, width: 32 }, true);
+    floor(await sizeOf(page, `[role=dialog] button[title="${EN_STRINGS.datePicker.chooseMonth}"]`), touch, { height: 28 });
+    for (const name of [EN_STRINGS.datePicker.today, EN_STRINGS.datePicker.clear]) {
+      const size = await sizeOf(page, `[role=dialog] button:text-is("${name}")`);
+      if (touch) expect(size.height).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test("YearInput: the field's button, the arrows and This year / Clear", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "year-input--picker-under-the-touch-floor");
+    const yp = EN_OPTIONAL_STRINGS.yearPicker;
+    floor(await sizeOf(page, `[data-story] button[aria-label="${yp.openPicker}"]`), touch, { height: 28, width: 28 }, true);
+    await tapOrClick(page, "[data-story] input[role=combobox]", touch);
+    const arrows = await smallest(page, `button[aria-label="${EN_STRINGS.datePicker.previousYears}"], button[aria-label="${EN_STRINGS.datePicker.nextYears}"]`);
+    expect(arrows.count).toBe(2);
+    floor(arrows, touch, { height: 32, width: 32 }, true);
+    const years = await smallest(page, "[role=dialog] button[aria-pressed]");
+    if (touch) expect(years.height).toBeGreaterThanOrEqual(44);
+    for (const name of [yp.thisYear, EN_STRINGS.datePicker.clear]) {
+      const size = await sizeOf(page, `[role=dialog] button:text-is("${name}")`);
+      if (touch) expect(size.height).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test("FileInput is 44px tall", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "field--under-the-touch-floor");
+    const size = await sizeOf(page, "[data-story] input[type=file]");
+    if (touch) expect(size.height).toBeGreaterThanOrEqual(44);
+    else expect(size.height).toBeLessThan(44);
+  });
+
+  test("Switch: the track keeps its look, the target around it is at least 44 x 44, and a tap on its edge toggles", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "field--under-the-touch-floor");
+    const sw = page.locator("[data-story] button[role=switch]").first();
+    expect(await sw.evaluate((el) => [el.getBoundingClientRect().width, el.getBoundingClientRect().height])).toEqual([40, 24]);
+    const reach = await sw.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const hits = (x: number, y: number) => {
+        const at = document.elementFromPoint(x, y);
+        return at !== null && (at === el || el.contains(at));
+      };
+      let up = 0, down = 0, left = 0, right = 0;
+      while (up < 80 && hits(cx, cy - up - 1)) up++;
+      while (down < 80 && hits(cx, cy + down + 1)) down++;
+      while (left < 80 && hits(cx - left - 1, cy)) left++;
+      while (right < 80 && hits(cx + right + 1, cy)) right++;
+      return { width: left + right + 1, height: up + down + 1, row: el.parentElement!.getBoundingClientRect().height };
+    });
+    if (touch) {
+      expect(reach.width).toBeGreaterThanOrEqual(44);
+      expect(reach.height).toBeGreaterThanOrEqual(44);
+      expect(reach.row).toBeGreaterThanOrEqual(44);
+      // A tap 20px above the track's centre (outside its 24px) still toggles it.
+      const box = (await sw.boundingBox())!;
+      const before = await sw.getAttribute("aria-checked");
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2 - 20);
+      await expect(sw).not.toHaveAttribute("aria-checked", before!);
+    } else {
+      expect([reach.width, reach.height]).toEqual([40, 24]);
+    }
+  });
+
+  test("RowMenu: every item is 44px tall", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "row-menu--open-below-under-the-touch-floor");
+    await tapOrClick(page, '[data-story] button[aria-haspopup="menu"]', touch);
+    const items = await smallest(page, "[role=menuitem]");
+    expect(items.count).toBe(4);
+    floor(items, touch, { height: 32 });
+  });
+
+  test("Segmented in a one-column form Grid stays inside its row; the page never scrolls sideways", async ({ page }) => {
+    await open(page, "segmented--in-a-form-grid");
+    const control = page.getByRole("group", { name: "Employer" });
+    const { scroll, client, right } = await control.evaluate((el) => ({
+      scroll: el.scrollWidth,
+      client: el.clientWidth,
+      right: el.getBoundingClientRect().right,
+    }));
+    expect(scroll).toBeGreaterThan(client);
+    expect(right).toBeLessThanOrEqual(375 - 24);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+  });
+});
+
 test.describe("phone behaviour", () => {
   test.beforeEach(({}, info) => {
     test.skip(!info.project.name.startsWith("375"), "phone behaviour runs at 375 and 375-touch");

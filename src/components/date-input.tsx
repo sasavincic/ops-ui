@@ -48,6 +48,7 @@ import { riseSheet } from "../lib/sheet-motion";
  * reader fills forms by field name) dispatches an `input` event on it and
  * the field follows.
  */
+
 export type DateInputChange = { target: { value: string; name?: string } };
 
 type View = { year: number; month: number };
@@ -59,6 +60,12 @@ function subscribeCoarse(onChange: () => void) {
   return () => mq.removeEventListener("change", onChange);
 }
 const coarseNow = () => window.matchMedia("(pointer: coarse)").matches;
+
+/**
+ * 1.7.0: under the touch floor the calendar button is 44 x 44 at the field's right edge (4px in),
+ * so the text keeps 48px clear of it instead of 36px. Nothing changes without the floor.
+ */
+const ROOM_FOR_TOUCH_BUTTON = "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:pr-12";
 
 export function DateInput({
   id,
@@ -283,7 +290,7 @@ export function DateInput({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className="flex size-8 items-center justify-center rounded-control text-ink-secondary hover:bg-surface-raised hover:text-ink"
+      className={cn("flex size-8 items-center justify-center rounded-control text-ink-secondary hover:bg-surface-raised hover:text-ink", TOUCH_FLOOR.height, TOUCH_FLOOR.width)}
     >
       <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -353,7 +360,7 @@ export function DateInput({
         required={required}
         disabled={off}
         value={text}
-        className={cn(controlClasses, CONTROL_SIZE_CLASS[size], "pr-9 tabular-nums", TOUCH_FLOOR.height, TOUCH_FLOOR.text)}
+        className={cn(controlClasses, CONTROL_SIZE_CLASS[size], "pr-9 tabular-nums", TOUCH_FLOOR.height, TOUCH_FLOOR.text, ROOM_FOR_TOUCH_BUTTON)}
         onClick={() => {
           if (!open) openCalendar(false);
         }}
@@ -399,7 +406,7 @@ export function DateInput({
           aria-label={dp.openCalendar}
           title={dp.openCalendar}
           onClick={() => (open ? close(true) : openCalendar(true))}
-          className="absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-control text-ink-muted hover:bg-surface-raised hover:text-ink"
+          className={cn("absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-control text-ink-muted hover:bg-surface-raised hover:text-ink", TOUCH_FLOOR.height, TOUCH_FLOOR.width)}
         >
           <svg aria-hidden="true" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
             strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -457,7 +464,7 @@ export function DateInput({
                 type="button"
                 title={dp.chooseMonth}
                 onClick={() => setMode(mode === "days" ? "months" : "years")}
-                className="inline-flex items-center gap-1 rounded-control px-2 py-1 text-sm font-semibold text-ink hover:bg-surface-raised"
+                className={cn("inline-flex items-center gap-1 rounded-control px-2 py-1 text-sm font-semibold text-ink hover:bg-surface-raised", TOUCH_FLOOR.height)}
               >
                 {mode === "days" ? `${cap(months[view.month - 1])} ${view.year}` : view.year}
                 <svg aria-hidden="true" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor"
@@ -503,6 +510,8 @@ export function DateInput({
                       className={cn(
                         cellClasses(picked, isDisabled),
                         "h-9 tabular-nums",
+                        // 1.7.0: 44px tall under the touch floor (36px otherwise, unchanged).
+                        TOUCH_FLOOR.height,
                         !picked && !isDisabled && !inMonth && "text-ink-muted",
                         isToday && !picked && "font-semibold text-primary ring-1 ring-primary/40 ring-inset"
                       )}
@@ -565,7 +574,7 @@ export function DateInput({
               type="button"
               disabled={!withinRange(today, min, max)}
               onClick={() => pick(today)}
-              className={cn("rounded-control font-medium text-primary hover:bg-primary-subtle disabled:cursor-not-allowed disabled:text-ink-muted disabled:hover:bg-transparent", coarse ? "px-4 py-2.5 text-sm" : "px-2 py-1 text-detail")}
+              className={cn("rounded-control font-medium text-primary hover:bg-primary-subtle disabled:cursor-not-allowed disabled:text-ink-muted disabled:hover:bg-transparent", coarse ? "px-4 py-2.5 text-sm" : "px-2 py-1 text-detail", TOUCH_FLOOR.height)}
             >
               {dp.today}
             </button>
@@ -573,7 +582,7 @@ export function DateInput({
               <button
                 type="button"
                 onClick={() => pick("")}
-                className={cn("rounded-control font-medium text-ink-secondary hover:bg-surface-raised hover:text-ink", coarse ? "px-4 py-2.5 text-sm" : "px-2 py-1 text-detail")}
+                className={cn("rounded-control font-medium text-ink-secondary hover:bg-surface-raised hover:text-ink", coarse ? "px-4 py-2.5 text-sm" : "px-2 py-1 text-detail", TOUCH_FLOOR.height)}
               >
                 {dp.clear}
               </button>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useSyncExternalStore } from "rea
 import { CALLOUT_TONE, Callout } from "./callout";
 import { useOpsUi } from "../config/provider";
 import { cn } from "../lib/cn";
+import { TOUCH_FLOOR } from "../lib/touch";
 import type { ToastAction, ToastTone } from "../types";
 
 /**
@@ -236,7 +237,9 @@ export function ToastViewport() {
                 type="button"
                 aria-label={item.closeLabel}
                 onClick={() => dismissToast(item.id)}
-                className="-my-1 shrink-0 rounded-control p-1.5 text-sm leading-none text-ink-muted transition-colors duration-150 hover:bg-surface hover:text-ink"
+                // 1.7.0: 44 x 44 under the touch floor (26 x 26 otherwise, unchanged); the larger
+                // negative margin keeps the toast as tall as before, the target reaching past it.
+                className={cn("-my-1 shrink-0 rounded-control p-1.5 text-sm leading-none text-ink-muted transition-colors duration-150 hover:bg-surface hover:text-ink", TOUCH_FLOOR.height, TOUCH_FLOOR.width, "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:-my-3.5")}
               >
                 ✕
               </button>

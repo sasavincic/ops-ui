@@ -134,6 +134,15 @@ the kit's look). Two things to watch: a `TextButton` / `TagRemove` hides in a re
 unless `readOnlySafe` (add it where the button changes no data), and the sync's G3 shows
 `removed token --container-5xl` and `--container-6xl` once (AppFrame's widths became values).
 
+## Adopting 1.7.0
+
+No API change and no wrapper. Every new class sits behind the touch floor (`data-ops-touch` +
+`(hover: none) and (pointer: coarse)`), so an app without the attribute (Workforce Ops, FinaOps)
+sees 0 changed pixels, except a page whose `Grid` with `cols` / `from` overflowed sideways on a
+phone (`Grid` is now one explicit `minmax(0, 1fr)` column below its breakpoint; Workforce Ops'
+`/workers/new` at 375). PrefabOps (`<html data-ops-touch>`) gets its kit-internal targets at
+44px at 375-touch: the CHANGELOG lists each one, before → after.
+
 ## Adopting the shell (1.5.0)
 
 Each app replaces its `components/shell/*` with one client component that renders `AppFrame`

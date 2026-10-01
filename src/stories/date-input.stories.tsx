@@ -53,4 +53,15 @@ export const stories: Story[] = [
   },
   { name: "Calendar", render: () => <Calendar initial="2026-09-18" />, open: OPEN },
   { name: "Calendar with limits", render: () => <Calendar initial="" min="2026-09-10" max="2026-10-05" />, open: OPEN },
+  // 1.7.0: under [data-ops-touch] on a phone the calendar button, the arrows, the title, the days
+  // and Today / Clear are at least 44px; at 1440 and 375 this is the Calendar story.
+  {
+    name: "Calendar under the touch floor",
+    render: () => (
+      <div data-ops-touch="">
+        <Calendar initial="2026-09-18" />
+      </div>
+    ),
+    open: OPEN,
+  },
 ];

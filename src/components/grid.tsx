@@ -6,7 +6,8 @@ import { cn } from "../lib/cn";
  * two columns from `sm`, two cards side by side from `lg`. Every prop adds exactly its classes:
  * always `grid`; `gap` as Stack; `cols` (2 or 3) from a breakpoint (`from`: none = always, `"sm"`,
  * `"lg"`); `align="start"` → `items-start`. `<Grid gap={3} cols={2} from="sm">` renders
- * `grid gap-3 sm:grid-cols-2`. A field that spans both columns keeps `className="sm:col-span-2"`.
+ * `grid gap-3 grid-cols-1 sm:grid-cols-2` (1.7.0: the explicit one column below `from`). A field
+ * that spans both columns keeps `className="sm:col-span-2"`.
  */
 export type GridTag = "div" | "section" | "ul" | "ol" | "dl" | "form" | "fieldset";
 export type GridCols = 2 | 3;
@@ -36,6 +37,11 @@ export function Grid<T extends GridTag = "div">({ as, gap, cols, from, align, cl
         "grid",
         gap !== undefined && GAP_CLASS[gap],
         align === "start" && "items-start",
+        // 1.7.0: below `from` the grid is one explicit column, minmax(0, 1fr). The implicit track
+        // was `auto`, whose items keep their content's width as a minimum: a control that scrolls
+        // inside itself (Segmented) still pushed its row, and the page, wider on a phone. Where
+        // the content fits, the column is the same width as before.
+        cols !== undefined && from !== undefined && "grid-cols-1",
         cols !== undefined && GRID_COLS[cols][from ?? "base"],
         className
       )}

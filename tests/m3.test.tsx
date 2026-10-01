@@ -153,7 +153,8 @@ describe("RowMenu trigger + sections (G8)", () => {
     // The menu list's classes, each item's two shapes, the ⋯ button's classes.
     for (const fragment of [
       'className="fixed z-[var(--ops-z-menu,40)] w-52 max-w-[calc(100vw-2rem)] rounded-control border border-border bg-bg py-1 shadow-lg"',
-      'className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-ink hover:bg-surface"',
+      // 1.7.0 wraps the link item's string in cn(…, TOUCH_FLOOR.height): the classes are the same.
+      '"flex items-center gap-1.5 px-3 py-1.5 text-sm text-ink hover:bg-surface"',
       '"flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm hover:bg-surface disabled:opacity-50", item.danger ? "text-danger hover:bg-danger/10" : "text-ink"',
       'className={cn("px-2", TOUCH_FLOOR.width)}',
       '<ActionIcon name="more" always />',

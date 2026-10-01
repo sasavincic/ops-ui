@@ -473,6 +473,25 @@ links, `IconButton`, `Input`, `Select`, `Combobox`, `DateInput`, `YearInput` (1.
 `RowMenu` trigger; icon-only ones 44px wide too) and every text input at 16px, at every width.
 Without the attribute nothing changes. The classes are `TOUCH_FLOOR` in `lib/touch.ts`.
 
+Since 1.7.0 the floor also reaches the kit's own small targets, the ones an app cannot size from
+outside: the `Dialog` ✕ and each toast's ✕ (44 x 44; the toast keeps its height, the target
+reaches past it), the `DateInput` / `YearInput` button inside the field (44 x 44, the text keeps
+48px clear of it) and, in the calendar and the year picker, the arrows (44 x 44), the month title,
+the day cells and Today / This year / Clear (44px tall), `FileInput` (44px tall), every `RowMenu`
+item (44px tall) and the `Switch`. A Switch keeps its 40 x 24 track at every pointer: under the
+floor its row is at least 44px tall and an invisible `::after` around the track makes a 54 x 46
+target (a tap on it toggles), so the look never changes, only where a finger may land. The rule
+for a new kit control: whatever a finger can press either carries `TOUCH_FLOOR` or, when its look
+must stay, an invisible target behind the same media query and attribute. Nothing outside the
+floor may change: the 1440 and 375 shots stay byte-identical, the gallery's `* under the touch
+floor` stories show the floor at 375-touch and `gallery/tests/behaviour.spec.ts` measures it.
+
+**A control that scrolls inside itself** (`Segmented`) keeps `max-w-full` and scrolls,
+but its content still counts as the minimum width of a grid item on an `auto` track: in a
+one-column grid on a phone it pushed the row, and the page, sideways. `Grid` with `cols` and
+`from` is one explicit `minmax(0, 1fr)` column below its breakpoint (`grid-cols-1`, 1.7.0); a
+hand-written grid that holds one should do the same, or give the item `min-w-0`.
+
 **Islands and stacking** (1.3.0, for an app whose legacy CSS predates the kit): kit markup may
 live inside an element of class `ops-ui-root` on a page WITHOUT the global reset;
 `styles/preflight-scoped.css`, imported in `layer(base)` above the app's legacy layer, resets what

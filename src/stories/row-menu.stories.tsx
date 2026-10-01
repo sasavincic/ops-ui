@@ -97,4 +97,14 @@ export const stories: Story[] = [
     ),
     open: '[data-story] button[aria-label="Review actions"]',
   },
+  // 1.7.0: under [data-ops-touch] on a phone every item is at least 44px tall.
+  {
+    name: "Open below under the touch floor",
+    render: () => (
+      <div data-ops-touch="" className="min-h-96 max-w-xl">
+        <Rows names={["Passport"]} />
+      </div>
+    ),
+    open: '[data-story] button[aria-haspopup="menu"]',
+  },
 ];

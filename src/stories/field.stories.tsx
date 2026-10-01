@@ -195,6 +195,24 @@ function BareCheckboxes() {
   );
 }
 
+/**
+ * 1.7.0: under [data-ops-touch] on a phone the file picker is 44px tall and a Switch's track keeps
+ * its 40 x 24 look inside a row of at least 44px, with an invisible 54 x 46 target around it.
+ */
+function TouchFloorControls() {
+  const [never, setNever] = useState(true);
+  const [mobile, setMobile] = useState(false);
+  return (
+    <div data-ops-touch="" className="flex max-w-md flex-col gap-3">
+      <Field label="Scan" htmlFor="t-file">
+        <FileInput id="t-file" />
+      </Field>
+      <Switch id="t-never" label="Never expires" checked={never} onChange={setNever} />
+      <Switch id="t-mobile" label="Mobile worksite" hint="The crew moves with the client." checked={mobile} onChange={setMobile} />
+    </div>
+  );
+}
+
 export const stories: Story[] = [
   { name: "States", render: () => <States /> },
   { name: "Controls", render: () => <Controls /> },
@@ -218,4 +236,5 @@ export const stories: Story[] = [
       </ReadOnlyScope>
     ),
   },
+  { name: "Under the touch floor", render: () => <TouchFloorControls /> },
 ];
