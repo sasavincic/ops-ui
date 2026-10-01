@@ -431,9 +431,16 @@ function push(repo, args, { retryDelays = [2000, 4000, 8000, 16000] } = {}) {
  * @param {string[]} compatible
  * @returns {Classification & { refusals: string[] }}
  */
-export function classify(repo, previous, section, compatible) {
+export function classify(repo, previous, section, requestedCompatible) {
   /** @type {string[]} */
   const reasons = [];
+  // The OPS_UI_VERSION surface line never counts (VERSION_LINE), so the `--compatible
+  // OPS_UI_VERSION` that releases before the tools fixes needed has nothing left to authorize: it
+  // is accepted and ignored, so a release prepared the old way still runs.
+  const compatible = requestedCompatible.filter((name) => name !== "OPS_UI_VERSION");
+  if (compatible.length !== requestedCompatible.length) {
+    reasons.push("note: --compatible OPS_UI_VERSION is no longer needed (the release ignores and rewrites that surface line); ignored");
+  }
   /** @type {string[]} */
   const refusals = [];
   /** @type {string[]} */
