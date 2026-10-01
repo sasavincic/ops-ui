@@ -501,3 +501,72 @@ left in `className`). Classes are compared as sets; the element keeps its tag th
 | X2 | TH / TD `text-right` | `alignRight` | TH 15, TD 11 | TH 23, TD 7 |
 | X3 | TH / TD `hidden <bp>:table-cell text-right` | `hideBelow="<bp>" alignRight` | TH 17, TD 3 | TH 26, TD 5 |
 | X4 | TD `font-mono text-right` (+ `hidden <bp>:table-cell`, + `text-detail` / `whitespace-nowrap` in className) | `<TD numeric [hideBelow]>` | 8 (+25) | – |
+
+### 4.6 Library 1.6.0 as specified
+
+**Status: SPECIFIED 2026-10-01** (measured, then built as 1.6.0). The gaps both apps' Phase D
+sweeps left behind: the recipes the 1.2.0 primitives could not take (a `<button>` that looks like
+a link, choice controls, grid templates, a chip's remove ✕, two Text classes), one guard false
+positive, one theme-variable leak, and three tooling gaps. Additive throughout: every existing
+baseline keeps 0 changed pixels, new stories add new baselines only.
+
+**How it was measured.** As §4.4, against the post-sweep apps (`git archive origin/main src`:
+Workforce Ops `a5cd0e4`, FinaOps `526d1a7`), every `.tsx` outside `src/components/ui` and
+`src/vendor`; class strings compared as sets; *exact* = the whole set is the recipe, *(+N)* = the
+recipe plus other classes that stay in `className`. Raw controls are the sync script's own
+`raw-control` findings with an empty allow-list (WFO 98, FinaOps 20). Scratch:
+`/tmp/claude-0/ops-ui-scratch/s16/`. The rule of §4.4 holds: a prop renders exactly the classes of
+the recipe it replaces, so adoption is a 0-changed-pixel codemod unless a row says otherwise.
+
+| Component (file) | Prop → exact classes | Replaces, Workforce Ops / FinaOps |
+|---|---|---|
+| `TextButton` (`components/text-button.tsx`, client) | a `<button>` with `TextLink`'s classes: `variant` (required) as `TEXT_LINK_VARIANT` · `size` as `Text` · `tone` as `Text` (`TEXT_TONE`) · no default `type` (as `Button`) · hidden in a read-only scope unless `readOnlySafe` (as `Button`) | raw `<button>`s styled as links: 16 / 2 (quiet ×12, underline ×3, plain ×1 / muted ×1, strong ×1) |
+| `TextLink` + `TextButton` variant `muted` (additive) | `muted` → `text-ink-secondary hover:text-primary` | 0 (+3) / 0 (+3): the sign-in pages' secondary links and buttons |
+| `Radio`, `RadioGroup` (`components/radio.tsx`, client) | `Radio`: the kit `Checkbox` recipe with `type="radio"` (label `flex items-center gap-2 text-sm text-ink`, disabled `cursor-not-allowed text-ink-muted`; input `size-4 accent-primary`) · `RadioGroup`: `role="radiogroup"`, `orientation` `vertical` → `flex flex-col`, `horizontal` → `flex flex-wrap`, `gap` as `Stack`; it gives its `Radio`s and `ChoiceTile`s `name`, `checked` and `onChange` from `value` / `onChange` | WFO travel-dialogs (exact, 1 component, 3 call sites); FinaOps' 4 native radios (`invoice-controls` ×2, `instruction-invoice-dialog` ×2: **visible**, a 13px native radio becomes the 16px primary one — the suite's look; their sweep commit lists the two dialogs as expected) |
+| `ChoiceTile` (`components/radio.tsx`) | the bordered radio tile: `cursor-pointer rounded-control border transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60`, checked `border-primary bg-primary-subtle text-primary`, else `border-border-strong hover:bg-surface`; an `sr-only` radio inside · `layout`: `row` (default) → `flex min-h-11 min-w-0 items-center gap-2 px-3 py-2 text-sm`, `compact` → `flex min-h-11 min-w-11 items-center justify-center gap-2 px-2.5 py-2 text-detail sm:min-h-10 sm:justify-start`, `stacked` → `flex min-h-11 min-w-0 flex-col justify-center gap-0.5 px-2.5 py-2 text-center text-detail sm:min-h-0 sm:text-left` | WFO 4: employer picker ×2 (`row`), quote editor issuer (`compact`) and type (`stacked`); FinaOps 0 |
+| `Checkbox` without `label` (additive overload) | `label` omitted → the bare `<input type="checkbox" class="size-4 accent-primary">`, `aria-label` required by the type | FinaOps review-board line selection 1; the selection column of any list |
+| `SplitLayout` (`components/split-layout.tsx`) | `grid items-start gap-6 lg:grid-cols-[1fr_minmax(20rem,26rem)]` (main + side column) · `as` | 7 / 0 (one other width each: className) |
+| `Grid` (`components/grid.tsx`) | `grid` · `gap` as `Stack` · `cols` `2` \| `3` with `from` (none) → `grid-cols-N`, `"sm"` → `sm:grid-cols-N`, `"lg"` → `lg:grid-cols-N` · `align="start"` → `items-start` · `as` | `gap-3 sm:2` 34 (+5) / 10 (+1), `gap-4 sm:2` 21 (+6) / 3 (+4), `gap-3 2` 7 (+2) / 2, `gap-6 start lg:2` 6 / 5 (+2), `sm:3` (+4) / (+3) |
+| `TagRemove` (`components/tag-remove.tsx`, client) | the ✕ inside a `Tag`: `<button type="button" aria-label=…>` `shrink-0 rounded-control px-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink`, children default `✕` · hidden in a read-only scope (removing changes data) | FinaOps 4: allocation-editor ×2 (exact), rules-board ×2 (no `shrink-0`, no hover fill: 0 pixels at rest, the hover gains the fill) |
+| `Text` `nowrap`, `tabular` (additive) | `nowrap` → `whitespace-nowrap`, `tabular` → `tabular-nums` | `whitespace-nowrap` with Text classes only: 23 / 9; `tabular-nums` on `Text`: 10 (+12) / 4 (+7). `font-mono text-detail` is already `<Text size="detail" mono>` |
+
+Readings:
+- **`Tag` stays server-safe**: an `onRemove` prop would put a handler in it, so the ✕ is its own
+  client component placed as the Tag's last child (the markup FinaOps writes by hand).
+- **`TextButton` takes `tone`, `TextLink` does not**: the quiet buttons carry a tone 11 times
+  (`text-ink-muted` ×6, `text-ink-secondary` ×5); the post-sweep TextLinks carry one 3 times.
+- **No `GridItem` / `span` prop.** `sm:col-span-2` (43 / 29, mostly on `Field`) is one utility
+  in `className`; a prop would save nothing.
+- **Not in 1.6.0**: the hours card's visible-radio tile (1 use), the quote editor's pricing radio
+  (1 use, `min-h-10` + `shrink-0`), `text-xs text-ink-muted` (8 / 0: `text-xs` is not a `Text`
+  size, §4.4), `xl:` grid templates, other split widths (1 each).
+
+**Theme variables the library declares by itself (item 6).** Tailwind v4 emits a theme variable
+for every scanned class that uses one. 1.5.0's `AppFrame` wrote `max-w-5xl` and `max-w-6xl`, so
+each app declared both `--container-5xl` and `--container-6xl` although it renders one (FinaOps'
+G3 saw `--container-5xl`, Workforce Ops' `--container-6xl`). 1.6.0 writes the two widths as
+`max-w-[64rem]` / `max-w-[72rem]`: the same computed `max-width` (Tailwind's 64rem / 72rem), no
+theme variable. The DOM's class token changes, nothing paints differently (every `app-frame--*`
+baseline unchanged; the shell proofs list it as an intentional difference). An app taking 1.6.0
+sees both names leave its G3 once: `removed token --container-5xl` and `removed token
+--container-6xl` in its `--expect` (unless its own code still uses one). DESIGN.md → "Library
+classes and theme variables" states the rule for later components: a library class must not
+need a theme variable an app may not use (sizes from the spacing scale or arbitrary values).
+
+**Guards (sync script).** `<input type="hidden">` is not a raw control (it renders nothing and has
+no read-only or touch behaviour): WFO 20, FinaOps 3 findings leave the reports.
+
+**Tools.** `app-shots`: a `visual.routes` entry may be an object `{ "path", "resolve"?, "noise"?,
+"tries"? }`: `resolve: { "from": "<list route>", "selector": "<css>" }` opens `from` and shoots
+the `href` of the first match instead of `path` (the key stays `path`, e.g.
+`/transactions/:first`; a fixture id is read at capture time); `noise: { "pixels", "reason" }`
+settles the page when two shots differ by at most `pixels` and lets `compare` pass that page up
+to the same number (reported, never silent; every other page stays exact); `tries` (and
+`visual.settleTries`) the number of extra shots before "never settled" (default 10). The gallery's
+RowMenu follow-scroll behaviour test reads the button and menu rectangles in one frame and polls
+until the menu has followed (it measured between the scroll and the menu's re-render under load).
+
+**Codemods for each app's second sweep** are listed in the 1.6.0 CHANGELOG entry (file:line per
+use, the target call). New stories: `text-button--variants`, `radio--group`,
+`radio--choice-tiles`, `field--bare-checkbox`, `split-layout--main-and-side`, `grid--templates`,
+`tag-remove--in-a-tag`, `text--nowrap-and-tabular`.
