@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminIconButton, Button, ButtonLink, FileLink } from "../components/button";
+import { AdminIconButton, Button, ButtonLink, ExternalButtonLink, FileLink } from "../components/button";
 import { ReadOnlyScope } from "../config/read-only";
 import type { Story } from "./index";
 import { Row, Stack } from "./story-layout";
@@ -43,9 +43,12 @@ function Matrix() {
           Download
         </FileLink>
         <FileLink disabled>Not generated</FileLink>
+        <ExternalButtonLink href="tel:+38620000000" variant="secondary" size="sm">
+          Call
+        </ExternalButtonLink>
       </Row>
       <Row label="admin icon buttons">
-        {(["edit", "delete", "unlock", "permissions", "key"] as const).map((icon) => (
+        {(["edit", "delete", "unlock", "permissions", "key", "deactivate", "reactivate"] as const).map((icon) => (
           <AdminIconButton key={icon} icon={icon} label={`Admin ${icon}`} />
         ))}
       </Row>
