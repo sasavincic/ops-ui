@@ -24,9 +24,9 @@ import { ROOT, readSource } from "./source-files";
 // tools/diff-against-app.mjs (spec §12.1 L6): the extraction proof. The unit tests pin each
 // normalization to what the spec calls mechanical; the end-to-end tests run the tool against an
 // app tree rebuilt from the library's own L2 import commit (the FinaOps kit byte for byte and the
-// Workforce Ops modules) with the 2026-10-01 re-import laid over it (FinaOps 2eef5a4, kept raw in
-// tests/fixtures/reimport-finaops-2eef5a4: button, date-input, dialog, floating-place,
-// sheet-motion; spec §12.4 option 1), so the proof is exercised without an app checkout - and a
+// Workforce Ops modules) with the 2026-10-01 re-import laid over it (FinaOps 2eef5a4 + 19aad88, kept raw in
+// tests/fixtures/reimport-finaops: button, date-input, dialog, floating-place,
+// sheet-motion, glance-card; spec §12.4 option 1), so the proof is exercised without an app checkout - and a
 // planted change must fail it.
 
 const EN = stringLeaves(readSource("src/config/strings.ts"), "strings.ts", "EN_STRINGS");
@@ -125,12 +125,12 @@ afterAll(() => rmSync(SANDBOX, { recursive: true, force: true }));
 const L2 = execFileSync("git", ["-C", ROOT, "log", "--format=%H", "--grep=^L2: import the kit"], { encoding: "utf8" }).trim().split("\n")[0];
 const atL2 = (p: string) => execFileSync("git", ["-C", ROOT, "show", `${L2}:${p}`], { encoding: "utf8" });
 
-const REIMPORT_DIR = path.join(ROOT, "tests/fixtures/reimport-finaops-2eef5a4");
+const REIMPORT_DIR = path.join(ROOT, "tests/fixtures/reimport-finaops");
 const listFiles = (dir: string, rel = ""): string[] =>
   readdirSync(path.join(dir, rel), { withFileTypes: true }).flatMap((e) =>
     e.isDirectory() ? listFiles(dir, path.join(rel, e.name)) : [path.join(rel, e.name).replace(/\.txt$/, "")],
   );
-/** App paths the 2026-10-01 re-import replaced (FinaOps 2eef5a4). */
+/** App paths the 2026-10-01 re-import replaced (FinaOps 2eef5a4 + 19aad88). */
 const REIMPORTED = new Set(listFiles(REIMPORT_DIR));
 
 /** An app tree as the kit was imported: FinaOps' kit files and the modules at their app paths. */

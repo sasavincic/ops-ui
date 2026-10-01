@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardBody, CardHeader, CardTitle } from "./card";
+import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 
 /** Overview glance: a tab's key numbers at sight, linking into the tab. */
 export function GlanceCard({
@@ -11,7 +11,7 @@ export function GlanceCard({
   title: string;
   /** Omitted when the tab it would open is closed to this session. */
   href?: string;
-  /** Localised link text — pass strings.open. */
+  /** Localised link text — pass t.common.open. */
   openLabel?: string;
   children: React.ReactNode;
 }) {

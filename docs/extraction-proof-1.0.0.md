@@ -1,5 +1,20 @@
 # Extraction proof: @latro/ops-ui 1.0.0 (spec §12.1 L6)
 
+**Final run for the release, 2026-10-01**, after spec §12.4 option 1: both app kits were aligned
+(FinaOps 2eef5a4 took Workforce Ops' button, date-input, dialog, lib/floating-place and
+lib/sheet-motion; FinaOps 19aad88 took its GlanceCard optional `href`) and the library re-imported
+them (`tests/fixtures/reimport-finaops` keeps the raw files for the end-to-end test).
+`WFO_AHEAD` and `FINAOPS_AHEAD` are empty.
+
+| App (fresh `git archive` export) | Verdict | Exit |
+|---|---|---|
+| FinaOps `origin/main` `19aad88` | **PROVEN**: 30 components identical after normalization, 5 differing only by named spec rows; modules and kit words identical | 0 |
+| Workforce Ops `origin/main` `23d7d5c` (source: FinaOps `19aad88`) | **PROVEN**: 25 components identical after normalization, 8 differing only by named spec rows; `validity-cell` stays app-local | 0 |
+
+The rest of this file is the 2026-09-30 run, kept as the record of the decision.
+
+---
+
 **Date:** 2026-09-30. First run at library `3c31100` (L6); **re-run for L7 on 2026-09-30 at 21:50 UTC** at library `e0afe5c` (the L7a commit: `tools/release.mjs`, `tools/app-shots.mjs`; nothing under `src/` or `styles/` changed since the L6 review rounds). The outputs below are the re-run's.
 
 **Inputs of the re-run:**

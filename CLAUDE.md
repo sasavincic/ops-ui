@@ -379,11 +379,15 @@ Captures go to `$TMPDIR/ops-ui-shots/<app>/<label>/`.
   undeclared names, `manifest.json`; `compare` with `exactDiff`, the G3 rules
   and `--expect`, syntax in §11.4). `CHANGELOG.md` `## 1.0.0` gained its
   `Visible:` line (1.0.0 is a major bump from 0.0.0).
-- **L7b `pnpm release 1.0.0`: BLOCKED** (re-checked 2026-09-30 21:45 UTC with
-  `git ls-remote`): the §12.4 decision "Found while proving 1.0 (L6)" is still
-  open (Saša's; releasing now would decide it for option 2), and the §12.4
-  "FinaOps ahead" re-import cannot happen yet (FinaOps' security branch, now
-  at 0286b33, is not on its `main`, still 80828fc). The re-run L6 proof is in
-  `docs/extraction-proof-1.0.0.md`. Once both are done: re-import, date the
-  `## 1.0.0` section in its own commit, push, then `pnpm release 1.0.0
-  --trailer "Co-Authored-By: …"` with the git identity above.
+- **L7b release 1.0.0** (2026-10-01): spec §12.4 decided as option 1 (the
+  styling programme `2026-10-01-suite-styling-programme.md` Phase A). FinaOps
+  2eef5a4 + 19aad88 took Workforce Ops' newer kit files, the library
+  re-imported button, date-input, dialog, glance-card and the
+  `lib/floating-place` / `lib/sheet-motion` modules (fb28c86 and after; the
+  raw files are `tests/fixtures/reimport-finaops`, laid over the L2 import in
+  the end-to-end proof), 36 phone baselines were re-accepted (dialogs and
+  the touch calendar as bottom sheets) and the button story shows
+  ExternalButtonLink and the two new admin glyphs. The proof passes against
+  both apps' `main` (`docs/extraction-proof-1.0.0.md`); kit-freeze notes are
+  in both apps' CLAUDE.md. Next: Phase B (F0-F7, W0-W8) and library 1.1-1.3
+  per the styling programme.

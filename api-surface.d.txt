@@ -296,7 +296,7 @@ export declare function BottomActions({ children, className, }: {
 // src/components/glance-card.d.ts
 export declare function GlanceCard({ title, href, openLabel, children, }: {
     title: string;
-    href: string;
+    href?: string;
     openLabel?: string;
     children: React.ReactNode;
 }): import("react").JSX.Element;
