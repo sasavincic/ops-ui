@@ -119,6 +119,34 @@ export declare function CardHeader({ className, ...props }: React.ComponentProps
 export declare function CardTitle({ className, ...props }: React.ComponentProps<"h2">): import("react").JSX.Element;
 export declare function CardBody({ className, ...props }: React.ComponentProps<"div">): import("react").JSX.Element;
 
+// src/components/cluster.d.ts
+import { type Gap } from "../lib/gap";
+export declare const CLUSTER_ALIGN: {
+    readonly center: "items-center";
+    readonly start: "items-start";
+    readonly baseline: "items-baseline";
+    readonly end: "items-end";
+    readonly stretch: null;
+};
+export declare const CLUSTER_JUSTIFY: {
+    readonly start: null;
+    readonly between: "justify-between";
+    readonly end: "justify-end";
+    readonly center: "justify-center";
+};
+export type ClusterTag = "div" | "span" | "p" | "li" | "ul" | "nav";
+export type ClusterAlign = keyof typeof CLUSTER_ALIGN;
+export type ClusterJustify = keyof typeof CLUSTER_JUSTIFY;
+export type ClusterProps<T extends ClusterTag = "div"> = {
+    as?: T;
+    gap?: Gap;
+    wrap?: boolean;
+    align?: ClusterAlign;
+    justify?: ClusterJustify;
+    className?: string;
+} & Omit<React.ComponentProps<T>, "className" | "as" | "gap" | "wrap" | "align" | "justify">;
+export declare function Cluster<T extends ClusterTag = "div">({ as, gap, wrap, align, justify, className, ...props }: ClusterProps<T>): import("react").JSX.Element;
+
 // src/components/combobox.d.ts
 export type ComboboxOptionLine = {
     text: string;
@@ -311,6 +339,27 @@ export declare function GlanceCard({ title, href, openLabel, children, }: {
     children: React.ReactNode;
 }): import("react").JSX.Element;
 
+// src/components/heading.d.ts
+export declare const HEADING_LEVEL: {
+    readonly title: {
+        readonly tag: "h1";
+        readonly className: "text-lg font-semibold tracking-tight text-ink";
+    };
+    readonly section: {
+        readonly tag: "h2";
+        readonly className: "text-sm font-semibold text-ink";
+    };
+    readonly subsection: {
+        readonly tag: "h3";
+        readonly className: "text-xs font-medium text-ink-secondary";
+    };
+};
+export type HeadingLevel = keyof typeof HEADING_LEVEL;
+export declare function Heading({ level, as, className, ...props }: {
+    level: HeadingLevel;
+    as?: "h1" | "h2" | "h3" | "h4";
+} & React.ComponentProps<"h2">): import("react").JSX.Element;
+
 // src/components/kicker.d.ts
 export declare function Kicker({ icon, as: Tag, className, children, }: {
     icon?: React.ReactNode;
@@ -447,6 +496,16 @@ export declare function SheetFooter({ children, className, }: {
     className?: string;
 }): import("react").JSX.Element;
 
+// src/components/stack.d.ts
+import { type Gap } from "../lib/gap";
+export type StackTag = "div" | "span" | "section" | "ul" | "ol" | "li" | "form" | "fieldset";
+export type StackProps<T extends StackTag = "div"> = {
+    as?: T;
+    gap?: Gap;
+    className?: string;
+} & Omit<React.ComponentProps<T>, "className" | "as" | "gap">;
+export declare function Stack<T extends StackTag = "div">({ as, gap, className, ...props }: StackProps<T>): import("react").JSX.Element;
+
 // src/components/state-mark.d.ts
 import type { StateMarkSpec } from "../types";
 export type { StateMarkSpec };
@@ -474,8 +533,20 @@ export declare function TBody({ ...props }: React.ComponentProps<"tbody">): impo
 export declare function TR({ className, href, onClick, ...props }: React.ComponentProps<"tr"> & {
     href?: string;
 }): import("react").JSX.Element;
-export declare function TH({ className, ...props }: React.ComponentProps<"th">): import("react").JSX.Element;
-export declare function TD({ className, ...props }: React.ComponentProps<"td">): import("react").JSX.Element;
+export declare const CELL_HIDE_BELOW: {
+    readonly sm: "hidden sm:table-cell";
+    readonly md: "hidden md:table-cell";
+    readonly lg: "hidden lg:table-cell";
+};
+export type CellHideBelow = keyof typeof CELL_HIDE_BELOW;
+export type CellProps = {
+    hideBelow?: CellHideBelow;
+    alignRight?: boolean;
+};
+export declare function TH({ className, hideBelow, alignRight, ...props }: React.ComponentProps<"th"> & CellProps): import("react").JSX.Element;
+export declare function TD({ className, hideBelow, alignRight, numeric, ...props }: React.ComponentProps<"td"> & CellProps & {
+    numeric?: boolean;
+}): import("react").JSX.Element;
 export declare function RowLink({ className, children, ...props }: React.ComponentProps<typeof Link>): import("react").JSX.Element;
 
 // src/components/tabs.d.ts
@@ -501,6 +572,61 @@ export declare function Tag({ icon, tone, className, title, children, }: {
     title?: string;
     children: React.ReactNode;
 }): import("react").JSX.Element;
+
+// src/components/text-link.d.ts
+import { type TextSize } from "./text";
+export declare const TEXT_LINK_VARIANT: {
+    readonly quiet: "underline underline-offset-2 hover:text-ink";
+    readonly underline: "underline underline-offset-2";
+    readonly primary: "text-primary hover:underline";
+    readonly plain: "hover:underline";
+    readonly strong: "font-medium text-ink hover:underline";
+};
+export type TextLinkVariant = keyof typeof TEXT_LINK_VARIANT;
+export declare function isExternalHref(href: string): boolean;
+export declare function TextLink({ href, variant, size, className, ...props }: {
+    href: string;
+    variant: TextLinkVariant;
+    size?: TextSize;
+} & Omit<React.ComponentProps<"a">, "href">): import("react").JSX.Element;
+
+// src/components/text.d.ts
+export declare const TEXT_SIZE: {
+    readonly body: "text-sm";
+    readonly detail: "text-detail";
+    readonly micro: "text-micro";
+};
+export declare const TEXT_TONE: {
+    readonly ink: "text-ink";
+    readonly secondary: "text-ink-secondary";
+    readonly muted: "text-ink-muted";
+    readonly warning: "text-warning";
+    readonly danger: "text-danger";
+    readonly success: "text-success";
+};
+export declare const TEXT_WEIGHT: {
+    readonly normal: "font-normal";
+    readonly medium: "font-medium";
+    readonly semibold: "font-semibold";
+};
+export type TextSize = keyof typeof TEXT_SIZE;
+export type TextTone = keyof typeof TEXT_TONE;
+export type TextWeight = keyof typeof TEXT_WEIGHT;
+export type TextTag = "span" | "p" | "div" | "li" | "dt" | "dd";
+export type TextStyleProps = {
+    size?: TextSize;
+    tone?: TextTone;
+    weight?: TextWeight;
+    mono?: boolean;
+    block?: boolean;
+    truncate?: boolean;
+};
+export declare function textClasses({ size, tone, weight, mono, block, truncate }: TextStyleProps): string[];
+export type TextProps<T extends TextTag = "span"> = TextStyleProps & {
+    as?: T;
+    className?: string;
+} & Omit<React.ComponentProps<T>, "className" | keyof TextStyleProps | "as">;
+export declare function Text<T extends TextTag = "span">({ as, size, tone, weight, mono, block, truncate, className, ...props }: TextProps<T>): import("react").JSX.Element;
 
 // src/components/toast.d.ts
 import type { ToastAction, ToastTone } from "../types";
@@ -694,6 +820,20 @@ export declare function floatingTop(field: {
 // src/lib/fmt.d.ts
 export declare function fmt(template: string, vars: Record<string, string | number>): string;
 
+// src/lib/gap.d.ts
+export declare const GAP_CLASS: {
+    readonly 0.5: "gap-0.5";
+    readonly 1: "gap-1";
+    readonly 1.5: "gap-1.5";
+    readonly 2: "gap-2";
+    readonly 2.5: "gap-2.5";
+    readonly 3: "gap-3";
+    readonly 4: "gap-4";
+    readonly 5: "gap-5";
+    readonly 6: "gap-6";
+};
+export type Gap = keyof typeof GAP_CLASS;
+
 // src/lib/months.d.ts
 export declare function shiftMonth(month: string, delta: number): string;
 
@@ -788,6 +928,10 @@ export declare const stories: Story[];
 import type { Story } from "./index";
 export declare const stories: Story[];
 
+// src/stories/cluster.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
 // src/stories/combobox.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
@@ -825,6 +969,10 @@ import type { Story } from "./index";
 export declare const stories: Story[];
 
 // src/stories/glance-card.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/heading.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
 
@@ -890,6 +1038,10 @@ export declare const stories: Story[];
 import type { Story } from "./index";
 export declare const stories: Story[];
 
+// src/stories/stack.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
 // src/stories/state-mark.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
@@ -925,6 +1077,14 @@ import type { Story } from "./index";
 export declare const stories: Story[];
 
 // src/stories/tag.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/text-link.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/text.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
 

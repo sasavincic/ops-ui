@@ -26,6 +26,9 @@ const SERVER_SAFE = [
   "tag",
 ].map((name) => `src/components/${name}.tsx`);
 
+/** The server-safe components added after 1.0 (1.2.0: the primitives, styling programme §4.4). */
+const SERVER_SAFE_LATER = ["cluster", "heading", "stack", "text", "text-link"].map((name) => `src/components/${name}.tsx`);
+
 const SOURCES = filesUnder("src").filter((f) => /\.(ts|tsx)$/.test(f));
 const code = (file: string) => stripCommentsAndStrings(readSource(file));
 
@@ -70,7 +73,7 @@ describe("client-directive", () => {
   });
 
   it("the server-safe files: no directive, no hook, no context, no kit config", () => {
-    for (const file of SERVER_SAFE) {
+    for (const file of [...SERVER_SAFE, ...SERVER_SAFE_LATER]) {
       const src = readSource(file);
       expect(hasUseClient(src), file).toBe(false);
       expect(callsHook(code(file)), file).toBe(false);
@@ -82,8 +85,8 @@ describe("client-directive", () => {
 
   it("the other component files are client modules", () => {
     const components = SOURCES.filter((f) => f.startsWith("src/components/"));
-    expect(components).toHaveLength(37);
-    const clients = components.filter((f) => !SERVER_SAFE.includes(f));
+    expect(components).toHaveLength(42);
+    const clients = components.filter((f) => !SERVER_SAFE.includes(f) && !SERVER_SAFE_LATER.includes(f));
     expect(clients.filter((f) => !hasUseClient(readSource(f)))).toEqual([]);
   });
 

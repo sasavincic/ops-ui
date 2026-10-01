@@ -141,6 +141,51 @@ The step is chosen by the **role of the content**, on every surface, a dense boa
 Density is bought with spacing, never by shrinking the type. `text-micro` is for its named roles
 only. (`cn` knows `text-detail` and `text-micro` are sizes, so they never remove a colour class.)
 
+## Primitives: text and layout without hand-typed recipes
+
+Since 1.2 the kit names the class recipes every screen repeats, so a screen reads as what it
+is instead of as a string of utilities. Before writing a `className` for text or a row of
+things, walk the decision ladder (styling programme spec §3: use a kit component, promote a
+shared one, build an app pattern, build a special) and reach for these first:
+
+| Instead of | Write |
+|---|---|
+| `<p className="text-detail text-ink-muted">` | `<Text as="p" size="detail" tone="muted">` |
+| `<span className="font-medium text-ink">` | `<Text weight="medium" tone="ink">` |
+| `<h2 className="text-sm font-semibold text-ink">` | `<Heading level="section">` |
+| `<div className="flex flex-col gap-4">` | `<Stack gap={4}>` |
+| `<div className="flex flex-wrap items-center gap-2">` | `<Cluster gap={2}>` |
+| `<div className="flex justify-end">` | `<Cluster wrap={false} align="stretch" justify="end">` |
+| `<Link className="underline underline-offset-2 hover:text-ink">` | `<TextLink variant="quiet">` |
+| `<TH className="hidden sm:table-cell text-right">` | `<TH hideBelow="sm" alignRight>` |
+| `<TD className="font-mono text-right">` | `<TD numeric>` |
+
+- **`Text`** carries one `size` (`body` 14px, `detail` 13px, `micro` 11px: the type scale
+  below), one `tone` (ink, secondary, muted, or the warning / danger / success hue for a line
+  that is itself an attention line) and one `weight`; `mono`, `block`, `truncate` as flags.
+- **`Heading`** has three levels: `title` (a stand-alone card's title, the sign-in pages),
+  `section` (a section of a page or a card) and `subsection` (a group inside a section or a
+  sheet). A page's own title is `PageHeader`'s; an uppercase label is `Kicker`.
+- **`Stack`** is a column, **`Cluster`** a row that wraps (and centres its items unless told
+  otherwise): toolbars, chips, footers of buttons. Both take a `gap` from the spacing steps.
+- **`TextLink`** is a link inside text: `quiet` (underlined, ink on hover), `underline`,
+  `primary` (the link colour), `plain` (underline on hover), `strong` (a record's name outside a
+  table; inside a table that is `RowLink`).
+- **Table columns** hide below a breakpoint with `hideBelow`, align right with `alignRight`, and
+  a number or money column is `numeric` (right-aligned, monospace).
+
+Each renders exactly the classes it names, so moving a screen onto them changes no pixel. Spacing
+that belongs to the surroundings (`mt-1`, `min-w-0`) stays in `className`. What is not a recipe
+(a one-off grid, a special's geometry) stays a `className`, or the special's own stylesheet.
+
+**The guards.** Each app runs the style checks of `scripts/sync-ops-ui.mjs` in its own
+`tests/style-guards.test.ts` (README → "Style guards"): no colour literal in `.tsx` (colours are
+tokens), no arbitrary value (`w-[37px]`) outside `style-allowlist.json`, `style={{}}` only for a
+value computed at runtime (a `runtime:` comment, or CSS variables only), no raw `<button>`,
+`<select>`, `<input>`, `<table>` outside the kit and the listed specials. The allow-list holds
+today's exceptions, each with its reason, and only shrinks. `--style-report` prints the findings
+and the most repeated class strings: the next recipes to name.
+
 ## Components
 
 All variants via cva; no styling outside the kit and the tokens. Radius: 6px controls, 8px

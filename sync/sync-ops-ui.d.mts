@@ -322,6 +322,93 @@ export function vendoredKitGraph(appRoot: string): Map<string, string[]>;
  * @returns {number}
  */
 export function writeWrappers(appRoot: string, log: (line: string) => void): number;
+/** An empty allow-list. @returns {StyleAllowlist} */
+export function emptyStyleAllowlist(): StyleAllowlist;
+/**
+ * Validates an allow-list object: `{ arbitrary?, colours?, styles?, rawControls? }`, each a list
+ * of `{ value, reason }` with both non-empty strings. `arbitrary` values are utility tokens
+ * (`max-h-[calc(100dvh-2.5rem)]`); the other three are repo-relative paths (a file, or a folder).
+ * @param {unknown} json
+ * @param {string} [file]
+ * @returns {StyleAllowlist}
+ */
+export function parseStyleAllowlist(json: unknown, file?: string): StyleAllowlist;
+/**
+ * Reads `<appRoot>/style-allowlist.json` (or `file`); a missing file is an empty allow-list.
+ * @param {string} appRoot
+ * @param {string} [file]
+ * @returns {StyleAllowlist}
+ */
+export function readStyleAllowlist(appRoot: string, file?: string): StyleAllowlist;
+/**
+ * The source with its comments blanked (line structure kept). Strings stay: colours and class
+ * names live in them. Single- and double-quoted strings end at the line's end, so an apostrophe
+ * in JSX text ("don't") never swallows the code after it.
+ * @param {string} source
+ * @returns {string}
+ */
+export function blankTsxComments(source: string): string;
+/** The utility without its variant prefixes and important mark: `sm:!w-[3px]` → `w-[3px]`. */
+export function bareUtility(token: string): string;
+/**
+ * The style findings of one .tsx source (`file` is its repo-relative path, forward slashes).
+ * - `colour`: a hex, rgb(), rgba(), hsl(), hsla(), oklch() or oklab() literal outside comments
+ *   (colours come from tokens; files on `allowlist.colours` are exempt);
+ * - `arbitrary`: an `x-[…]` utility not on `allowlist.arbitrary`;
+ * - `style`: a `style={{` whose line has no `runtime:` comment and whose object sets anything but
+ *   CSS variables (files on `allowlist.styles` are exempt);
+ * - `raw-control`: a `<button`, `<select`, `<input` or `<table` outside RAW_CONTROL_FOLDERS and
+ *   `allowlist.rawControls`.
+ * @param {string} source
+ * @param {string} file
+ * @param {{ allowlist?: StyleAllowlist }} [options]
+ * @returns {StyleFinding[]}
+ */
+export function styleFindings(source: string, file: string, options?: {
+    allowlist?: StyleAllowlist;
+}): StyleFinding[];
+/**
+ * The literal class strings of a source - `className="…"`, `className={"…"}`, `className={'…'}`,
+ * `` className={`…`} `` (without `${`) and the first string of `cn(` / `clsx(` - each as its
+ * sorted class set ("text-detail text-ink-secondary").
+ * @param {string} source
+ * @returns {string[]}
+ */
+export function classRecipes(source: string): string[];
+/**
+ * Every .tsx file under `<appRoot>/<src>` (repo-relative, forward slashes, sorted), minus the
+ * `exclude` prefixes.
+ * @param {string} appRoot
+ * @param {string} src
+ * @param {string[]} exclude
+ * @returns {string[]}
+ */
+export function tsxFiles(appRoot: string, src: string, exclude: string[]): string[];
+/**
+ * The style report of an app (spec: styling programme §5): every finding of `styleFindings`
+ * over `src/**\/*.tsx` minus `exclude` (default the vendor folder), the count per kind, the
+ * allow-list entries that matched nothing (`stale`: shrink the file), and the `top` most
+ * repeated class strings used at least twice (the next primitives to promote).
+ * @param {string} appRoot
+ * @param {StyleReportOptions} [options]
+ * @returns {StyleReport}
+ */
+export function styleReport(appRoot: string, options?: StyleReportOptions): StyleReport;
+/**
+ * The report as printed by `--style-report`.
+ * @param {StyleReport} report
+ * @returns {string}
+ */
+export function formatStyleReport(report: StyleReport): string;
+/**
+ * `--style-report [--top N] [--src <dir>]`: prints the report, exits 0 (it informs; the app's
+ * tests/style-guards.test.ts is what fails).
+ * @param {string[]} argv
+ * @param {string} appRoot
+ * @param {(line: string) => void} log
+ * @returns {number}
+ */
+export function styleReportCommand(argv: string[], appRoot: string, log: (line: string) => void): number;
 /**
  * @param {string[]} argv
  * @returns {{ command: "sync" | "check" | "write-wrappers" } & SyncOptions}
@@ -369,6 +456,9 @@ export const SYNC_DEST: "scripts/sync-ops-ui.mjs";
 export const SYNC_TYPES_DEST: "scripts/sync-ops-ui.d.mts";
 export const LOCK_FILE: "ops-ui.lock.json";
 export const CONFIG_FILE: "ops-ui.config.json";
+export const STYLE_ALLOWLIST_FILE: "style-allowlist.json";
+/** Folders where a raw <button>/<select>/<input>/<table> is the kit itself or its binding. */
+export const RAW_CONTROL_FOLDERS: string[];
 export type CssToken = {
     type: "comment" | "string" | "text" | "{" | "}" | ";";
     text: string;
@@ -440,4 +530,40 @@ export type ContractToken = {
 };
 export type TokenContract = {
     tokens: ContractToken[];
+};
+export type StyleAllowEntry = {
+    value: string;
+    reason: string;
+};
+export type StyleAllowlist = {
+    arbitrary: StyleAllowEntry[];
+    colours: StyleAllowEntry[];
+    styles: StyleAllowEntry[];
+    rawControls: StyleAllowEntry[];
+};
+export type StyleFindingKind = "colour" | "arbitrary" | "style" | "raw-control";
+export type StyleFinding = {
+    kind: StyleFindingKind;
+    file: string;
+    line: number;
+    text: string;
+};
+export type ClassRecipe = {
+    classes: string;
+    count: number;
+};
+export type StyleReportOptions = {
+    src?: string;
+    exclude?: string[];
+    allowlist?: StyleAllowlist;
+    top?: number;
+};
+export type StyleReport = {
+    files: number;
+    src: string;
+    exclude: string[];
+    findings: StyleFinding[];
+    counts: Record<StyleFindingKind, number>;
+    stale: StyleAllowlist;
+    recipes: ClassRecipe[];
 };

@@ -445,5 +445,40 @@ changes:
 - Rule 5 of §5 (a special's stylesheet listed in `extensions`) is already the sync's
   `checkAppStyles`.
 
-**Codemods for Phase D** (recipe → primitive; each 0 changed pixels; run per area, G2 checks):
-see the 1.2.0 CHANGELOG section and README.md → "Adopting the primitives".
+**Codemods for Phase D** (recipe → primitive; each 0 changed pixels; one commit per area, G2
+at 0 changed pixels; counts = exact uses, Workforce Ops / FinaOps, `+N` = with other classes
+left in `className`). Classes are compared as sets; the element keeps its tag through `as`.
+
+| # | Recipe (class set, element) | Primitive | WFO | FinaOps |
+|---|---|---|---|---|
+| T1 | `text-detail text-ink-muted` (p / span / div) | `<Text as="p" size="detail" tone="muted">` | 127 | 47 |
+| T2 | `text-detail text-ink-secondary` | `<Text size="detail" tone="secondary">` | 104 | 45 |
+| T3 | `text-sm text-ink-secondary` | `<Text size="body" tone="secondary">` | 84 | 14 |
+| T4 | `text-ink-muted` | `<Text tone="muted">` | 81 | 29 |
+| T5 | `text-sm text-ink-muted` | `<Text size="body" tone="muted">` | 54 | – |
+| T6 | `block text-detail text-ink-muted` | `<Text block size="detail" tone="muted">` | 27 | 6 |
+| T7 | `font-medium text-ink` | `<Text weight="medium" tone="ink">` | 27 | 10 |
+| T8 | `text-sm text-ink` | `<Text size="body" tone="ink">` | 25 | – |
+| T9 | `font-medium text-detail text-ink` / `font-medium text-sm text-ink` | `<Text size="detail"\|"body" weight="medium" tone="ink">` | 15 / 15 | 4 / – |
+| T10 | every other set of only size / tone / weight / mono / block / truncate classes | `Text` with those props | the rest of 726 (+293) | the rest of 224 (+92) |
+| H1 | `text-lg font-semibold tracking-tight text-ink` (h1) | `<Heading level="title">` | 5 | 5 |
+| H2 | `text-sm font-semibold text-ink` (h2 / h3) | `<Heading level="section">` (`as="h3"` where it was one) | 12 (+2) | 13 |
+| H3 | `text-xs font-medium text-ink-secondary` (h3) | `<Heading level="subsection">` | 14 | – |
+| S1 | `flex flex-col gap-N` (div / section / ul / form / fieldset / span / li) | `<Stack gap={N}>` (`as=` the tag) | 121 (+109) + 64 | 38 (+28) + 30 |
+| C1 | `flex flex-wrap items-center gap-2` | `<Cluster gap={2}>` | 20 | 17 |
+| C2 | `flex flex-wrap items-center justify-between gap-2` | `<Cluster gap={2} justify="between">` | 11 | 3 |
+| C3 | `flex flex-wrap justify-end gap-1` (span) | `<Cluster as="span" gap={1} align="stretch" justify="end">` | 10 | – |
+| C4 | `flex flex-wrap items-center justify-end gap-2` | `<Cluster gap={2} justify="end">` | 7 | 3 |
+| C5 | `flex flex-wrap gap-N` | `<Cluster gap={N} align="stretch">` | 11 | 7 |
+| C6 | `flex items-center gap-N` | `<Cluster wrap={false} gap={N}>` | 42 | 13 |
+| C7 | `flex gap-2 justify-end` / `flex justify-end` | `<Cluster wrap={false} align="stretch" justify="end" gap={2}>` / without gap | 14 / 12 | 3 / 11 |
+| C8 | other `flex [flex-wrap] [items-*] [justify-*] [gap-*]` sets | `Cluster` with those props | the rest of 166 (+161) | the rest of 73 (+48) |
+| L1 | `underline underline-offset-2 hover:text-ink` (Link / a) | `<TextLink variant="quiet">` | 8 (+12) | – |
+| L2 | `underline underline-offset-2` | `<TextLink variant="underline">` | 7 (+14) | – |
+| L3 | `text-primary hover:underline` (+ `text-detail`) | `<TextLink variant="primary" [size="detail"]>` | 1 (+4) | 19 (+3) |
+| L4 | `hover:underline` | `<TextLink variant="plain">` | 1 (+38) | 8 (+13) |
+| L5 | `font-medium text-ink hover:underline` (+ `text-sm`) | `<TextLink variant="strong" [size="body"]>` | 5 + 3 | – |
+| X1 | TH / TD `hidden sm:table-cell` (`md`, `lg`) | `hideBelow="sm"` (`"md"`, `"lg"`) | TH 76, TD 35 | TH 27, TD 5 |
+| X2 | TH / TD `text-right` | `alignRight` | TH 15, TD 11 | TH 23, TD 7 |
+| X3 | TH / TD `hidden <bp>:table-cell text-right` | `hideBelow="<bp>" alignRight` | TH 17, TD 3 | TH 26, TD 5 |
+| X4 | TD `font-mono text-right` (+ `hidden <bp>:table-cell`, + `text-detail` / `whitespace-nowrap` in className) | `<TD numeric [hideBelow]>` | 8 (+25) | – |

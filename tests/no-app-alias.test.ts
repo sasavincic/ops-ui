@@ -41,7 +41,7 @@ describe('no "@/" anywhere in src/', () => {
     ]) {
       expect(rel).toContain(expected);
     }
-    expect(rel.filter((f) => f.startsWith("components/"))).toHaveLength(37);
+    expect(rel.filter((f) => f.startsWith("components/"))).toHaveLength(42);
   });
 
   it("the scanner finds a planted alias", () => {

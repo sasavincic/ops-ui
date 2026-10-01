@@ -58,6 +58,65 @@ node scripts/sync-ops-ui.mjs --check             # verify the vendored copy (als
   code, zero-pixel screenshots, identical token dump, and a check by hand
   (spec §5.5, §12.0).
 
+## Style guards (1.2.0, styling programme spec §5)
+
+The sync script carries the style checks as pure exports (`styleReport`, `styleFindings`,
+`classRecipes`, `readStyleAllowlist`, `formatStyleReport`), so an app needs no other tool:
+
+```bash
+node scripts/sync-ops-ui.mjs --style-report [--top 30]   # prints the findings + most repeated class strings, exits 0
+```
+
+The failing part is the app's own test. Copy this file as `tests/style-guards.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { styleReport } from "../scripts/sync-ops-ui.mjs";
+
+// Styling programme §5 (ops-ui DESIGN.md → Primitives): colours are tokens, arbitrary values and
+// style={{}} only with a reason, controls from the kit. Today's exceptions are listed, with
+// their reasons, in style-allowlist.json, which only shrinks.
+const report = styleReport(process.cwd()); // src/**/*.tsx minus src/vendor/
+
+describe("style guards", () => {
+  it.each(["colour", "arbitrary", "style", "raw-control"] as const)("no %s finding outside the allow-list", (kind) => {
+    const found = report.findings.filter((f) => f.kind === kind).map((f) => `${f.file}:${f.line} ${f.text}`);
+    expect(found).toEqual([]);
+  });
+
+  it("the allow-list lists nothing that is gone (remove the entry)", () => {
+    expect(report.stale).toEqual({ arbitrary: [], colours: [], styles: [], rawControls: [] });
+  });
+});
+```
+
+`style-allowlist.json` (app-owned, at the repo root; every entry needs a reason):
+
+```json
+{
+  "arbitrary": [{ "value": "max-h-[calc(100dvh-2.5rem)]", "reason": "the dialog sheet under the browser chrome" }],
+  "colours": [{ "value": "src/app/layout.tsx", "reason": "the theme-color meta tag needs a literal" }],
+  "styles": [{ "value": "src/components/wall/", "reason": "the wall canvas: positions computed per frame" }],
+  "rawControls": [{ "value": "src/components/operations/gap-grid.tsx", "reason": "special: the gap grid's cells" }]
+}
+```
+
+`arbitrary` values are class tokens (matched with or without variant prefixes: the entry
+`max-h-[…]` also covers `sm:max-h-[…]`); the other three are paths (a file, or a folder). A raw
+control is always allowed under `src/components/ui/` and `src/vendor/`. A `style={{` passes when
+its line carries a `runtime:` comment (`{/* runtime: drag position */}`) or its object sets CSS
+variables only (`style={{ "--w": pct }}` + `w-(--w)`). On day one, generate the file from the
+report's findings (one entry per distinct value or file, with a real reason); each sweep commit
+removes entries, and the stale check makes sure they go.
+
+## Adopting the primitives (1.2.0)
+
+`Text`, `Heading`, `Stack`, `Cluster`, `TextLink` and the `TH` / `TD` column props each render
+exactly the classes of the recipe they replace (DESIGN.md → Primitives; the measured list is the
+styling programme spec §4.4), so a codemod commit changes no pixel: G2 (`tools/app-shots.mjs`)
+must show 0 changed pixels. Move a class into a prop only when no other class left in
+`className` belongs to the same group (one size, one colour, one weight).
+
 ## Versions: strict semver by what an unchanged call site renders
 
 | Level | Allowed |

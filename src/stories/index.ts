@@ -7,6 +7,7 @@ import { stories as badge } from "./badge.stories";
 import { stories as button } from "./button.stories";
 import { stories as callout } from "./callout.stories";
 import { stories as card } from "./card.stories";
+import { stories as cluster } from "./cluster.stories";
 import { stories as combobox } from "./combobox.stories";
 import { stories as confirmDialog } from "./confirm-dialog.stories";
 import { stories as copyValue } from "./copy-value.stories";
@@ -17,6 +18,7 @@ import { stories as emptyState } from "./empty-state.stories";
 import { stories as field } from "./field.stories";
 import { stories as formActions } from "./form-actions.stories";
 import { stories as glanceCard } from "./glance-card.stories";
+import { stories as heading } from "./heading.stories";
 import { stories as kicker } from "./kicker.stories";
 import { stories as monogram } from "./monogram.stories";
 import { stories as monthNav } from "./month-nav.stories";
@@ -28,11 +30,14 @@ import { stories as searchForm } from "./search-form.stories";
 import { stories as searchInput } from "./search-input.stories";
 import { stories as segmented } from "./segmented.stories";
 import { stories as sheet } from "./sheet.stories";
+import { stories as stack } from "./stack.stories";
 import { stories as stateMark } from "./state-mark.stories";
 import { stories as statusIcon } from "./status-icon.stories";
 import { stories as table } from "./table.stories";
 import { stories as tabs } from "./tabs.stories";
 import { stories as tag } from "./tag.stories";
+import { stories as textLink } from "./text-link.stories";
+import { stories as text } from "./text.stories";
 import { stories as toast } from "./toast.stories";
 import { stories as urlSelect } from "./url-select.stories";
 import { stories as validityCell } from "./validity-cell.stories";
@@ -64,6 +69,7 @@ export const STORY_GROUPS: readonly StoryGroup[] = [
   { component: "button", stories: button },
   { component: "callout", stories: callout },
   { component: "card", stories: card },
+  { component: "cluster", stories: cluster },
   { component: "combobox", stories: combobox },
   { component: "confirm-dialog", stories: confirmDialog },
   { component: "copy-value", stories: copyValue },
@@ -74,6 +80,7 @@ export const STORY_GROUPS: readonly StoryGroup[] = [
   { component: "field", stories: field },
   { component: "form-actions", stories: formActions },
   { component: "glance-card", stories: glanceCard },
+  { component: "heading", stories: heading },
   { component: "kicker", stories: kicker },
   { component: "monogram", stories: monogram },
   { component: "month-nav", stories: monthNav },
@@ -85,11 +92,14 @@ export const STORY_GROUPS: readonly StoryGroup[] = [
   { component: "search-input", stories: searchInput },
   { component: "segmented", stories: segmented },
   { component: "sheet", stories: sheet },
+  { component: "stack", stories: stack },
   { component: "state-mark", stories: stateMark },
   { component: "status-icon", stories: statusIcon },
   { component: "table", stories: table },
   { component: "tabs", stories: tabs },
   { component: "tag", stories: tag },
+  { component: "text", stories: text },
+  { component: "text-link", stories: textLink },
   { component: "toast", stories: toast },
   { component: "url-select", stories: urlSelect },
   { component: "validity-cell", stories: validityCell },

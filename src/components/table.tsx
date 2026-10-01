@@ -58,11 +58,29 @@ export function TR({
   );
 }
 
-export function TH({ className, ...props }: React.ComponentProps<"th">) {
+/** The breakpoint below which a column is hidden (1.2): `hidden <bp>:table-cell`. */
+export const CELL_HIDE_BELOW = {
+  sm: "hidden sm:table-cell",
+  md: "hidden md:table-cell",
+  lg: "hidden lg:table-cell",
+} as const;
+
+export type CellHideBelow = keyof typeof CELL_HIDE_BELOW;
+
+/**
+ * Column props (1.2, all optional; without them a cell renders exactly as before):
+ * `hideBelow` hides the column on narrow screens, `alignRight` right-aligns it (on TH it takes
+ * the place of the base `text-left`, as `className="text-right"` always did).
+ */
+export type CellProps = { hideBelow?: CellHideBelow; alignRight?: boolean };
+
+export function TH({ className, hideBelow, alignRight, ...props }: React.ComponentProps<"th"> & CellProps) {
   return (
     <th
       className={cn(
         "px-4 py-2.5 text-left text-xs font-medium text-ink-secondary",
+        alignRight && "text-right",
+        hideBelow && CELL_HIDE_BELOW[hideBelow],
         className
       )}
       {...props}
@@ -70,9 +88,25 @@ export function TH({ className, ...props }: React.ComponentProps<"th">) {
   );
 }
 
-export function TD({ className, ...props }: React.ComponentProps<"td">) {
+/** `numeric` (1.2): a number or money column, `text-right font-mono`. */
+export function TD({
+  className,
+  hideBelow,
+  alignRight,
+  numeric,
+  ...props
+}: React.ComponentProps<"td"> & CellProps & { numeric?: boolean }) {
   return (
-    <td className={cn("px-4 py-3 align-middle text-ink", className)} {...props} />
+    <td
+      className={cn(
+        "px-4 py-3 align-middle text-ink",
+        (alignRight || numeric) && "text-right",
+        numeric && "font-mono",
+        hideBelow && CELL_HIDE_BELOW[hideBelow],
+        className
+      )}
+      {...props}
+    />
   );
 }
 

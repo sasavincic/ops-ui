@@ -410,3 +410,17 @@ Captures go to `$TMPDIR/ops-ui-shots/<app>/<label>/`.
   Known tooling gap: the release commit writes `src/version.ts` but not
   `api-surface.d.txt`, so after each release the surface is stale (regenerate in
   the next commit) and the next release needs `--compatible OPS_UI_VERSION`.
+- **1.2.0** (2026-10-01, styling programme spec §4.4 + the library side of §5): the
+  primitives `Text`, `Heading`, `Stack`, `Cluster`, `TextLink` (server-safe, `lib/gap.ts`) and
+  the additive `TH` / `TD` props `hideBelow` / `alignRight` / `numeric` (not `align`: React
+  types `<td align>` as the HTML attribute, and narrowing it would be a major). Every prop
+  renders exactly the classes of a measured app recipe (`tests/primitives.test.tsx` compares
+  each with the hand-written recipe as markup with sorted classes), so adopting them is a
+  0-changed-pixel codemod (Phase D list in §4.4). The style guards live in the sync script as
+  pure exports (`styleReport`, `styleFindings`, `classRecipes`, `readStyleAllowlist`, …) plus
+  `--style-report` (handled in `main` before `parseArgs`, so the existing commands, their
+  output and the usage text are unchanged); tests in `tests/style-report.test.ts`; the app's
+  `tests/style-guards.test.ts` template is in README.md. Arbitrary values are read as whole
+  class tokens from string literals (`has-[[data-x]]:…`, `top-[calc(…)]`), colours/styles/raw
+  controls from comment-blanked source. 8 new stories (72), new baselines only. Released with
+  `--compatible TH --compatible TD --compatible OPS_UI_VERSION`.

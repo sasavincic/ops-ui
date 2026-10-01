@@ -6,6 +6,7 @@
 //   node scripts/sync-ops-ui.mjs --ref <sha> [--repo <path>]     local trial only; stamps 1.2.0-dev+<sha7>
 //   node scripts/sync-ops-ui.mjs --check                          verify only (= checkVendor)
 //   node scripts/sync-ops-ui.mjs --write-wrappers                 create missing pure wrappers; never overwrites
+//   node scripts/sync-ops-ui.mjs --style-report [--top N]         the style report (styling programme §5); exits 0
 //
 // Exit codes: 0 done or verified, 1 refused (reasons printed one per line), 2 usage or environment.
 // It never commits, never pushes, and writes nothing outside the vendor folder, its own path and
@@ -1700,6 +1701,407 @@ export function writeWrappers(appRoot, log) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Style guards (styling programme spec §5, library 1.2.0): pure checks over an app's .tsx
+// sources, for the app's own tests/style-guards.test.ts and the `--style-report` command. They
+// read source text only (no TypeScript, no Tailwind); the allow-list file is app-owned.
+// ---------------------------------------------------------------------------------------------
+
+export const STYLE_ALLOWLIST_FILE = "style-allowlist.json";
+
+/** Folders where a raw <button>/<select>/<input>/<table> is the kit itself or its binding. */
+export const RAW_CONTROL_FOLDERS = ["src/components/ui/", "src/vendor/"];
+
+/**
+ * @typedef {{ value: string, reason: string }} StyleAllowEntry
+ * @typedef {{ arbitrary: StyleAllowEntry[], colours: StyleAllowEntry[], styles: StyleAllowEntry[], rawControls: StyleAllowEntry[] }} StyleAllowlist
+ * @typedef {"colour" | "arbitrary" | "style" | "raw-control"} StyleFindingKind
+ * @typedef {{ kind: StyleFindingKind, file: string, line: number, text: string }} StyleFinding
+ * @typedef {{ classes: string, count: number }} ClassRecipe
+ * @typedef {{ src?: string, exclude?: string[], allowlist?: StyleAllowlist, top?: number }} StyleReportOptions
+ * @typedef {{ files: number, src: string, exclude: string[], findings: StyleFinding[], counts: Record<StyleFindingKind, number>, stale: StyleAllowlist, recipes: ClassRecipe[] }} StyleReport
+ */
+
+const STYLE_ALLOW_KEYS = /** @type {const} */ (["arbitrary", "colours", "styles", "rawControls"]);
+
+/** An empty allow-list. @returns {StyleAllowlist} */
+export function emptyStyleAllowlist() {
+  return { arbitrary: [], colours: [], styles: [], rawControls: [] };
+}
+
+/**
+ * Validates an allow-list object: `{ arbitrary?, colours?, styles?, rawControls? }`, each a list
+ * of `{ value, reason }` with both non-empty strings. `arbitrary` values are utility tokens
+ * (`max-h-[calc(100dvh-2.5rem)]`); the other three are repo-relative paths (a file, or a folder).
+ * @param {unknown} json
+ * @param {string} [file]
+ * @returns {StyleAllowlist}
+ */
+export function parseStyleAllowlist(json, file = STYLE_ALLOWLIST_FILE) {
+  if (json === null || typeof json !== "object" || Array.isArray(json)) {
+    throw new Error(`${file}: expected an object with arbitrary / colours / styles / rawControls lists`);
+  }
+  const out = emptyStyleAllowlist();
+  for (const [key, list] of Object.entries(json)) {
+    if (!(/** @type {readonly string[]} */ (STYLE_ALLOW_KEYS)).includes(key)) {
+      throw new Error(`${file}: unknown key "${key}" (allowed: ${STYLE_ALLOW_KEYS.join(", ")})`);
+    }
+    if (!Array.isArray(list)) throw new Error(`${file}: ${key} must be a list`);
+    list.forEach((entry, i) => {
+      const value = entry?.value;
+      const reason = entry?.reason;
+      if (typeof value !== "string" || !value.trim()) throw new Error(`${file}: ${key}[${i}] needs a value`);
+      if (typeof reason !== "string" || !reason.trim()) throw new Error(`${file}: ${key}[${i}] (${value}) needs a reason`);
+      out[/** @type {keyof StyleAllowlist} */ (key)].push({ value, reason });
+    });
+  }
+  return out;
+}
+
+/**
+ * Reads `<appRoot>/style-allowlist.json` (or `file`); a missing file is an empty allow-list.
+ * @param {string} appRoot
+ * @param {string} [file]
+ * @returns {StyleAllowlist}
+ */
+export function readStyleAllowlist(appRoot, file = STYLE_ALLOWLIST_FILE) {
+  const abs = path.join(appRoot, file);
+  if (!existsSync(abs)) return emptyStyleAllowlist();
+  let json;
+  try {
+    json = JSON.parse(readFileSync(abs, "utf8"));
+  } catch (error) {
+    throw new Error(`${file}: not valid JSON (${/** @type {Error} */ (error).message})`);
+  }
+  return parseStyleAllowlist(json, file);
+}
+
+/**
+ * The source with its comments blanked (line structure kept). Strings stay: colours and class
+ * names live in them. Single- and double-quoted strings end at the line's end, so an apostrophe
+ * in JSX text ("don't") never swallows the code after it.
+ * @param {string} source
+ * @returns {string}
+ */
+export function blankTsxComments(source) {
+  let out = "";
+  let i = 0;
+  const blank = (/** @type {string} */ text) => text.replace(/[^\n]/g, " ");
+  while (i < source.length) {
+    const ch = source[i];
+    const next = source[i + 1];
+    if (ch === "/" && next === "*") {
+      const end = source.indexOf("*/", i + 2);
+      const stop = end === -1 ? source.length : end + 2;
+      out += blank(source.slice(i, stop));
+      i = stop;
+    } else if (ch === "/" && next === "/" && source[i - 1] !== ":") {
+      let j = i;
+      while (j < source.length && source[j] !== "\n") j++;
+      out += blank(source.slice(i, j));
+      i = j;
+    } else if (ch === '"' || ch === "'" || ch === "`") {
+      let j = i + 1;
+      while (j < source.length && source[j] !== ch && (ch === "`" || source[j] !== "\n")) j += source[j] === "\\" ? 2 : 1;
+      const stop = j < source.length && source[j] === ch ? j + 1 : j;
+      out += source.slice(i, stop);
+      i = stop;
+    } else {
+      out += ch;
+      i += 1;
+    }
+  }
+  return out;
+}
+
+/** True when `file` is the path or lies under it (a folder, with or without its trailing /). */
+const underPath = (/** @type {string} */ file, /** @type {string} */ value) =>
+  file === value || file.startsWith(value.endsWith("/") ? value : `${value}/`);
+
+const lineAt = (/** @type {string} */ text, /** @type {number} */ index) => text.slice(0, index).split("\n").length;
+
+/** The bodies of the string literals of comment-blanked code ('…' and "…" on one line, `…`). */
+const STRING_LITERAL = /"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g;
+/** A class token with an arbitrary value: `w-[37px]`, `lg:grid-cols-[1fr_2fr]`, `has-[[data-x]]:p-0`. */
+const isArbitraryToken = (/** @type {string} */ token) => /^[!\w:-]*-\[/.test(token) && token.includes("]");
+const HEX_COLOUR = /(?<![\w&])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])/g;
+const COLOUR_FUNCTION = /(?<![\w-])(?:rgba?|hsla?|oklch|oklab)\(/g;
+const RAW_CONTROL = /<(button|select|input|table)(?=[\s/>])/g;
+
+/** The utility without its variant prefixes and important mark: `sm:!w-[3px]` → `w-[3px]`. */
+export function bareUtility(/** @type {string} */ token) {
+  return token.replace(/^(?:[\w-]+(?:-\[[^\]]*\]+)?:)*!?/, "");
+}
+
+/**
+ * The object literal of a `style={{ … }}` starting at `open` (the second brace): its keys, or
+ * null when it contains a spread or cannot be read.
+ * @param {string} code
+ * @param {number} open
+ * @returns {string[] | null}
+ */
+function styleObjectKeys(code, open) {
+  let depth = 0;
+  let end = -1;
+  for (let j = open; j < code.length; j++) {
+    const c = code[j];
+    if (c === '"' || c === "'" || c === "`") {
+      j += 1;
+      while (j < code.length && code[j] !== c) j += code[j] === "\\" ? 2 : 1;
+      continue;
+    }
+    if (c === "{" || c === "(" || c === "[") depth++;
+    else if (c === "}" || c === ")" || c === "]") {
+      depth--;
+      if (depth === 0) {
+        end = j;
+        break;
+      }
+    }
+  }
+  if (end === -1) return null;
+  const body = code.slice(open + 1, end);
+  if (body.includes("...")) return null;
+  /** @type {string[]} */
+  const keys = [];
+  let level = 0;
+  let start = 0;
+  const parts = [];
+  for (let j = 0; j <= body.length; j++) {
+    const c = body[j];
+    if (j === body.length || (c === "," && level === 0)) {
+      parts.push(body.slice(start, j));
+      start = j + 1;
+    } else if (c === "{" || c === "(" || c === "[") level++;
+    else if (c === "}" || c === ")" || c === "]") level--;
+  }
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const match = /^(?:"([^"]+)"|'([^']+)'|\[?([\w$.]+)\]?)\s*:/.exec(trimmed);
+    keys.push(match ? (match[1] ?? match[2] ?? match[3]) : trimmed);
+  }
+  return keys;
+}
+
+/**
+ * The style findings of one .tsx source (`file` is its repo-relative path, forward slashes).
+ * - `colour`: a hex, rgb(), rgba(), hsl(), hsla(), oklch() or oklab() literal outside comments
+ *   (colours come from tokens; files on `allowlist.colours` are exempt);
+ * - `arbitrary`: an `x-[…]` utility not on `allowlist.arbitrary`;
+ * - `style`: a `style={{` whose line has no `runtime:` comment and whose object sets anything but
+ *   CSS variables (files on `allowlist.styles` are exempt);
+ * - `raw-control`: a `<button`, `<select`, `<input` or `<table` outside RAW_CONTROL_FOLDERS and
+ *   `allowlist.rawControls`.
+ * @param {string} source
+ * @param {string} file
+ * @param {{ allowlist?: StyleAllowlist }} [options]
+ * @returns {StyleFinding[]}
+ */
+export function styleFindings(source, file, options = {}) {
+  const allowlist = options.allowlist ?? emptyStyleAllowlist();
+  const code = blankTsxComments(source);
+  const lines = source.split("\n");
+  /** @type {StyleFinding[]} */
+  const findings = [];
+  const add = (/** @type {StyleFindingKind} */ kind, /** @type {number} */ index, /** @type {string} */ text) =>
+    findings.push({ kind, file, line: lineAt(code, index), text });
+
+  if (!allowlist.colours.some((e) => underPath(file, e.value))) {
+    for (const m of code.matchAll(HEX_COLOUR)) add("colour", m.index ?? 0, m[0]);
+    for (const m of code.matchAll(COLOUR_FUNCTION)) add("colour", m.index ?? 0, m[0]);
+  }
+  const allowedValues = new Set(allowlist.arbitrary.map((e) => e.value));
+  for (const m of code.matchAll(STRING_LITERAL)) {
+    const body = m[1] ?? m[2] ?? m[3] ?? "";
+    const start = (m.index ?? 0) + 1;
+    for (const t of body.matchAll(/[^\s"'`{}]+/g)) {
+      const token = t[0];
+      if (!isArbitraryToken(token)) continue;
+      if (allowedValues.has(token) || allowedValues.has(bareUtility(token))) continue;
+      add("arbitrary", start + (t.index ?? 0), token);
+    }
+  }
+  if (!allowlist.styles.some((e) => underPath(file, e.value))) {
+    for (const m of code.matchAll(/\bstyle=\{\s*\{/g)) {
+      const index = m.index ?? 0;
+      const line = lines[lineAt(code, index) - 1] ?? "";
+      if (/runtime:/.test(line)) continue;
+      const keys = styleObjectKeys(code, index + m[0].length - 1);
+      if (keys && keys.length > 0 && keys.every((k) => k.startsWith("--"))) continue;
+      add("style", index, line.trim());
+    }
+  }
+  const rawAllowed = [...RAW_CONTROL_FOLDERS, ...allowlist.rawControls.map((e) => e.value)];
+  if (!rawAllowed.some((folder) => underPath(file, folder))) {
+    for (const m of code.matchAll(RAW_CONTROL)) add("raw-control", m.index ?? 0, `<${m[1]}>`);
+  }
+  return findings;
+}
+
+/**
+ * The literal class strings of a source - `className="…"`, `className={"…"}`, `className={'…'}`,
+ * `` className={`…`} `` (without `${`) and the first string of `cn(` / `clsx(` - each as its
+ * sorted class set ("text-detail text-ink-secondary").
+ * @param {string} source
+ * @returns {string[]}
+ */
+export function classRecipes(source) {
+  const code = blankTsxComments(source);
+  /** @type {string[]} */
+  const out = [];
+  const forms = [
+    /\bclassName=(?:"([^"]*)"|\{\s*"([^"]*)"\s*\}|\{\s*'([^']*)'\s*\}|\{\s*`([^`$]*)`\s*\})/g,
+    /\b(?:cn|clsx)\(\s*(?:"([^"]*)"|'([^']*)')/g,
+  ];
+  for (const form of forms) {
+    for (const m of code.matchAll(form)) {
+      const value = m.slice(1).find((v) => v !== undefined) ?? "";
+      const classes = value.split(/\s+/).filter(Boolean).sort().join(" ");
+      if (classes) out.push(classes);
+    }
+  }
+  return out;
+}
+
+/**
+ * Every .tsx file under `<appRoot>/<src>` (repo-relative, forward slashes, sorted), minus the
+ * `exclude` prefixes.
+ * @param {string} appRoot
+ * @param {string} src
+ * @param {string[]} exclude
+ * @returns {string[]}
+ */
+export function tsxFiles(appRoot, src, exclude) {
+  /** @type {string[]} */
+  const files = [];
+  const walk = (/** @type {string} */ rel) => {
+    const abs = path.join(appRoot, rel);
+    if (!existsSync(abs)) return;
+    for (const entry of readdirSync(abs, { withFileTypes: true })) {
+      const child = `${rel}/${entry.name}`;
+      if (exclude.some((prefix) => underPath(child, prefix) || underPath(`${child}/`, prefix))) continue;
+      if (entry.isDirectory()) walk(child);
+      else if (entry.name.endsWith(".tsx")) files.push(child);
+    }
+  };
+  walk(src.replace(/\/+$/, ""));
+  return files.sort();
+}
+
+/**
+ * The style report of an app (spec: styling programme §5): every finding of `styleFindings`
+ * over `src/**\/*.tsx` minus `exclude` (default the vendor folder), the count per kind, the
+ * allow-list entries that matched nothing (`stale`: shrink the file), and the `top` most
+ * repeated class strings used at least twice (the next primitives to promote).
+ * @param {string} appRoot
+ * @param {StyleReportOptions} [options]
+ * @returns {StyleReport}
+ */
+export function styleReport(appRoot, options = {}) {
+  const src = options.src ?? "src";
+  const exclude = options.exclude ?? ["src/vendor/"];
+  const allowlist = options.allowlist ?? readStyleAllowlist(appRoot);
+  const top = options.top ?? 20;
+  const files = tsxFiles(appRoot, src, exclude);
+  /** @type {StyleFinding[]} */
+  const findings = [];
+  /** @type {Map<string, number>} */
+  const recipes = new Map();
+  const used = { arbitrary: new Set(), colours: new Set(), styles: new Set(), rawControls: new Set() };
+  const none = emptyStyleAllowlist();
+  for (const file of files) {
+    const source = readFileSync(path.join(appRoot, file), "utf8");
+    findings.push(...styleFindings(source, file, { allowlist }));
+    // Which entries did any work: the findings this file would have without the allow-list.
+    for (const f of styleFindings(source, file, { allowlist: none })) {
+      if (f.kind === "arbitrary") {
+        for (const e of allowlist.arbitrary) if (e.value === f.text || e.value === bareUtility(f.text)) used.arbitrary.add(e.value);
+      } else if (f.kind === "colour") {
+        for (const e of allowlist.colours) if (underPath(file, e.value)) used.colours.add(e.value);
+      } else if (f.kind === "style") {
+        for (const e of allowlist.styles) if (underPath(file, e.value)) used.styles.add(e.value);
+      } else {
+        for (const e of allowlist.rawControls) if (underPath(file, e.value)) used.rawControls.add(e.value);
+      }
+    }
+    for (const classes of classRecipes(source)) recipes.set(classes, (recipes.get(classes) ?? 0) + 1);
+  }
+  /** @type {Record<StyleFindingKind, number>} */
+  const counts = { colour: 0, arbitrary: 0, style: 0, "raw-control": 0 };
+  for (const f of findings) counts[f.kind] += 1;
+  const stale = emptyStyleAllowlist();
+  for (const key of STYLE_ALLOW_KEYS) stale[key] = allowlist[key].filter((e) => !used[key].has(e.value));
+  const ranked = [...recipes]
+    .filter(([, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .slice(0, top)
+    .map(([classes, count]) => ({ classes, count }));
+  return { files: files.length, src, exclude, findings, counts, stale, recipes: ranked };
+}
+
+/**
+ * The report as printed by `--style-report`.
+ * @param {StyleReport} report
+ * @returns {string}
+ */
+export function formatStyleReport(report) {
+  /** @type {string[]} */
+  const out = [];
+  const skipped = report.exclude.length ? ` (${report.exclude.join(", ")} skipped)` : "";
+  out.push(`style report: ${report.files} .tsx files under ${report.src}${skipped}`);
+  /** @type {[StyleFindingKind, string][]} */
+  const sections = [
+    ["colour", "colour literals (colours come from tokens)"],
+    ["arbitrary", "arbitrary values not on the allow-list"],
+    ["style", "style={{ }} without a runtime: reason"],
+    ["raw-control", "raw <button>/<select>/<input>/<table> outside the kit"],
+  ];
+  for (const [kind, title] of sections) {
+    const list = report.findings.filter((f) => f.kind === kind);
+    const distinct = new Set(list.map((f) => f.text)).size;
+    out.push("", `${title}: ${list.length}${kind === "arbitrary" || kind === "colour" ? ` (${distinct} distinct)` : ""}`);
+    for (const f of list) out.push(`  ${f.file}:${f.line}  ${f.text}`);
+  }
+  const stale = STYLE_ALLOW_KEYS.flatMap((key) => report.stale[key].map((e) => `  ${key}: ${e.value}`));
+  if (stale.length) out.push("", `allow-list entries that match nothing (remove them): ${stale.length}`, ...stale);
+  out.push("", `most repeated class strings (top ${report.recipes.length}):`);
+  for (const r of report.recipes) out.push(`  ${String(r.count).padStart(4)}  ${r.classes}`);
+  return out.join("\n");
+}
+
+/**
+ * `--style-report [--top N] [--src <dir>]`: prints the report, exits 0 (it informs; the app's
+ * tests/style-guards.test.ts is what fails).
+ * @param {string[]} argv
+ * @param {string} appRoot
+ * @param {(line: string) => void} log
+ * @returns {number}
+ */
+export function styleReportCommand(argv, appRoot, log) {
+  /** @type {StyleReportOptions} */
+  const options = {};
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    const value = argv[i + 1];
+    if (arg === "--style-report") continue;
+    if ((arg === "--top" || arg === "--src") && (value === undefined || value.startsWith("--"))) {
+      throw new UsageError(`${arg} needs a value\nusage: node scripts/sync-ops-ui.mjs --style-report [--top N] [--src <dir>]`);
+    }
+    if (arg === "--top") {
+      const top = Number(value);
+      if (!Number.isInteger(top) || top < 0) throw new UsageError(`--top takes a whole number, got ${value}`);
+      options.top = top;
+      i++;
+    } else if (arg === "--src") {
+      options.src = value;
+      i++;
+    } else throw new UsageError(`unknown argument ${arg}\nusage: node scripts/sync-ops-ui.mjs --style-report [--top N] [--src <dir>]`);
+  }
+  log(formatStyleReport(styleReport(appRoot, options)));
+  return 0;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Command line (spec §5.1).
 // ---------------------------------------------------------------------------------------------
 
@@ -1757,6 +2159,7 @@ export function parseArgs(argv) {
 export async function main(argv, appRoot = process.cwd()) {
   const log = (/** @type {string} */ line) => console.log(line);
   try {
+    if (argv.includes("--style-report")) return styleReportCommand(argv, appRoot, log);
     const args = parseArgs(argv);
     if (args.command === "check") {
       const result = await checkVendor(appRoot);
