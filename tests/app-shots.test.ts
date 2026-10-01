@@ -252,6 +252,10 @@ describe("app-shots helpers", () => {
       { kind: "removed token", pattern: "--x", line: 5, used: false },
       { kind: "removed route", pattern: "/y", line: 6, used: false },
     ]);
+    // A hex colour in a value is not a comment.
+    expect(parseExpect("token --shadow-card = 0 1px 2px #000 # F3\n#\n")).toEqual([
+      { kind: "token", pattern: "--shadow-card", value: "0 1px 2px #000", line: 1, used: false },
+    ]);
     expect(routeMatches("/dev/kit/*", "/dev/kit/button--matrix")).toBe(true);
     expect(routeMatches("/dev/kit/*", "/dev/kit")).toBe(false);
     expect(routeMatches("/transactions?tab=all", "/transactions?tab=all")).toBe(true);
@@ -284,26 +288,41 @@ describe("app-shots helpers", () => {
 // capture, end to end against a local server
 // ---------------------------------------------------------------------------------------------
 
-const USERS: Record<string, { password: string; session: string; lands: string }> = {
+const USERS: Record<string, { password: string; session: string; lands: string; delay?: number }> = {
   "editor@example.invalid": { password: "pw-editor", session: "editor", lands: "/home" },
   "readonly@example.invalid": { password: "pw-readonly", session: "readonly", lands: "/home" },
   "owner@example.invalid": { password: "pw-owner", session: "owner", lands: "/two-factor/setup" },
+  // Their own users, so the concurrent tests can count their sign-ins.
+  "counted-editor@example.invalid": { password: "pw-editor", session: "editor", lands: "/home" },
+  "counted-readonly@example.invalid": { password: "pw-readonly", session: "readonly", lands: "/home" },
+  // A sign-in that answers late, like a dev server compiling the landing route on first hit.
+  "slow@example.invalid": { password: "pw-slow", session: "editor", lands: "/home", delay: 3_000 },
 };
-const CSS = ":root { --color-primary: oklch(0.45 0.12 250); --color-app-only: #ff0000; --ops-toast-offset: 3.75rem; --text-detail: 13px; } body { margin: 0; font: 16px/1.4 sans-serif; }";
+/** POST /login per e-mail address, across both servers. */
+const signIns: Record<string, number> = {};
+// base.css's reduced-motion rule (the captures run with reduced motion): under it, a reused colour
+// probe reads every --color-* as the first colour probed.
+const MOTION = "@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }";
+const CSS = `:root { --color-primary: oklch(0.45 0.12 250); --color-app-only: #ff0000; --color-second: #00ff00; --ops-toast-offset: 3.75rem; --text-detail: 13px; } body { margin: 0; font: 16px/1.4 sans-serif; } ${MOTION}`;
+// The "branch": one colour changed (not the first probed) and two names outside the token
+// families newly declared; nothing on the page uses them, so every page stays identical.
+const BRANCH_CSS = CSS.replace("--color-second: #00ff00;", "--color-second: #0000ff; --shadow-card: 0 1px 2px #000; --tracking-snug: -0.01em;");
 // The page's timers do not run under the capture's fixed clock; like React's scheduler (a message
 // channel), the load event does.
 const READY = (id: string) => `<script>addEventListener("load", () => document.querySelector('[data-story="${id}"]').setAttribute("data-ready", ""))</script>`;
 
 let server: http.Server;
+let branchServer: http.Server;
 let baseUrl = "";
+let branchBaseUrl = "";
 
-beforeAll(async () => {
-  server = http.createServer((req, res) => {
+function fakeApp(css: string) {
+  return http.createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://x");
     const session = /session=(\w+)/.exec(req.headers.cookie ?? "")?.[1];
     const html = (body: string, status = 200) => {
       res.writeHead(status, { "content-type": "text/html; charset=utf-8" });
-      res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>${CSS}</style></head><body>${body}</body></html>`);
+      res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style></head><body>${body}</body></html>`);
     };
     const redirect = (to: string, headers: Record<string, string> = {}) => {
       res.writeHead(302, { location: to, ...headers });
@@ -314,14 +333,24 @@ beforeAll(async () => {
       req.on("data", (chunk) => (body += chunk));
       req.on("end", () => {
         const form = new URLSearchParams(body);
-        const user = USERS[form.get("email") ?? ""];
+        const email = form.get("email") ?? "";
+        signIns[email] = (signIns[email] ?? 0) + 1;
+        const user = USERS[email];
         if (!user || user.password !== form.get("password")) return redirect("/login?error=1");
-        redirect(user.lands, { "set-cookie": `session=${user.session}; Path=/` });
+        setTimeout(() => redirect(user.lands, { "set-cookie": `session=${user.session}; Path=/` }), user.delay ?? 0);
       });
       return;
     }
     if (url.pathname === "/login") {
       return html('<form method="post" action="/login"><input type="email" name="email"><input type="password" name="password"><button type="submit">Sign in</button></form>');
+    }
+    if (url.pathname === "/login-js") {
+      // A client-side sign-in, like both apps' (fetch, then navigate): the submit itself starts no
+      // navigation, so only the capture's login timeout waits for a late answer.
+      return html(
+        '<form id="f"><input type="email" name="email"><input type="password" name="password"><button type="submit">Sign in</button></form>' +
+          '<script>f.addEventListener("submit", async (e) => { e.preventDefault(); const r = await fetch("/login", { method: "POST", body: new URLSearchParams(new FormData(f)) }); location.assign(r.url); });</script>',
+      );
     }
     if (url.pathname === "/two-factor/setup") return html("<h1>Set up two-step sign-in</h1>");
     if (!session) return redirect("/login");
@@ -344,10 +373,20 @@ beforeAll(async () => {
         return html("<h1>Not found</h1>", 404);
     }
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+}
+
+async function listen(app: http.Server) {
+  await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+  return `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+}
+
+beforeAll(async () => {
+  server = fakeApp(CSS);
+  branchServer = fakeApp(BRANCH_CSS);
+  baseUrl = await listen(server);
+  branchBaseUrl = await listen(branchServer);
 });
-afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
+afterAll(() => Promise.all([server, branchServer].map((app) => new Promise<void>((resolve) => app.close(() => resolve())))));
 
 function config(visual: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) {
   return {
@@ -379,18 +418,18 @@ function appDir(own?: object) {
   return app;
 }
 
-async function captureRun(app: string, args: string[], env: Record<string, string> = CREDENTIALS) {
-  const tmp = dir("tmp");
+async function captureRun(app: string, args: string[], env: Record<string, string> = CREDENTIALS, { label = "main", tmp = dir("tmp") } = {}) {
+  const out = path.join(tmp, "ops-ui-shots", "fake-app", label);
   try {
-    const { stdout, stderr } = await run(process.execPath, [TOOL, "capture", "--app", app, "--label", "main", ...args], {
+    const { stdout, stderr } = await run(process.execPath, [TOOL, "capture", "--app", app, "--label", label, ...args], {
       env: { ...process.env, ...env, TMPDIR: tmp },
       encoding: "utf8",
       timeout: 170_000,
     });
-    return { status: 0, stdout, stderr, out: path.join(tmp, "ops-ui-shots", "fake-app", "main") };
+    return { status: 0, stdout, stderr, out };
   } catch (error) {
     const e = error as { code?: number; stdout?: string; stderr?: string };
-    return { status: e.code ?? -1, stdout: e.stdout ?? "", stderr: e.stderr ?? "", out: path.join(tmp, "ops-ui-shots", "fake-app", "main") };
+    return { status: e.code ?? -1, stdout: e.stdout ?? "", stderr: e.stderr ?? "", out };
   }
 }
 
@@ -457,12 +496,111 @@ describe.concurrent("app-shots capture (the real script against a local server)"
 
   it("fails a login that stays on the login page, and one that lands on a two-step page", T, async ({ expect }) => {
     const app = appDir(config());
-    let r = await captureRun(app, [], { ...CREDENTIALS, OPS_UI_SHOTS_PASSWORD: "wrong" });
+    let r = await captureRun(app, ["--login-timeout", "2000"], { ...CREDENTIALS, OPS_UI_SHOTS_PASSWORD: "wrong" });
     expect(r.status).toBe(1);
-    expect(r.stderr).toContain("editor login did not complete: landed on /login?error=1 (a gate page)");
+    expect(r.stderr).toContain("editor login did not complete: landed on /login?error=1 (a gate page; waited up to 2000 ms, --login-timeout raises it)");
     r = await captureRun(app, [], { ...CREDENTIALS, OPS_UI_SHOTS_USER: "owner@example.invalid", OPS_UI_SHOTS_PASSWORD: "pw-owner" });
     expect(r.status).toBe(1);
-    expect(r.stderr).toContain("editor login did not complete: landed on /two-factor/setup (a gate page)");
+    expect(r.stderr).toContain("editor login did not complete: landed on /two-factor/setup (a gate page;");
+  });
+
+  it("signs in once per user for the whole capture: every project reuses the session", T, async ({ expect }) => {
+    // 3 projects (1440, 375, 375-touch) x 2 users: 6 sign-ins before; the apps allow 5 a minute.
+    const app = appDir(config({ widths: [1440, 375], routes: ["/home", "/dev/kit"], readonlyRoutes: ["/home"] }));
+    const before = { editor: signIns["counted-editor@example.invalid"] ?? 0, readonly: signIns["counted-readonly@example.invalid"] ?? 0 };
+    const r = await captureRun(app, [], {
+      ...CREDENTIALS,
+      OPS_UI_SHOTS_USER: "counted-editor@example.invalid",
+      OPS_UI_SHOTS_RO_USER: "counted-readonly@example.invalid",
+    });
+    expect(r.status, r.stderr).toBe(0);
+    expect(signIns["counted-editor@example.invalid"] - before.editor).toBe(1);
+    expect(signIns["counted-readonly@example.invalid"] - before.readonly).toBe(1);
+    const manifest = JSON.parse(readFileSync(path.join(r.out, "manifest.json"), "utf8"));
+    expect(Object.keys(manifest.projects).sort()).toEqual(["1440", "375", "375-touch"]);
+    for (const project of Object.values(manifest.projects) as { routes: Record<string, { file?: string; landed: string }> }[]) {
+      // Signed in everywhere: no route landed on /login, the read-only page is the read-only user's.
+      expect(Object.keys(project.routes).sort()).toEqual(["/dev/kit", "/dev/kit/alpha", "/dev/kit/beta", "/home", "readonly:/home"]);
+      expect(Object.values(project.routes).every((route) => route.file && route.landed !== "/login")).toBe(true);
+    }
+    const home = readFileSync(path.join(r.out, "375-touch", manifest.projects["375-touch"].routes["/home"].file));
+    const readonlyHome = readFileSync(path.join(r.out, "375-touch", manifest.projects["375-touch"].routes["readonly:/home"].file));
+    expect(home.equals(readonlyHome)).toBe(false);
+  });
+
+  it("the login timeout is configurable: a late sign-in fails under a short one and passes under visual.loginTimeout", T, async ({ expect }) => {
+    const slow = { ...CREDENTIALS, OPS_UI_SHOTS_USER: "slow@example.invalid", OPS_UI_SHOTS_PASSWORD: "pw-slow" };
+    const clientSide = (visual: Record<string, unknown> = {}) =>
+      config({ login: { path: "/login-js", userEnv: "OPS_UI_SHOTS_USER", passwordEnv: "OPS_UI_SHOTS_PASSWORD" }, ...visual });
+    let r = await captureRun(appDir(clientSide()), ["--login-timeout", "1000"], slow);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("editor login did not complete: landed on /login-js (a gate page; waited up to 1000 ms");
+    r = await captureRun(appDir(clientSide({ loginTimeout: 20_000 })), [], slow);
+    expect(r.status, r.stderr).toBe(0);
+    // The default (60 s) is long enough for a dev server's first compile; L7a's 10 s was not.
+    r = await captureRun(appDir(clientSide()), [], slow);
+    expect(r.status, r.stderr).toBe(0);
+    r = await captureRun(appDir(config({ loginTimeout: "60s" })), [], slow);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("visual.loginTimeout is a positive number of milliseconds");
+    r = await captureRun(appDir(config()), ["--login-timeout", "soon"], slow);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("--login-timeout takes a positive number of milliseconds");
+  });
+
+  it("G3 sees colour values (a fresh probe per name) and fails a changed colour and newly declared names", T, async ({ expect }) => {
+    const tmp = dir("tmp");
+    const app = appDir();
+    const mainConfig = path.join(dir("scratch"), "main.json");
+    const branchConfig = path.join(dir("scratch"), "branch.json");
+    writeFileSync(mainConfig, JSON.stringify(config()));
+    writeFileSync(branchConfig, JSON.stringify(config({ baseUrl: branchBaseUrl })));
+    const creds = withoutReadonlyCredentials();
+    for (const [label, file] of [["main", mainConfig], ["main2", mainConfig], ["branch", branchConfig]]) {
+      const r = await captureRun(app, ["--config", file], creds, { label, tmp });
+      expect(r.status, r.stderr).toBe(0);
+    }
+    const root = path.join(tmp, "ops-ui-shots", "fake-app");
+    // Every colour reads as its own value under reduced motion (a reused probe read all three as
+    // the first one probed, --color-app-only's red).
+    const { tokens } = JSON.parse(readFileSync(path.join(root, "main", "1440", "tokens.json"), "utf8"));
+    expect(tokens["--color-app-only"].value).toBe("rgb(255, 0, 0)");
+    expect(tokens["--color-second"].value).toBe("rgb(0, 255, 0)");
+    expect(tokens["--color-primary"].value).not.toBe("rgb(255, 0, 0)");
+    const compareIn = async (a: string, b: string, expectText?: string) => {
+      const errors: string[] = [];
+      const error = console.error;
+      console.error = (line: string) => errors.push(line);
+      let expectFile: string | undefined;
+      if (expectText !== undefined) {
+        expectFile = path.join(root, `${a}-${b}-expect.txt`);
+        writeFileSync(expectFile, expectText);
+      }
+      try {
+        const code = await compare({ app, a, b, expect: expectFile, root }, () => {});
+        return { code, err: errors.join("\n") };
+      } finally {
+        console.error = error;
+      }
+    };
+    let r = await compareIn("main", "main2");
+    expect(r.code, r.err).toBe(0);
+    r = await compareIn("main", "branch");
+    expect(r.code).toBe(1);
+    for (const project of ["1440", "375-touch"]) {
+      expect(r.err).toContain(`${project} token --color-second: rgb(0, 255, 0) → rgb(0, 0, 255)`);
+      // Newly declared, and outside the old dump families (--color/--text/--radius/--font/--ops).
+      expect(r.err).toContain(`${project} token --shadow-card: new in branch = 0 1px 2px #000, not listed as "token --shadow-card = 0 1px 2px #000"`);
+      expect(r.err).toContain(`${project} token --tracking-snug: new in branch = -0.01em`);
+    }
+    expect(r.err).not.toContain("pixel(s) differ");
+    expect(r.err).not.toMatch(/--tw-/);
+    // Listed with their values, the branch passes; a wrong value for a new name does not.
+    r = await compareIn("main", "branch", "token --color-second = rgb(0, 0, 255)\ntoken --shadow-card = 0 1px 2px #000\ntoken --tracking-snug = -0.01em\n");
+    expect(r.code, r.err).toBe(0);
+    r = await compareIn("main", "branch", "token --color-second = rgb(0, 0, 255)\ntoken --shadow-card = 0 1px 2px #111\ntoken --tracking-snug = -0.01em\n");
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("token --shadow-card: new in branch = 0 1px 2px #000");
   });
 
   it("reads --config instead of the app's own file; a missing config, or one without visual, is exit 2", T, async ({ expect }) => {

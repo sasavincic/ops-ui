@@ -1,7 +1,7 @@
 // tools/app-shots.mjs - the per-app visual check of spec §11.4 (gates G2 and G3 of §12.0). Run from
 // the library checkout: the apps carry no Playwright.
 //
-//   node tools/app-shots.mjs capture --app <app dir> --label <label> [--config <file>]
+//   node tools/app-shots.mjs capture --app <app dir> --label <label> [--config <file>] [--login-timeout <ms>]
 //   node tools/app-shots.mjs compare --app <app dir> <labelA> <labelB> [--expect <file>]
 //
 // capture   The app's dev server must be running (visual.baseUrl). Reads `visual` and `extensions`
@@ -9,8 +9,12 @@
 //           scratch config their prepare step wrote, because main has no config until the swap
 //           merges). Signs in as the fixture editor (visual.login; credentials from the env
 //           variables it names, local database only) and, for visual.readonlyRoutes, as the
-//           read-only user (visual.readonlyLogin). After each sign-in it checks that the page
-//           left login.path and landed on no gate page. Every route of visual.routes, at each of
+//           read-only user (visual.readonlyLogin): ONCE per user per capture, every project's
+//           context reusing the session (Playwright storageState), because the apps allow five
+//           email sign-ins a minute per client. After each sign-in it checks that the page left
+//           login.path within the login timeout (--login-timeout <ms>, else visual.loginTimeout,
+//           else 60 s: a dev server compiles the landing route on its first request) and landed
+//           on no gate page. Every route of visual.routes, at each of
 //           visual.widths and at 375-touch (a phone: touch, a coarse pointer, no hover), with
 //           reduced motion, the caret hidden, visual.mask masked and a clock fixed at the
 //           capture's start and paused once the route is ready. Every route must land where it
@@ -20,9 +24,10 @@
 //           clicks its `data-story-open` selector, and is shot as its own route. A route
 //           answering 404 is recorded as absent (a route the branch adds). Per width, the token
 //           dump `tokens.json`: every contract token (styles/tokens.css), config.extensions and
-//           every --color-*, --text-*, --radius-*, --font-*, --ops-* the page's style sheets
-//           declare, each with `declared` and, when declared, its value (colours read through a
-//           probe element's computed colour). Writes $TMPDIR/ops-ui-shots/<app>/<label>/.
+//           every other custom property the page's style sheets declare (Tailwind's `--tw-*`
+//           internals excepted), each with `declared` and, when declared, its value (colours read
+//           through a fresh, transition-free probe element per name). Writes
+//           $TMPDIR/ops-ui-shots/<app>/<label>/.
 // compare   G2: every page of A and B compared with the gallery's gate, exactDiff of
 //           gallery/shot-options.ts (every RGBA byte; 0 changed pixels), red-overlay diffs written
 //           to $TMPDIR/ops-ui-shots/<app>/<A>-vs-<B>/. G3: every name declared in A declared in B
@@ -32,7 +37,7 @@
 //             token <name> = <value>        a token new in B, or changed, with its value in B
 //             removed route <route>         a route only A has
 //             removed token <name>          a token only A declares
-//           `#` starts a comment; `*` in a route matches any characters; a read-only capture is
+//           `#` followed by a space (or alone) starts a comment; `*` in a route matches any characters; a read-only capture is
 //           the route `readonly:<route>`. A route a step adds (`/dev/kit/<storyId>`) is a new
 //           route until main has it.
 //
@@ -51,12 +56,19 @@ const LIB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const TOUCH_PROJECT = { name: "375-touch", viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true };
 /** Pages a sign-in or a route must never land on (spec §3.3, §11.4). */
 export const GATE_PAGES = ["/login", "/two-factor", "/password", "/read-only"];
-/** Token families the dump reads from the page's style sheets besides the contract (spec §11.4). */
-export const DUMP_FAMILIES = /^--(?:color|text|radius|font|ops)-/;
+/**
+ * The dump reads every custom property the page's style sheets declare besides the contract,
+ * except names with this prefix: Tailwind's per-utility internals (spec §11.4).
+ */
+export const DUMP_SKIPPED_PREFIX = "--tw-";
 const STABLE_TRIES = 10;
 const STORY_TIMEOUT = 20_000;
-/** How long a sign-in may take to leave the login page (a client-side sign-in navigates late). */
-const LOGIN_TIMEOUT = 10_000;
+/**
+ * How long a sign-in may take to leave the login page, by default (visual.loginTimeout or
+ * --login-timeout override it, in milliseconds): a client-side sign-in navigates late, and a dev
+ * server compiles the landing route on its first request.
+ */
+export const DEFAULT_LOGIN_TIMEOUT = 60_000;
 /** A first request to a dev server compiles the route: allow for it. */
 const NAVIGATION_TIMEOUT = 120_000;
 /** Next's dev tools (the indicator in <nextjs-portal>): not the app, and its state is transient. */
@@ -71,7 +83,7 @@ class UsageError extends Error {}
 
 /**
  * @typedef {{ path: string, userEnv: string, passwordEnv: string, userSelector?: string, passwordSelector?: string, submitSelector?: string }} Login
- * @typedef {{ baseUrl: string, login: Login, readonlyLogin?: Omit<Login, "path"> & { path?: string }, widths: number[], routes: string[], readonlyRoutes?: string[], redirects?: Record<string, string>, mask?: string[] }} Visual
+ * @typedef {{ baseUrl: string, login: Login, readonlyLogin?: Omit<Login, "path"> & { path?: string }, widths: number[], routes: string[], readonlyRoutes?: string[], redirects?: Record<string, string>, mask?: string[], loginTimeout?: number }} Visual
  */
 
 /**
@@ -107,6 +119,9 @@ export function readCaptureConfig(appRoot, configFile) {
   }
   if (visual.readonlyRoutes?.length && (!visual.readonlyLogin?.userEnv || !visual.readonlyLogin?.passwordEnv)) {
     problems.push("visual.readonlyRoutes needs visual.readonlyLogin (userEnv, passwordEnv)");
+  }
+  if (visual.loginTimeout !== undefined && !(Number.isInteger(visual.loginTimeout) && visual.loginTimeout > 0)) {
+    problems.push("visual.loginTimeout is a positive number of milliseconds");
   }
   if (problems.length > 0) throw new UsageError(`${file}: ${problems.join("; ")}`);
   return { file, visual, extensions: Array.isArray(config.extensions) ? config.extensions : [] };
@@ -186,10 +201,10 @@ export function dumpNames(/** @type {string[]} */ extensions) {
 
 /**
  * Runs in the page: which custom properties the style sheets declare, and the values of the named
- * ones plus every declared name of the dump families.
- * @param {{ names: string[], families: string }} input
+ * ones plus every other declared name (Tailwind's `--tw-*` internals excepted).
+ * @param {{ names: string[], internal: string }} input
  */
-function readTokens({ names, families }) {
+function readTokens({ names, internal }) {
   const declared = new Set();
   /** @param {CSSRuleList} rules */
   const visit = (rules) => {
@@ -207,24 +222,30 @@ function readTokens({ names, families }) {
       // A cross-origin sheet: its rules are not readable, and it is not the app's.
     }
   }
-  const family = new RegExp(families);
-  const all = [...new Set([...names, ...[...declared].filter((n) => family.test(n))])].sort();
-  const probe = document.createElement("i");
-  document.body.append(probe);
+  // Every declared custom property is dumped except Tailwind's per-utility `--tw-*` internals: a
+  // name outside the token families (a `--shadow-*` or `--tracking-*` a stray class in a scanned
+  // file made Tailwind emit) is a CSS change too, and only a dumped name can fail G3.
+  const all = [...new Set([...names, ...[...declared].filter((n) => !n.startsWith(internal))])].sort();
   /** @type {Record<string, { declared: boolean, value?: string }>} */
   const out = {};
   for (const name of all) {
     if (!declared.has(name)) {
       out[name] = { declared: false };
     } else if (name.startsWith("--color-")) {
-      probe.style.color = "";
+      // A FRESH probe per name, with no transition. One reused probe is blind: under reduced
+      // motion base.css gives every element `transition-duration: 0.01ms` (transition-property
+      // stays `all`), so each new `color` starts a transition and the computed colour read at once
+      // is still the previous one: every --color-* read as the first colour probed.
+      const probe = document.createElement("i");
+      probe.style.setProperty("transition", "none", "important");
       probe.style.color = `var(${name})`;
+      document.body.append(probe);
       out[name] = { declared: true, value: getComputedStyle(probe).color };
+      probe.remove();
     } else {
       out[name] = { declared: true, value: getComputedStyle(document.documentElement).getPropertyValue(name).trim() };
     }
   }
-  probe.remove();
   return out;
 }
 
@@ -236,18 +257,23 @@ function envValue(name, what) {
 }
 
 /**
- * Signs in on a fresh page and checks the landing.
- * @param {import("playwright-core").BrowserContext} context
+ * Signs in ONCE in its own context, checks the landing and returns the session (cookies and
+ * storage) for every project's context to reuse: the apps allow five email sign-ins a minute per
+ * client, and a capture has up to six projects × users.
+ * @param {import("playwright-core").Browser} browser
  * @param {string} baseUrl
  * @param {Login} login
  * @param {string} who
+ * @param {number} timeout
  */
-async function signIn(context, baseUrl, login, who) {
+async function signIn(browser, baseUrl, login, who, timeout) {
   const user = envValue(login.userEnv, `${who} sign-in`);
   const password = envValue(login.passwordEnv, `${who} sign-in`);
-  const page = await context.newPage();
-  page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT);
+  const context = await browser.newContext({ baseURL: baseUrl, viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, reducedMotion: "reduce" });
   try {
+    const page = await context.newPage();
+    page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT);
+    page.setDefaultTimeout(Math.max(timeout, 30_000));
     await page.goto(new URL(login.path, baseUrl).href, { waitUntil: "load" });
     const userField = page.locator(login.userSelector ?? 'input[type="email"], input[name="email"], input[name="username"], input[autocomplete="username"]').first();
     const passwordField = page.locator(login.passwordSelector ?? 'input[type="password"]').first();
@@ -256,14 +282,15 @@ async function signIn(context, baseUrl, login, who) {
     const before = page.url();
     if (login.submitSelector) await page.locator(login.submitSelector).first().click();
     else await passwordField.press("Enter");
-    await page.waitForURL((url) => url.href !== before && pathAndQuery(url.href).split("?")[0] !== login.path, { timeout: LOGIN_TIMEOUT }).catch(() => {});
+    await page.waitForURL((url) => url.href !== before && pathAndQuery(url.href).split("?")[0] !== login.path, { timeout }).catch(() => {});
     await page.waitForLoadState("load").catch(() => {});
     const landed = page.url();
     if (isGatePage(landed, login.path)) {
-      throw new CaptureFailure(`${who} login did not complete: landed on ${pathAndQuery(landed)} (a gate page)`);
+      throw new CaptureFailure(`${who} login did not complete: landed on ${pathAndQuery(landed)} (a gate page; waited up to ${timeout} ms, --login-timeout raises it)`);
     }
+    return await context.storageState();
   } finally {
-    await page.close();
+    await context.close();
   }
 }
 
@@ -331,7 +358,7 @@ async function captureRoute(run, target) {
     }
     shot.file = `${slug(target.key)}.png`;
     writeFileSync(path.join(dir, shot.file), png);
-    const tokens = target.tokens ? await page.evaluate(readTokens, { names: target.tokens, families: DUMP_FAMILIES.source }) : null;
+    const tokens = target.tokens ? await page.evaluate(readTokens, { names: target.tokens, internal: DUMP_SKIPPED_PREFIX }) : null;
     const storyLinks = await page.$$eval("a[data-story-id]", (links) =>
       links.map((a) => ({ id: /** @type {string} */ (a.getAttribute("data-story-id")), open: a.getAttribute("data-story-open") ?? undefined })),
     );
@@ -349,8 +376,9 @@ async function launch() {
 }
 
 /**
- * @param {{ app: string, label: string, config?: string, root?: string }} options `root` (tests
- *   only) replaces $TMPDIR/ops-ui-shots/<app>
+ * @param {{ app: string, label: string, config?: string, loginTimeout?: number, root?: string }} options
+ *   `loginTimeout` (ms) overrides visual.loginTimeout; `root` (tests only) replaces
+ *   $TMPDIR/ops-ui-shots/<app>
  * @param {(line: string) => void} log
  * @returns {Promise<number>}
  */
@@ -376,8 +404,17 @@ export async function capture(options, log) {
   /** @type {Manifest} */
   const manifest = { app: appName(appRoot), label, config: file, baseUrl: visual.baseUrl, capturedAt: now.toISOString(), complete: false, failures, projects: {} };
   const names = dumpNames(extensions);
+  const loginTimeout = options.loginTimeout ?? visual.loginTimeout ?? DEFAULT_LOGIN_TIMEOUT;
   const browser = await launch();
   try {
+    // One sign-in per user for the whole capture; every project's context reuses its session.
+    const sessions = {
+      editor: await signIn(browser, visual.baseUrl, visual.login, "editor", loginTimeout),
+      readonly:
+        visual.readonlyRoutes?.length && visual.readonlyLogin
+          ? await signIn(browser, visual.baseUrl, /** @type {Login} */ ({ path: visual.login.path, ...visual.readonlyLogin }), "read-only", loginTimeout)
+          : null,
+    };
     for (const project of projectsFor(visual.widths)) {
       const projectDir = path.join(dir, project.name);
       mkdirSync(projectDir, { recursive: true });
@@ -386,7 +423,7 @@ export async function capture(options, log) {
       let tokensFile = /** @type {string | null} */ (null);
       /** @param {"editor" | "readonly"} user @param {string[]} list */
       const shoot = async (user, list) => {
-        const login = user === "editor" ? visual.login : { path: visual.login.path, ...visual.readonlyLogin };
+        const storageState = sessions[user] ?? undefined;
         const context = await browser.newContext({
           baseURL: visual.baseUrl,
           viewport: project.viewport,
@@ -394,9 +431,9 @@ export async function capture(options, log) {
           isMobile: project.isMobile,
           deviceScaleFactor: 1,
           reducedMotion: "reduce",
+          storageState,
         });
         try {
-          await signIn(context, visual.baseUrl, /** @type {Login} */ (login), user === "editor" ? "editor" : "read-only");
           const run = { context, visual, dir: projectDir, now, failures };
           for (const route of list) {
             const key = user === "readonly" ? `readonly:${route}` : route;
@@ -463,7 +500,9 @@ export function parseExpect(text) {
   const out = [];
   const problems = [];
   for (const [i, raw] of text.split("\n").entries()) {
-    const line = raw.replace(/(^|\s)#.*$/, "").trim();
+    // A comment is `#` at the start or after a space, followed by a space or the line's end, so a
+    // value such as `0 1px 2px #000` keeps its hex colour.
+    const line = raw.replace(/(^|\s)#(\s.*)?$/, "").trim();
     if (!line) continue;
     let m;
     if ((m = line.match(/^removed (route|token) (\S+)$/))) {
@@ -651,7 +690,7 @@ export async function compare(options, log) {
 
 const USAGE = [
   "usage:",
-  "  node tools/app-shots.mjs capture --app <app dir> --label <label> [--config <file>]",
+  "  node tools/app-shots.mjs capture --app <app dir> --label <label> [--config <file>] [--login-timeout <ms>]",
   "  node tools/app-shots.mjs compare --app <app dir> <labelA> <labelB> [--expect <file>]",
 ].join("\n");
 
@@ -659,7 +698,7 @@ const USAGE = [
 export function parseArgs(argv) {
   const [command, ...rest] = argv;
   if (command !== "capture" && command !== "compare") throw new UsageError(USAGE);
-  /** @type {{ command: "capture" | "compare", app?: string, label?: string, config?: string, expect?: string, labels: string[] }} */
+  /** @type {{ command: "capture" | "compare", app?: string, label?: string, config?: string, loginTimeout?: number, expect?: string, labels: string[] }} */
   const out = { command, labels: [] };
   for (let i = 0; i < rest.length; i++) {
     const arg = rest[i];
@@ -671,6 +710,11 @@ export function parseArgs(argv) {
     if (arg === "--app") out.app = value();
     else if (arg === "--label" && command === "capture") out.label = value();
     else if (arg === "--config" && command === "capture") out.config = value();
+    else if (arg === "--login-timeout" && command === "capture") {
+      const ms = Number(value());
+      if (!Number.isInteger(ms) || ms <= 0) throw new UsageError(`--login-timeout takes a positive number of milliseconds\n${USAGE}`);
+      out.loginTimeout = ms;
+    }
     else if (arg === "--expect" && command === "compare") out.expect = value();
     else if (!arg.startsWith("--") && command === "compare") out.labels.push(arg);
     else throw new UsageError(`unknown argument ${arg}\n${USAGE}`);
@@ -687,7 +731,7 @@ export async function main(argv) {
   try {
     const args = parseArgs(argv);
     if (args.command === "capture") {
-      return await capture({ app: /** @type {string} */ (args.app), label: /** @type {string} */ (args.label), config: args.config }, log);
+      return await capture({ app: /** @type {string} */ (args.app), label: /** @type {string} */ (args.label), config: args.config, loginTimeout: args.loginTimeout }, log);
     }
     return await compare({ app: /** @type {string} */ (args.app), a: args.labels[0], b: args.labels[1], expect: args.expect }, log);
   } catch (error) {
