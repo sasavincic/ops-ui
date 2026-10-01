@@ -65,7 +65,7 @@ import Link from "next/link";
 import { type ActionIconName } from "./action-icon";
 declare const buttonVariants: (props?: ({
     variant?: "danger" | "admin" | "primary" | "secondary" | "ghost" | "ghostDanger" | null | undefined;
-    size?: "sm" | "md" | null | undefined;
+    size?: "md" | "lg" | "sm" | null | undefined;
 } & import("class-variance-authority/types").ClassProp) | undefined) => string;
 type ReadOnlyProps = {
     readOnlySafe?: boolean;
@@ -85,6 +85,13 @@ export declare function FileLink({ href, children, size, className, disabled, ta
     size?: "sm" | "md";
     disabled?: boolean;
 }): import("react").JSX.Element;
+export declare function IconButton({ label, icon, variant, size, readOnlySafe, className, type, ...props }: Omit<React.ComponentProps<"button">, "children" | "aria-label" | "title"> & {
+    label: string;
+    icon: ActionIconName;
+    variant?: NonNullable<VariantProps<typeof buttonVariants>["variant"]>;
+    size?: "sm" | "md" | "lg";
+    readOnlySafe?: boolean;
+}): import("react").JSX.Element | null;
 export declare function AdminIconButton({ label, icon, className, ...props }: Omit<React.ComponentProps<"button">, "children"> & {
     label: string;
     icon?: "edit" | "delete" | "unlock" | "permissions" | "key" | "deactivate" | "reactivate";
@@ -148,6 +155,7 @@ export type ClusterProps<T extends ClusterTag = "div"> = {
 export declare function Cluster<T extends ClusterTag = "div">({ as, gap, wrap, align, justify, className, ...props }: ClusterProps<T>): import("react").JSX.Element;
 
 // src/components/combobox.d.ts
+import type { ControlSize } from "../lib/touch";
 export type ComboboxOptionLine = {
     text: string;
     tone?: "muted" | "warning";
@@ -167,7 +175,7 @@ export type ComboboxOption = {
     keywords?: string;
 };
 export declare function comboboxOptionMatches(option: ComboboxOption, query: string): boolean;
-export declare function Combobox({ id, value, options, onChange, placeholder, clearLabel, tall, }: {
+export declare function Combobox({ id, value, options, onChange, placeholder, clearLabel, tall, size, }: {
     id?: string;
     value: string;
     options: ComboboxOption[];
@@ -175,6 +183,7 @@ export declare function Combobox({ id, value, options, onChange, placeholder, cl
     placeholder?: string;
     clearLabel?: string;
     tall?: boolean;
+    size?: ControlSize;
 }): import("react").JSX.Element;
 
 // src/components/confirm-dialog.d.ts
@@ -207,13 +216,14 @@ export declare function CopyValue({ value, className, }: {
 }): import("react").JSX.Element;
 
 // src/components/date-input.d.ts
+import { type ControlSize } from "../lib/touch";
 export type DateInputChange = {
     target: {
         value: string;
         name?: string;
     };
 };
-export declare function DateInput({ id, name, value, defaultValue, onChange, min, max, disabled, required, placeholder, className, readOnlySafe, "aria-label": ariaLabel, }: {
+export declare function DateInput({ id, name, value, defaultValue, onChange, min, max, disabled, required, placeholder, className, readOnlySafe, "aria-label": ariaLabel, size, }: {
     id?: string;
     name?: string;
     value?: string;
@@ -227,6 +237,7 @@ export declare function DateInput({ id, name, value, defaultValue, onChange, min
     className?: string;
     readOnlySafe?: boolean;
     "aria-label"?: string;
+    size?: ControlSize;
 }): import("react").JSX.Element;
 
 // src/components/description-list.d.ts
@@ -284,6 +295,7 @@ export declare function EmptyState({ title, description, action, className, }: {
 }): import("react").JSX.Element;
 
 // src/components/field.d.ts
+import { type ControlSize } from "../lib/touch";
 export declare const controlClasses = "w-full rounded-control border border-border-strong bg-bg px-3 text-base lg:text-sm text-ink placeholder:text-ink-muted transition-colors duration-150 outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-muted aria-invalid:border-danger aria-invalid:focus-visible:ring-danger/25";
 export declare function Field({ label, htmlFor, error, warning, hint, announceWarning, className, children, }: {
     label: string;
@@ -298,8 +310,11 @@ export declare function Field({ label, htmlFor, error, warning, hint, announceWa
 type ReadOnlyProps = {
     readOnlySafe?: boolean;
 };
-export declare function Input({ className, readOnlySafe, ...props }: React.ComponentProps<"input"> & ReadOnlyProps): import("react").JSX.Element;
-export declare function Select({ className, readOnlySafe, ...props }: React.ComponentProps<"select"> & ReadOnlyProps): import("react").JSX.Element;
+type SizeProps = {
+    size?: ControlSize | number;
+};
+export declare function Input({ className, readOnlySafe, size, ...props }: Omit<React.ComponentProps<"input">, "size"> & ReadOnlyProps & SizeProps): import("react").JSX.Element;
+export declare function Select({ className, readOnlySafe, size, ...props }: Omit<React.ComponentProps<"select">, "size"> & ReadOnlyProps & SizeProps): import("react").JSX.Element;
 export declare function Checkbox({ label, className, readOnlySafe, ...props }: React.ComponentProps<"input"> & {
     label: string;
 } & ReadOnlyProps): import("react").JSX.Element;
@@ -846,6 +861,15 @@ export declare function normalizeSearchText(value: string): string;
 export declare function matchesAllWords(query: string, ...texts: (string | null | undefined)[]): boolean;
 export declare function buildHaystack(...parts: (string | null | undefined)[]): string;
 
+// src/lib/touch.d.ts
+export declare const TOUCH_FLOOR: {
+    readonly height: "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:min-h-11";
+    readonly width: "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:min-w-11";
+    readonly text: "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:text-base";
+};
+export type ControlSize = "md" | "lg";
+export declare const CONTROL_SIZE_CLASS: Record<ControlSize, string>;
+
 // src/lib/use-dismissable.d.ts
 import { type RefObject } from "react";
 export declare function useDismissable(open: boolean, ref: RefObject<HTMLElement | null>, onClose: () => void): void;
@@ -1103,7 +1127,7 @@ export declare const stories: Story[];
 // src/types.d.ts
 export type BadgeVariant = "neutral" | "success" | "warning" | "danger" | "info";
 export type StatusIconName = "current" | "check" | "clock" | "alert" | "problem" | "question" | "close" | "draft" | "ended" | "inactive" | "archive" | "key" | "lock" | "send" | "minus" | "info";
-export type ActionIconName = "add" | "edit" | "save" | "close" | "check" | "delete" | "archive" | "restore" | "enter" | "exit" | "calendar" | "upload" | "download" | "document" | "view" | "copy" | "send" | "print" | "link" | "search" | "filter" | "list" | "more" | "up" | "down" | "back" | "forward" | "settings" | "exchange" | "lock" | "unlock" | "user" | "bed" | "refresh";
+export type ActionIconName = "add" | "edit" | "save" | "close" | "check" | "delete" | "archive" | "restore" | "enter" | "exit" | "calendar" | "upload" | "download" | "document" | "view" | "copy" | "send" | "print" | "link" | "search" | "filter" | "list" | "more" | "up" | "down" | "back" | "forward" | "settings" | "exchange" | "lock" | "unlock" | "user" | "bed" | "refresh" | "sparkle" | "mail";
 export type StateMarkSpec = {
     tone: BadgeVariant;
     icon: StatusIconName;

@@ -242,7 +242,16 @@ other control in a filter bar is ghost.
 className: `md` (h-9, 14px, the default) in the record's own top row (`PageHeader` actions, form
 submit rows, dialog footers, filter bars, an `EmptyState`'s action); `sm` (h-8, 13px) inside the
 content (a card header's or `RecordTab`'s create, table row actions, sheet internals). The rule
-is "how deep in the page is this?"; a whole action row is one size.
+is "how deep in the page is this?"; a whole action row is one size. A third size, `lg` (h-12,
+16px, 1.3.0), is for a surface built for gloved hands and a phone at arm's length (PrefabOps'
+workshop portal): there EVERY control is `lg`, Button and the input family (`Input`, `Select`,
+`Combobox`, `DateInput`) alike, at every width. It is a surface's size, never a way to make one
+button louder.
+
+An icon-only control is `IconButton` (1.3.0): square at `sm` / `md` / `lg`, ghost unless the
+action table asks otherwise, its required `label` is the accessible name and the tooltip. Use it
+only where the glyph is universally read (✕ remove, ⬇ download, ✎ edit inside a dense editing
+grid); a row action in a list stays a labelled button (below).
 
 A row action is a **labelled** kit button, never a bare glyph (a ✎ alone is unreadable on
 touch, where `title` never appears); when two actions in one row would both read "Edit", each
@@ -285,9 +294,9 @@ modal for one focused act: `DialogBody` for the field stack, `DialogError` for t
 (a toast), `DialogFooter` for the ghost Cancel plus the commit button whose variant follows the
 action table. A **Sheet** is the right-hand slide-over for reading and editing a record beside the
 surface that named it: `SheetBody` / `SheetError` / `SheetFooter`, the last holding the
-record-level destructive act at the END of the scroll, never pinned under a thumb. In 1.0 the
-Dialog is the centred card at every width (Workforce Ops' phone bottom sheet is an open decision,
-spec §12.4).
+record-level destructive act at the END of the scroll, never pinned under a thumb. Below `sm` the
+Dialog is a bottom sheet (full width, rounded top, the footer pinned above the safe area); from
+`sm` the centred card (since 1.0, spec §12.4 option 1).
 
 Both close **only** by their ✕: no backdrop click, no Escape, because both hold half-typed forms.
 Once anything has been typed, the ✕ (and the Cancel) asks before discarding. The ghost escape
@@ -344,6 +353,21 @@ The top of a page is the same on every page of its kind: below `sm` the `PageHea
 under the description; the header's action group is right-aligned at every width with the
 primary always last, in the same corner on a phone and a laptop. On a touch screen the kit's small
 controls grow (`pointer-coarse:`), and text inputs are 16px below `lg` (no focus zoom on phones).
+
+**The touch floor** (1.3.0, opt-in): an app that puts `data-ops-touch` on an ancestor (PrefabOps:
+`<html data-ops-touch>`) gets, on a screen that cannot hover and has a coarse pointer
+(`(hover: none) and (pointer: coarse)`), every kit control at least 44px tall (`Button` and its
+links, `IconButton`, `Input`, `Select`, `Combobox`, `DateInput`, `Segmented`'s options, the
+`RowMenu` trigger; icon-only ones 44px wide too) and every text input at 16px, at every width.
+Without the attribute nothing changes. The classes are `TOUCH_FLOOR` in `lib/touch.ts`.
+
+**Islands and stacking** (1.3.0, for an app whose legacy CSS predates the kit): kit markup may
+live inside an element of class `ops-ui-root` on a page WITHOUT the global reset;
+`styles/preflight-scoped.css`, imported in `layer(base)` above the app's legacy layer, resets what
+the legacy element rules set there, so the kit renders as everywhere else (legacy markup never
+goes inside an island). The kit's fixed layers read `--ops-z-toast` (60), `--ops-z-calendar` (50),
+`--ops-z-menu` (40) and `--ops-z-sheet` (40) (TOKENS.md → Layout variables); an app with higher
+legacy layers raises them, in its own stylesheet. Modal dialogs are the top layer and need none.
 
 ## Motion
 

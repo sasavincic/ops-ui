@@ -33,9 +33,9 @@ describe("glyphs", () => {
   const statusNames = unionMembers("StatusIconName");
   const actionNames = unionMembers("ActionIconName");
 
-  it("types.ts declares the vocabularies (16 status glyphs, 34 action glyphs)", () => {
+  it("types.ts declares the vocabularies (16 status glyphs, 36 action glyphs)", () => {
     expect(statusNames).toHaveLength(16);
-    expect(actionNames).toHaveLength(34);
+    expect(actionNames).toHaveLength(36);
     expect(new Set(statusNames).size).toBe(statusNames.length);
     expect(new Set(actionNames).size).toBe(actionNames.length);
   });

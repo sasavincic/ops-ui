@@ -6,6 +6,7 @@ import { ActionIcon, type ActionIconName } from "./action-icon";
 import { Button } from "./button";
 import { useDismissable } from "../lib/use-dismissable";
 import { cn } from "../lib/cn";
+import { TOUCH_FLOOR } from "../lib/touch";
 
 /**
  * The row kebab (⋯): the secondary and destructive actions of ONE row,
@@ -96,7 +97,8 @@ export function RowMenu({
           setPlace(null);
           setOpen((v) => !v);
         }}
-        className="px-2"
+        // The trigger is icon-only: under the touch floor it is 44 x 44 (Button brings the height).
+        className={cn("px-2", TOUCH_FLOOR.width)}
       >
         {/* The dots ARE the button — always drawn, even where decorative
             action icons are off (Settings, workspaces rendered it empty). */}
@@ -107,7 +109,7 @@ export function RowMenu({
           ref={menuRef}
           role="menu"
           style={place ? { top: place.top, right: place.right } : { visibility: "hidden" }}
-          className="fixed z-40 w-52 max-w-[calc(100vw-2rem)] rounded-control border border-border bg-bg py-1 shadow-lg"
+          className="fixed z-[var(--ops-z-menu,40)] w-52 max-w-[calc(100vw-2rem)] rounded-control border border-border bg-bg py-1 shadow-lg"
         >
           {items.map((item) => (
             <li key={item.key} role="none">

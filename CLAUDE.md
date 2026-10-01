@@ -424,3 +424,19 @@ Captures go to `$TMPDIR/ops-ui-shots/<app>/<label>/`.
   class tokens from string literals (`has-[[data-x]]:…`, `top-[calc(…)]`), colours/styles/raw
   controls from comment-blanked source. 8 new stories (72), new baselines only. Released with
   `--compatible TH --compatible TD --compatible OPS_UI_VERSION`.
+- **1.3.0** (2026-10-01, the PrefabOps restyle plan's M1 + M2, §10.2: the plan's numbers shifted
+  by one because 1.2.0 became the primitives release): `styles/preflight-scoped.css` (preflight
+  under `:where(.ops-ui-root, .ops-ui-root *)`, generated rule for rule by
+  `gallery/preflight-scope.mjs`, which also writes the gallery's own reset
+  `gallery/app/preflight-global.css`: every element unless `<html data-ops-preflight="scoped">`,
+  set only by the island story; `globals.css` now imports Tailwind's theme / reset / utilities
+  separately); the stacking variables `--ops-z-toast` 60 / `-calendar` 50 / `-menu` 40 (RowMenu
+  and AppSwitcher) / `-sheet` 40 as `z-[var(--ops-z-…,<1.2 value>)]` (TOKENS.md → Layout
+  variables); the opt-in touch floor `TOUCH_FLOOR` (`lib/touch.ts`: an arbitrary
+  `(hover:none) and (pointer:coarse)` media variant + `in-data-ops-touch:`), `size="lg"` on Button
+  and the input family (`Input` / `Select` take `"md" | "lg" | number`, a number stays the HTML
+  attribute), `IconButton` in `button.tsx`, ActionIcon `sparkle` / `mail`. G3 needed nothing
+  (bottom-sheet dialogs since 1.0). 6 new stories (78), new baselines only;
+  `tests/touch-and-stacking.test.tsx`, `tests/preflight-scoped.test.ts`. Next: M3 = 1.4.0 (Input
+  prefix / suffix, YearInput, RowMenu trigger + sections). Note: the styling programme's §4.2
+  still calls the AppFrame release "1.3.0"; it is now 1.4.0 or later.

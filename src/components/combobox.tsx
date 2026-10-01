@@ -6,6 +6,7 @@ import { cn } from "../lib/cn";
 import { Monogram } from "./monogram";
 import { useOpsUi } from "../config/provider";
 import { matchesAllWords } from "../lib/text";
+import type { ControlSize } from "../lib/touch";
 
 /** Supporting line under an option's label; the tone picks a token colour. */
 export type ComboboxOptionLine = { text: string; tone?: "muted" | "warning" };
@@ -77,6 +78,7 @@ export function Combobox({
   placeholder,
   clearLabel,
   tall = false,
+  size,
 }: {
   id?: string;
   value: string;
@@ -91,6 +93,8 @@ export function Combobox({
    * 2026-09-25), so the dialog grows to show many names at once.
    */
   tall?: boolean;
+  /** The input's size (1.3.0): "md" (default) or "lg" (48px, 16px text). */
+  size?: ControlSize;
 }) {
   const { strings } = useOpsUi();
   const [query, setQuery] = useState("");
@@ -142,6 +146,7 @@ export function Combobox({
     <div className="relative">
       <Input
         id={id}
+        size={size}
         value={selected ? selected.label : query}
         placeholder={effectivePlaceholder}
         autoComplete="off"

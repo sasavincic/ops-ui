@@ -4,7 +4,15 @@
    that makes a story look right here while an app renders it without. An app gets the same set
    from its @source line plus the four @source not lines that keep the shipped docs, the sync
    script, ops-ui.config.json and ops-ui.lock.json out (tests/app-scan.test.ts). */
-@import "tailwindcss" source(none);
+/* Tailwind in its three parts (what @import "tailwindcss" expands to), so the gallery's reset is
+   gallery/app/preflight-global.css: tailwindcss/preflight.css for every element unless
+   <html data-ops-preflight=scoped>, which the island story (card--island-on-a-legacy-page) sets
+   (1.3.0); preflight-scoped.css next to it is what that story shows. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "./preflight-global.css" layer(base);
+@import "../../styles/preflight-scoped.css" layer(base);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
 /* The library styles, in the order an app imports them (spec 8.4). The brand fixtures
    (gallery/brands/*.css) are imported by the layout and play the part of an app brand.css. */
 @import "../../styles/tokens.css";

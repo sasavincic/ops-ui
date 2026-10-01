@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { ActionIcon } from "../components/action-icon";
+import { Button } from "../components/button";
+import { Combobox } from "../components/combobox";
+import { DateInput } from "../components/date-input";
 import { Checkbox, CheckTile, Field, FileInput, Input, Select, Switch, Textarea } from "../components/field";
 import { ReadOnlyScope } from "../config/read-only";
 import type { Story } from "./index";
@@ -86,11 +89,57 @@ function Switches() {
   );
 }
 
+/** The input family at size="lg" (1.3.0): 48px, 16px text at every width, beside a large Button. */
+function Large() {
+  const [worker, setWorker] = useState("w2");
+  const [year, setYear] = useState("2026-09-30");
+  return (
+    <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+      <Field label="Weight (kg)" htmlFor="lg-input">
+        <Input id="lg-input" size="lg" inputMode="decimal" defaultValue="1 240" />
+      </Field>
+      <Field label="Material certificate" htmlFor="lg-select">
+        <Select id="lg-select" size="lg" defaultValue="31">
+          <option value="31">3.1</option>
+          <option value="22">2.2</option>
+        </Select>
+      </Field>
+      <Field label="Welder" htmlFor="lg-combobox">
+        <Combobox
+          id="lg-combobox"
+          size="lg"
+          value={worker}
+          onChange={setWorker}
+          options={[
+            { value: "w1", label: "Barišić, Josip" },
+            { value: "w2", label: "Nguyen, Dinh Hai" },
+          ]}
+        />
+      </Field>
+      <Field label="Shipping date" htmlFor="lg-date">
+        <DateInput id="lg-date" size="lg" value={year} onChange={(e) => setYear(e.target.value)} />
+      </Field>
+      <div className="flex gap-2 sm:col-span-2">
+        <Button size="lg" variant="secondary">
+          Cancel
+        </Button>
+        <Button size="lg" icon="save">
+          Save
+        </Button>
+      </div>
+      <Field label="Medium, for comparison" htmlFor="md-input" className="sm:col-span-2">
+        <Input id="md-input" defaultValue="1 240" />
+      </Field>
+    </div>
+  );
+}
+
 export const stories: Story[] = [
   { name: "States", render: () => <States /> },
   { name: "Controls", render: () => <Controls /> },
   { name: "Check tiles", render: () => <Tiles /> },
   { name: "Switch", render: () => <Switches /> },
+  { name: "Large", render: () => <Large /> },
   {
     name: "In a read-only scope",
     render: () => (

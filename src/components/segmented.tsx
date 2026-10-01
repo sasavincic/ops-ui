@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "../lib/cn";
+import { TOUCH_FLOOR } from "../lib/touch";
 
 /**
  * A choice between mutually exclusive views (DESIGN.md → Toggles). The
@@ -52,6 +53,7 @@ export function Segmented<T extends string>({
         const active = option.value === value;
         const optionClass = cn(
           "inline-flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-detail whitespace-nowrap transition-colors duration-150 pointer-coarse:py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50",
+          TOUCH_FLOOR.height,
           active
             ? "bg-surface-raised font-medium text-ink"
             : "text-ink-secondary hover:text-ink",

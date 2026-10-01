@@ -74,7 +74,7 @@ export function Sheet({
   }
 
   return (
-    <div className="fixed inset-0 z-40">
+    <div className="fixed inset-0 z-[var(--ops-z-sheet,40)]">
       <div aria-hidden className="absolute inset-0 bg-ink/40" />
       <aside
         role="dialog"

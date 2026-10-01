@@ -112,18 +112,29 @@ primary).
 | `--color-success` | `--brand-success` | `oklch(0.48 0.11 155)` |
 | `--color-success-subtle` | `--brand-success-subtle` | `oklch(0.955 0.04 155)` |
 
-## Layout variable (1)
+## Layout variables (5)
 
-A plain `:root` variable, never in `@theme` (Tailwind drops theme variables that no utility
-uses). The kit reads it with a `var()` fallback.
+Plain `:root` variables, never in `@theme` (Tailwind drops theme variables that no utility
+uses). The kit reads each with a `var()` fallback, so an app that sets none renders exactly the
+defaults below.
 
 | Variable | Default | Read by |
 |---|---|---|
 | `--ops-toast-offset` | `0px` | the toast viewport: `bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + var(--ops-toast-offset, 0px))` |
+| `--ops-z-toast` | `60` | the toast viewport's `z-index` (1.3.0) |
+| `--ops-z-calendar` | `50` | DateInput's floating calendar (fine pointers; on touch it is a modal sheet, top layer) (1.3.0) |
+| `--ops-z-menu` | `40` | RowMenu's and AppSwitcher's floating menus (1.3.0) |
+| `--ops-z-sheet` | `40` | Sheet's fixed overlay (1.3.0) |
 
 A fixed offset goes into `brand.css` (Workforce Ops' 3.75rem for its assistant bubble). An offset
 that changes with the screen (PrefabOps' phone tab bar, spec §13.2 P3) needs a media query, which
 a brand file may not hold (rule 1): it goes into the app's own stylesheet, never `brand.css`.
+
+The four `--ops-z-*` defaults are the z-indexes these layers had before 1.3.0. Dialog,
+ConfirmDialog and a phone's calendar sheet are native modal `<dialog>`s, in the browser's top
+layer above every z-index, so they have no variable. An app whose own fixed layers sit higher
+raises the variables in its own stylesheet (PrefabOps during its restyle: toast 1300, calendar
+and menu 1150, sheet 1100, restyle plan 5.5) and removes them when those layers are gone.
 
 ## App extensions
 

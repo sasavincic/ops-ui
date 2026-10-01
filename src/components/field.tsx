@@ -3,6 +3,7 @@
 import { useReadOnlyScope } from "../config/read-only";
 import { useOpsUi } from "../config/provider";
 import { cn } from "../lib/cn";
+import { CONTROL_SIZE_CLASS, TOUCH_FLOOR, type ControlSize } from "../lib/touch";
 import { StatusIcon } from "./status-icon";
 import { useAnchoredToast } from "./toast";
 
@@ -94,6 +95,17 @@ export function Field({
  */
 type ReadOnlyProps = { readOnlySafe?: boolean };
 
+/**
+ * The input family's size (1.3.0): "md" (default, 36px) or "lg" (48px, 16px text at every width;
+ * the workshop portal's controls). A number is still the HTML `size` attribute (visible
+ * characters of an input, visible rows of a select), so every 1.2 call site keeps its meaning.
+ */
+type SizeProps = { size?: ControlSize | number };
+
+function controlSize(size: SizeProps["size"]): { size: ControlSize; htmlSize: number | undefined } {
+  return typeof size === "number" ? { size: "md", htmlSize: size } : { size: size ?? "md", htmlSize: undefined };
+}
+
 function useLocked(readOnlySafe?: boolean): boolean {
   return useReadOnlyScope() && !readOnlySafe;
 }
@@ -101,12 +113,15 @@ function useLocked(readOnlySafe?: boolean): boolean {
 export function Input({
   className,
   readOnlySafe,
+  size,
   ...props
-}: React.ComponentProps<"input"> & ReadOnlyProps) {
+}: Omit<React.ComponentProps<"input">, "size"> & ReadOnlyProps & SizeProps) {
   const locked = useLocked(readOnlySafe);
+  const sized = controlSize(size);
   return (
     <input
-      className={cn(controlClasses, "h-9", className)}
+      className={cn(controlClasses, CONTROL_SIZE_CLASS[sized.size], TOUCH_FLOOR.height, TOUCH_FLOOR.text, className)}
+      size={sized.htmlSize}
       {...props}
       disabled={props.disabled || locked}
     />
@@ -116,12 +131,15 @@ export function Input({
 export function Select({
   className,
   readOnlySafe,
+  size,
   ...props
-}: React.ComponentProps<"select"> & ReadOnlyProps) {
+}: Omit<React.ComponentProps<"select">, "size"> & ReadOnlyProps & SizeProps) {
   const locked = useLocked(readOnlySafe);
+  const sized = controlSize(size);
   return (
     <select
-      className={cn(controlClasses, "h-9", className)}
+      className={cn(controlClasses, CONTROL_SIZE_CLASS[sized.size], TOUCH_FLOOR.height, TOUCH_FLOOR.text, className)}
+      size={sized.htmlSize}
       {...props}
       disabled={props.disabled || locked}
     />
@@ -279,7 +297,7 @@ export function Textarea({
   const locked = useLocked(readOnlySafe);
   return (
     <textarea
-      className={cn(controlClasses, "min-h-24 py-2", className)}
+      className={cn(controlClasses, "min-h-24 py-2", TOUCH_FLOOR.text, className)}
       {...props}
       disabled={props.disabled || locked}
     />

@@ -64,7 +64,9 @@ export type ActionIconName =
   | "unlock"
   | "user"
   | "bed"
-  | "refresh";
+  | "refresh"
+  | "sparkle"
+  | "mail";
 
 /** An outlined status mark: the tone and glyph of a StateMark. */
 export type StateMarkSpec = { tone: BadgeVariant; icon: StatusIconName };

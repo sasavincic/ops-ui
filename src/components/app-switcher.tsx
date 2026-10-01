@@ -148,7 +148,7 @@ export function AppSwitcher({
           // cannot take focus, and under reduced motion base.css turns the
           // visibility flip itself into a (0.01ms) transition.
           style={place ? { top: place.top, left: place.left } : { top: -9999, left: -9999 }}
-          className="fixed z-40 w-56 max-w-[calc(100vw-2rem)] rounded-control border border-border bg-bg py-1 shadow-lg"
+          className="fixed z-[var(--ops-z-menu,40)] w-56 max-w-[calc(100vw-2rem)] rounded-control border border-border bg-bg py-1 shadow-lg"
         >
           {listed.map((app) => {
             const isCurrent = app.id === current;

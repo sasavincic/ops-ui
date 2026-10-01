@@ -684,7 +684,7 @@ describe("sync helpers", () => {
 
   it("module exports: runtime and type names in source order", () => {
     expect(moduleExports(readSource("src/components/button.tsx"))).toEqual({
-      runtime: ["Button", "ButtonLink", "ExternalButtonLink", "FileLink", "AdminIconButton"],
+      runtime: ["Button", "ButtonLink", "ExternalButtonLink", "FileLink", "IconButton", "AdminIconButton"],
       types: [],
     });
     expect(moduleExports(readSource("src/components/badge.tsx"))).toEqual({ runtime: ["Badge"], types: ["BadgeVariant"] });

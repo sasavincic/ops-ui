@@ -3,6 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useReadOnlyScope } from "../config/read-only";
 import { controlClasses } from "./field";
+import { CONTROL_SIZE_CLASS, TOUCH_FLOOR, type ControlSize } from "../lib/touch";
 import {
   isIsoDate,
   localTodayIso,
@@ -73,6 +74,7 @@ export function DateInput({
   className,
   readOnlySafe,
   "aria-label": ariaLabel,
+  size = "md",
 }: {
   id?: string;
   name?: string;
@@ -90,6 +92,8 @@ export function DateInput({
   className?: string;
   readOnlySafe?: boolean;
   "aria-label"?: string;
+  /** The field's size (1.3.0): "md" (default) or "lg" (48px, 16px text). */
+  size?: ControlSize;
 }) {
   const { strings } = useOpsUi();
   const dp = strings.datePicker;
@@ -349,7 +353,7 @@ export function DateInput({
         required={required}
         disabled={off}
         value={text}
-        className={cn(controlClasses, "h-9 pr-9 tabular-nums")}
+        className={cn(controlClasses, CONTROL_SIZE_CLASS[size], "pr-9 tabular-nums", TOUCH_FLOOR.height, TOUCH_FLOOR.text)}
         onClick={() => {
           if (!open) openCalendar(false);
         }}
@@ -423,7 +427,7 @@ export function DateInput({
             "bg-bg",
             coarse
               ? "mx-auto w-full max-w-[24rem]"
-              : "fixed z-50 w-[18.5rem] rounded-container border border-border p-3 shadow-lg"
+              : "fixed z-[var(--ops-z-calendar,50)] w-[18.5rem] rounded-container border border-border p-3 shadow-lg"
           )}
           onKeyDown={(e) => {
             if (e.key === "Escape") {

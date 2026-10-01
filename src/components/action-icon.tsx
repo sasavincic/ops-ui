@@ -53,6 +53,9 @@ const paths: Record<ActionIconName, string> = {
   user: "M10.5 4a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0M2 14v-2a6 6 0 0 1 12 0v2",
   bed: "M2 4v10M14 7v7M2 11h12M2 7h12M5 7V5H2",
   refresh: "M13 6a5 5 0 0 0-9-3L2 5M2 2v3h3M3 10a5 5 0 0 0 9 3l2-2M11 11h3v3",
+  // 1.3.0: an action the AI does for you (draft, read a scan), and an e-mail to compose.
+  sparkle: "M6.5 2c.5 2.8 1.7 4 4.5 4.5-2.8.5-4 1.7-4.5 4.5C6 8.2 4.8 7 2 6.5 4.8 6 6 4.8 6.5 2zM12 10v4M10 12h4",
+  mail: "M2 3.5h12v9H2zM2.5 4 8 8.5 13.5 4",
 };
 export type { ActionIconName };
 

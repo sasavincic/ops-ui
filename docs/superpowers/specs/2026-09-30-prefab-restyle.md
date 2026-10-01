@@ -110,7 +110,7 @@ The counts were re-checked against the working tree the same day. There are 26 c
 |---|---|---|
 | **C1** | **The Prefab security tranche is merged into `main` and deployed.** Its migrations are applied in the order the tranche states, and CSP report-only is live. The tranche (P1–P8): builder API key, office auth fail-closed + `requireOfficeUser`, workshop passcode throttle, RLS lock-down + signed upload URLs, MFA + admin/editor roles, security headers + CSP report-only, integration caller log, office audit log. It lives today on `claude/trusting-keller-r5bi2t`, with work continuing. | `git log main` contains the tranche's final head. The Vercel production deployment of that merge is READY. The tranche's post-deploy checklist is done. |
 | **C2** | **P0 (Next 16) is merged, deployed and has run ≥ 1 working day in production** without a regression. It needs R0 first (§3). | Deploy READY; runtime logs clean; the PrefabOps entry in the suite's decision log. |
-| **C3** | **The library is ready.** ops-ui ≥ 1.1.0 is released. WFO in production and FinaOps on `main` are on ≥ 1.1.0 with no open regression (library spec §13.1.1). **M1 is released before P2; M2 before P4.1; M3 before P4.4a** (§10.2). | The library's `CHANGELOG.md` and each app's `ops-ui.lock.json` |
+| **C3** | **The library is ready.** ops-ui ≥ 1.1.0 is released. WFO in production and FinaOps on `main` are on ≥ 1.1.0 with no open regression (library spec §13.1.1). **M1 is released before P2; M2 before P4.1; M3 before P4.4a** (§10.2; M1 + M2 shipped together as 1.3.0, M3 = 1.4.0). | The library's `CHANGELOG.md` and each app's `ops-ui.lock.json` |
 | **C4** | **R0 is merged:** the local environment, the fixtures, the drift migration, the vitest `@` alias, and baseline captures that can be made from `main`. | `dev/local/README.md` steps work from a fresh container |
 | **C5** | **Workshop tablets run iOS/Safari ≥ 16.4.** That is the support floor of Next 16 and also of Tailwind v4 and the kit's OKLCH tokens. | Checked once during P0. A tablet below it is updated before P2. |
 | **C6** | **No other in-flight change touches the files of the step being migrated.** | The §15 progress table marks the area "in migration" with its branch; other sessions read it (CLAUDE.md note, §11). |
@@ -404,7 +404,7 @@ A family, section or stylesheet is deleted when **both** of these hold:
 ### P2: Tailwind and the vendored kit, without the global reset (0 changed pixels)
 
 1. **Dependencies** (WFO's versions): `tailwindcss`, `@tailwindcss/postcss`, `class-variance-authority`, `clsx`, `tailwind-merge`. Plus `postcss.config.mjs`.
-2. **Sync.** `ops-ui.config.json` gets `vendorDir: src/vendor/ops-ui`, `source: ../../../ops-ui`, `globalsCss: src/app/app.css`, `brandCss: src/app/brand.css`, no extensions, no local files. `bindings` lists the only files allowed to import `@/vendor/ops-ui` directly: `src/components/ui/**`, `src/components/app-providers.tsx`, `src/app/dev/kit/**` and `src/components/ui/*.test.ts`. Copy `scripts/sync-ops-ui.mjs` once by hand, then run `node scripts/sync-ops-ui.mjs --version 1.2.0` (M1) and `--write-wrappers`. Add `.gitattributes` (vendor folder marked `linguist-generated`).
+2. **Sync.** `ops-ui.config.json` gets `vendorDir: src/vendor/ops-ui`, `source: ../../../ops-ui`, `globalsCss: src/app/app.css`, `brandCss: src/app/brand.css`, no extensions, no local files. `bindings` lists the only files allowed to import `@/vendor/ops-ui` directly: `src/components/ui/**`, `src/components/app-providers.tsx`, `src/app/dev/kit/**` and `src/components/ui/*.test.ts`. Copy `scripts/sync-ops-ui.mjs` once by hand, then run `node scripts/sync-ops-ui.mjs --version 1.3.0` (M1 + M2) and `--write-wrappers`. Add `.gitattributes` (vendor folder marked `linguist-generated`).
 3. **CSS.** `app.css` as in §5.1. `layout.tsx` imports it instead of the 17 files.
 4. **`brand.css`** with the D3 palette (§9.8). It must pass the §8.5 contract checks in `checkVendor`.
 5. **Fonts.** Geist and Geist Mono through `next/font/google` with `latin-ext`, as the variables `--font-geist-sans` / `--font-geist-mono` on `<html>`. The legacy body keeps its own font stack, so only kit islands use Geist.
@@ -524,7 +524,7 @@ About 2.8k TSX lines.
 |---|---|
 | `dash-finance-*`, `dash-group-*` | Prefab-owned `StatTile` + `ProgressBar` (share bar) in `Card`s with a `Kicker` |
 | `dash-attention-*` | `Table` rows with a status `Badge` + the kit `AttentionList` line for the reason |
-| `register-toolbar/-search/-filter/-chip/-menu/-filter-sheet/-archive` | Prefab-owned `ListToolbar` (D13): `SearchInput`, inline `Select`s from `lg`, a staged Filters `Dialog presentation="sheet"` on phones, the archived scope as a summary-line link ("9 projects · 1 archived hidden") |
+| `register-toolbar/-search/-filter/-chip/-menu/-filter-sheet/-archive` | Prefab-owned `ListToolbar` (D13): `SearchInput`, inline `Select`s from `lg`, a staged Filters `Dialog` on phones (a bottom sheet there since library 1.0), the archived scope as a summary-line link ("9 projects · 1 archived hidden") |
 | `register-view` Board/List | `Segmented` (controlled, today's client state kept) |
 | `kb-*` | Prefab-owned `KanbanBoard` (`@dnd-kit` kept, desktop only): columns grouped under phase `Kicker`s, cards = kit tokens + `Badge` + `Tag` |
 | `list-*` rows, `list-docs-*` | `Table/THead/TBody/TR/TH/TD/RowLink` with the WFO phone fold; `EmptyState` (never repeats the page's create); `DocsProgress` → Prefab-owned `PipelineMarkers` |
@@ -544,7 +544,7 @@ About 2.8k TSX lines.
 
 **Prefab-owned components built here:** `StatTile`, `ProgressBar`, `ListToolbar`, `KanbanBoard`, `PipelineMarkers`, `project-status-meta.ts`.
 
-**Needs:** M2 (`Dialog presentation="sheet"`, `IconButton`).
+**Needs:** M2 (`IconButton`, library 1.3.0).
 
 **Expected:**
 - status colours by meaning;
@@ -568,7 +568,7 @@ About 1.5k settings lines plus the dialog portions.
 
 | Legacy family | Becomes |
 |---|---|
-| `.modal-backdrop > .modal-panel(-wide)` + `useBodyScrollLock` + `useDialogFocus` | `Dialog presentation="sheet"` (bottom sheet on phones, sticky safe-area footer, ✕ close) |
+| `.modal-backdrop > .modal-panel(-wide)` + `useBodyScrollLock` + `useDialogFocus` | `Dialog` (a bottom sheet on phones since library 1.0: sticky safe-area footer, ✕ close) |
 | `.field-group(-wide)`, `.field-toggle`, `.field-hint-inline`, `.settings-input`, `.form-message` | `Field` + `Input` / `Select` / `Textarea` / `Checkbox` / `Switch` / `CheckTile` / `FileInput`; record picks → `Combobox` |
 | `.project-form-grid` | Tailwind grid utilities (`grid gap-4 sm:grid-cols-2`) |
 | `.form-actions` | `DialogFooter` (pages: an action row in `PageHeader actions`) |
@@ -583,7 +583,7 @@ About 1.5k settings lines plus the dialog portions.
 
 The Settings Welding tab stays legacy until 7.5, so `/settings` keeps the legacy canvas; the tab strip and the migrated panels are islands.
 
-**Needs:** M2 (`presentation="sheet"`, `mail` glyph for the handover composer).
+**Needs:** M2 (`mail` glyph for the handover composer, library 1.3.0).
 
 **Expected:**
 - dialogs in the kit look;
@@ -662,7 +662,7 @@ The welding blocks inside the documentation page (welding section, WPS section, 
 | Legacy family | Becomes |
 |---|---|
 | `wpqr-list/-row` | `Table` + `RowMenu` (archive, delete) + `FileLink` (PDF) |
-| `wpqr-form`, `wpqr-checkbox`, `wps-form` | `Dialog presentation="sheet"` + `Field` grid + `CheckTile` |
+| `wpqr-form`, `wpqr-checkbox`, `wps-form` | `Dialog` + `Field` grid + `CheckTile` |
 | `wps-layer(s)` | `ReviewGrid` (dense editable layers) |
 | tab-strip fade | kit `Tabs` (done in 7.3) |
 
@@ -820,14 +820,14 @@ Every control is `size="lg"` (48px, 16px text) at every width, matching the port
 | `notify.info(text)`: 6 s | `pushToast(text, "info")`: **stays until dismissed** (3 calls; D7) |
 | label words "Attention / Updated / Notice" | glyph only (`problem` / `check` / `info`) |
 | max 4 (2 on phones); the same text restarts its clock | kit: max 4; the same message replaces the earlier one |
-| phones: above the tab bar; moves to the top while a sheet or the keyboard is open | above the tab bar (`--ops-toast-offset`); inside an open kit `Dialog` the stack is drawn inside it, at the top of the sheet on phones (M2 `presentation="sheet"`); above legacy sheets through `--ops-z-toast` |
+| phones: above the tab bar; moves to the top while a sheet or the keyboard is open | above the tab bar (`--ops-toast-offset`); inside an open kit `Dialog` the stack is drawn inside it, at the top of the sheet on phones (the 1.0 bottom-sheet Dialog); above legacy sheets through `--ops-z-toast` |
 | `FloatingPromptBridge` | deleted (used only by a test) |
 
 `fetchSafely` and the "notifications, never inline alerts" rule are unchanged: the kit toast *is* that rule.
 
 ### 9.2 Modals and confirms
 
-- **Hand-rolled modals (16 files)** become `Dialog presentation="sheet"` for forms and pickers, and `Sheet` for the large material-cost review.
+- **Hand-rolled modals (16 files)** become `Dialog` (a bottom sheet on phones) for forms and pickers, and `Sheet` for the large material-cost review.
 - **The 26 confirm prompts** become `ConfirmDialog`, or `InlineConfirm` when the prompt comes from inside an open dialog.
 - **`useBodyScrollLock` and `useDialogFocus` retire.** Native `<dialog>` does both.
 - **Busy dialogs:** "Escape closes unless busy" becomes ✕ only, with the busy state shown as the `DialogFooter` `pending` label (D6).
@@ -992,7 +992,7 @@ A gap becomes a **library component** when it is a primitive whose interaction, 
 |---|---|---|---|
 | G1 | Dark theme | **Dropped** (D4) | 7.1 |
 | G2 | Touch floor (44px, 16px inputs on coarse pointers) and a large size (48px) | **Library M2:** opt-in `[data-ops-touch]` floor on Button / Input / Select / Combobox / DateInput / Segmented / RowMenu / IconButton; `size="lg"` | 7.1 (floor), 7.8 (`lg`) |
-| G3 | Bottom-sheet dialogs on phones, with a sticky safe-area footer | **Library M2:** `Dialog presentation="sheet"` (full width, rounded top, sticky footer with `env(safe-area-inset-bottom)`; toast host at the top of the sheet on phones) | 7.2 |
+| G3 | Bottom-sheet dialogs on phones, with a sticky safe-area footer | **Done by library 1.0:** every `Dialog` is a bottom sheet below `sm` (full width, rounded top, footer pinned above the safe area), so no `presentation` prop was needed (1.3.0 CHANGELOG) | 7.2 |
 | G4 | Icon-only button | **Library M2:** `IconButton` (required `label` → `aria-label` + `title`; square at `sm` / `md` / `lg`; honours the touch floor) | 7.2 |
 | G5 | Spinner / pending state | **Convention:** the `pending` label + disabled (`DialogFooter pending`, `Button disabled` with "Generating…"). This is already Prefab's rule ("progress lives in the triggering button's label"). No spinner component. | every area |
 | G6 | Progress bar, steps | **Prefab-owned** `ProgressBar`, `PipelineStepper`, `PipelineMarkers`, `StatusGauge` | 7.2, 7.4a, 7.6a |
@@ -1015,12 +1015,11 @@ A gap becomes a **library component** when it is a primitive whose interaction, 
 
 ### 10.2 Library minors, batched
 
-Each minor is additive, with **0 changed pixels on every existing gallery baseline**, and needs no action from WFO or FinaOps: they sync whenever they like. Version numbers assume 1.1.0 is the AppSwitcher / ValidityCell release. If another minor lands in between, the numbers shift and the content stays the same.
+Each minor is additive, with **0 changed pixels on every existing gallery baseline**, and needs no action from WFO or FinaOps: they sync whenever they like. The real version numbers (2026-10-01): 1.1.0 was the AppSwitcher / ValidityCell release and 1.2.0 the primitives release of the styling programme, so M1 and M2 shipped together as **1.3.0** and M3 is next.
 
 | Minor | Content | Needed before |
 |---|---|---|
-| **M1 = 1.2.0** | `styles/preflight-scoped.css`; stacking variables `--ops-z-*` (G18) | P2 (sync), P3 (stacking) |
-| **M2 = 1.3.0** | `[data-ops-touch]` coarse floor + `size="lg"` (G2); `Dialog presentation="sheet"` (G3); `IconButton` (G4); `ActionIcon` `sparkle`, `mail` (G17) | P4.1 |
+| **M1 + M2 = 1.3.0** (released 2026-10-01) | M1: `styles/preflight-scoped.css` (G19); stacking variables `--ops-z-toast` / `-calendar` / `-menu` / `-sheet`, defaults 60 / 50 / 40 / 40 (G18). M2: `[data-ops-touch]` coarse floor + `size="lg"` on Button and the input family (G2); `IconButton` in `components/button.tsx` (G4); `ActionIcon` `sparkle`, `mail` (G17). G3 needed nothing: every Dialog is a bottom sheet below `sm` since 1.0.0, so there is no `presentation` prop. | P2 (sync), P3 (stacking), P4.1 |
 | **M3 = 1.4.0** | `Input` prefix / suffix (G10); `YearInput` (G13); `RowMenu` `trigger` + `sections` (G8) | P4.4a |
 
 **PrefabOps and library 2.0.** PrefabOps takes 2.0 (the batched visible fixes) whenever it lands. Because every hand-built Cancel inside a Dialog already carries `data-ops-dismiss` (§9.2) and PrefabOps uses no `MonthNav`, its 2.0 upgrade steps are expected to be empty.
@@ -1057,7 +1056,7 @@ Each minor is additive, with **0 changed pixels on every existing gallery baseli
 > **Mobile and touch.**
 > - Tailwind breakpoints: sm 640 / md 768 / lg 1024 / xl 1280. The phone layout is below `md`.
 > - `<html data-ops-touch>` keeps every control ≥ 44px and every text input ≥ 16px on coarse pointers. The workshop portal uses `size="lg"` (48px) at every width.
-> - Dialogs use `presentation="sheet"`: a bottom sheet on phones with a sticky footer, closed with ✕. A hand-built Cancel carries `data-ops-dismiss`.
+> - Dialogs are the kit `Dialog`: a bottom sheet on phones with a sticky footer, closed with ✕. A hand-built Cancel carries `data-ops-dismiss`.
 > - Sticky bottom bars sit at `bottom: calc(var(--tab-bar-h, 64px) + var(--safe-bottom))`. Content edges use `var(--page-gutter)` plus the safe areas.
 >
 > **Page language (kept):**

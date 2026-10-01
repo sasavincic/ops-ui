@@ -51,9 +51,10 @@ describe("DialogFooter", () => {
     expect(tagOf(html, "Cancel")).not.toContain("data-ops-commit");
     expect(tagOf(html, "Save changes")).toContain('data-ops-commit=""');
     expect(tagOf(html, "Save changes")).not.toContain("data-ops-dismiss");
-    // Without the markers the markup is the 1.0 markup.
+    // Without the markers the markup is the 1.0 markup (no other data-ops attribute; the 1.3
+    // touch floor's in-data-ops-touch is a class, not an attribute).
     const strip = (s: string) => s.replace(/ data-ops-(dismiss|commit)=""/g, "");
-    expect(strip(html)).not.toContain("data-ops");
+    expect(strip(html)).not.toMatch(/ data-ops-[a-z-]+=/);
   });
 
   it("speaks the provider's words", () => {

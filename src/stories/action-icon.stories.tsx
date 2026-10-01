@@ -1,7 +1,7 @@
 "use client";
 
 import { ActionIcon, ActionIconScope } from "../components/action-icon";
-import { Button, FileLink } from "../components/button";
+import { Button, FileLink, IconButton } from "../components/button";
 import type { ActionIconName } from "../types";
 import type { Story } from "./index";
 import { Row, Stack } from "./story-layout";
@@ -24,6 +24,33 @@ export const stories: Story[] = [
           </span>
         ))}
       </div>
+    ),
+  },
+  {
+    // The Glyphs list above stays the 1.2 vocabulary so its baseline never moves; each later
+    // glyph is shown here.
+    name: "Added in 1.3",
+    render: () => (
+      <Stack>
+        <Row label="glyphs">
+          {(["sparkle", "mail"] as const).map((name) => (
+            <span key={name} className="inline-flex items-center gap-2 text-detail text-ink">
+              <ActionIcon name={name} />
+              {name}
+            </span>
+          ))}
+        </Row>
+        <Row label="in use">
+          <Button icon="sparkle" variant="secondary">
+            Draft with AI
+          </Button>
+          <Button icon="mail" variant="ghost">
+            Compose e-mail
+          </Button>
+          <IconButton icon="sparkle" label="Read the scan" />
+          <IconButton icon="mail" label="E-mail the client" />
+        </Row>
+      </Stack>
     ),
   },
   {
