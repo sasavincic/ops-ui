@@ -5,7 +5,7 @@ import { STORY_GROUPS, storyId } from "../../src/stories";
 // Behaviour the screenshots cannot prove (spec §11.1 "behaviour", §12.0 G4 by hand, automated
 // here): the Dialog and Sheet discard prompts, toast lifetimes, the toast hooks and Field messages
 // (localized, re-raised, taken away on unmount), DateInput typing and calendar,
-// Combobox matching and keyboard, RowMenu placement, MonthNav, Segmented at 375 and the
+// Combobox matching and keyboard, RowMenu placement, the AppSwitcher menu, MonthNav, Segmented at 375 and the
 // read-only default-deny. One brand is enough: behaviour does not depend on colour.
 
 const FIXED_NOW = new Date("2026-09-30T10:00:00");
@@ -360,6 +360,71 @@ test.describe("desktop behaviour", () => {
     [b, m] = [await button.boundingBox(), await menu.boundingBox()];
     expect(m!.y + m!.height).toBeLessThanOrEqual(b!.y);
     await page.mouse.click(5, 5);
+    await expect(menu).toBeHidden();
+  });
+
+  test("AppSwitcher: the menu lists the apps with a URL, the current one without a link; keyboard, Tab, Escape and an outside press close it", async ({ page }) => {
+    await open(page, "app-switcher--closed");
+    const trigger = page.getByRole("button", { name: "Switch app: Workforce Ops" });
+    await expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await trigger.click();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    const menu = page.getByRole("menu", { name: "Switch app" });
+    await expect(menu).toBeVisible();
+    const [b, m] = [await trigger.boundingBox(), await menu.boundingBox()];
+    expect(m!.y).toBeGreaterThanOrEqual(b!.y + b!.height);
+
+    // FinaOps has no URL (a demo until the end of 2026): not listed. The current app has no link.
+    const items = menu.getByRole("menuitem");
+    await expect(items).toHaveText(["Workforce Ops", "PrefabOps"]);
+    await expect(menu.getByText("FinaOps")).toHaveCount(0);
+    const current = items.nth(0);
+    await expect(current).toHaveAttribute("aria-current", "page");
+    await expect(current).toHaveAttribute("title", "Current app");
+    expect(await current.evaluate((el) => el.tagName)).toBe("SPAN");
+    await expect(menu.getByRole("link")).toHaveCount(0); // a role="menuitem" anchor is not a "link"
+    const prefab = items.nth(1);
+    expect(await prefab.evaluate((el) => el.tagName)).toBe("A");
+    await expect(prefab).toHaveAttribute("href", "https://prefab-ops-platform.vercel.app");
+    await expect(prefab).not.toHaveAttribute("target", /.+/);
+
+    // Keyboard: the menu opens on the current app; arrows wrap, Home / End.
+    await expect(current).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(prefab).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(current).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await expect(prefab).toBeFocused();
+    await page.keyboard.press("Home");
+    await expect(current).toBeFocused();
+    await page.keyboard.press("End");
+    await expect(prefab).toBeFocused();
+
+    // Escape closes and returns focus to the trigger.
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(trigger).toBeFocused();
+    await expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    // ArrowDown on the trigger opens it; Tab closes it.
+    await page.keyboard.press("ArrowDown");
+    await expect(menu).toBeVisible();
+    await expect(current).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(menu).toBeHidden();
+
+    // Enter on the trigger opens it; an outside press closes it.
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    await expect(menu).toBeVisible();
+    await page.mouse.click(1000, 600);
+    await expect(menu).toBeHidden();
+
+    // A click on the trigger toggles it.
+    await trigger.click();
+    await expect(menu).toBeVisible();
+    await trigger.click();
     await expect(menu).toBeHidden();
   });
 

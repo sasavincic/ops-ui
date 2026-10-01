@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { stories as actionIcon } from "./action-icon.stories";
+import { stories as appSwitcher } from "./app-switcher.stories";
 import { stories as attentionList } from "./attention-list.stories";
 import { stories as backLink } from "./back-link.stories";
 import { stories as badge } from "./badge.stories";
@@ -34,6 +35,7 @@ import { stories as tabs } from "./tabs.stories";
 import { stories as tag } from "./tag.stories";
 import { stories as toast } from "./toast.stories";
 import { stories as urlSelect } from "./url-select.stories";
+import { stories as validityCell } from "./validity-cell.stories";
 
 /**
  * One rendered state of a component, shot by the gallery (every story x brand x
@@ -55,6 +57,7 @@ export type StoryGroup = { component: string; stories: readonly Story[] };
  */
 export const STORY_GROUPS: readonly StoryGroup[] = [
   { component: "action-icon", stories: actionIcon },
+  { component: "app-switcher", stories: appSwitcher },
   { component: "attention-list", stories: attentionList },
   { component: "back-link", stories: backLink },
   { component: "badge", stories: badge },
@@ -89,6 +92,7 @@ export const STORY_GROUPS: readonly StoryGroup[] = [
   { component: "tag", stories: tag },
   { component: "toast", stories: toast },
   { component: "url-select", stories: urlSelect },
+  { component: "validity-cell", stories: validityCell },
 ];
 
 /** URL-safe id of a story: `button--matrix`, `dialog--open-with-error`. */

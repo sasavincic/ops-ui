@@ -17,7 +17,7 @@ const ALL = STORY_GROUPS.flatMap((group) => group.stories.map((story) => ({ grou
 
 describe("stories", () => {
   it("one group per component file, in file order, each with at least one story", () => {
-    expect(COMPONENTS).toHaveLength(35);
+    expect(COMPONENTS).toHaveLength(37);
     expect(STORY_GROUPS.map((g) => g.component)).toEqual(COMPONENTS);
     for (const group of STORY_GROUPS) expect(group.stories.length, group.component).toBeGreaterThan(0);
   });

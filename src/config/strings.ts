@@ -1,6 +1,7 @@
 // The words the kit itself says (spec §6.1): exactly the `common.*` keys the
 // two apps' kits read today, 17 top-level strings plus 16 for the date
-// picker. An app feeds its own dictionary through OpsUiProvider; outside a
+// picker, and since 1.1 three optional groups with English defaults (EN_OPTIONAL_STRINGS):
+// tabs, appSwitcher, validity. An app feeds its own dictionary through OpsUiProvider; outside a
 // provider (a root-layout Toaster, a login page) the kit speaks EN_STRINGS.
 // Per-call label props (closeLabel, openLabel, pendingLabel, clearLabel)
 // still win over these.
@@ -46,6 +47,24 @@ export type OpsUiStrings = {
     /** Template with {date}. */
     latest: string;
   };
+  /** 1.1, optional: the Tabs nav's accessible name. Default "Tabs". */
+  tabs?: string;
+  /** 1.1, optional: the AppSwitcher's words. Default EN_OPTIONAL_STRINGS.appSwitcher. */
+  appSwitcher?: {
+    /** The trigger's accessible name, before the current app's name ("Switch app"). */
+    label: string;
+    /** The title of the current app's entry ("Current app"). */
+    current: string;
+  };
+  /** 1.1, optional: ValidityCell / ValidityNote. Default EN_OPTIONAL_STRINGS.validity. */
+  validity?: {
+    /** Template with {days}. */
+    expiredAgo: string;
+    /** Template with {days}. */
+    expiresIn: string;
+    unknown: string;
+    noExpiry: string;
+  };
 };
 
 /** Today's Workforce Ops en `common` values (FinaOps' en values are identical). */
@@ -84,5 +103,23 @@ export const EN_STRINGS: OpsUiStrings = {
     clear: "Clear",
     earliest: "Earliest {date}",
     latest: "Latest {date}",
+  },
+};
+
+/**
+ * The English defaults of the optional strings (1.1). EN_STRINGS stays exactly the apps' `common`
+ * words of 1.0; a component reads `strings.x ?? EN_OPTIONAL_STRINGS.x`, so an app that passes no
+ * value renders what it rendered before. The validity words are Workforce Ops' English
+ * (`workers.compliance.expiredAgo` / `expiresIn`, `compliance.desk.unknown`,
+ * `statuses.expiry.no_expiry`).
+ */
+export const EN_OPTIONAL_STRINGS: Required<Pick<OpsUiStrings, "tabs" | "appSwitcher" | "validity">> = {
+  tabs: "Tabs",
+  appSwitcher: { label: "Switch app", current: "Current app" },
+  validity: {
+    expiredAgo: "expired {days} d ago",
+    expiresIn: "in {days} d",
+    unknown: "Validity unknown",
+    noExpiry: "No expiry",
   },
 };

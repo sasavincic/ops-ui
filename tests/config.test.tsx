@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { CopyValue } from "../src/components/copy-value";
 import { OpsUiProvider, useOpsUi } from "../src/config/provider";
-import { EN_STRINGS, type OpsUiStrings } from "../src/config/strings";
+import { EN_OPTIONAL_STRINGS, EN_STRINGS, type OpsUiStrings } from "../src/config/strings";
 
 // The runtime contract (spec §6.1): the words the kit says (OpsUiStrings / EN_STRINGS) and the
 // provider an app mounts inside its own I18nProvider (strings, localize, locale). The read-only
@@ -53,7 +53,11 @@ const DATE_PICKER_KEYS = [
   "latest",
 ] as const satisfies readonly (keyof OpsUiStrings["datePicker"])[];
 type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-const topKeysAreAll: Exact<(typeof TOP_KEYS)[number], Exclude<keyof OpsUiStrings, "datePicker">> = true;
+/** The optional groups 1.1 added (spec §6.1), each with an English default. */
+const OPTIONAL_KEYS = ["tabs", "appSwitcher", "validity"] as const satisfies readonly (keyof OpsUiStrings)[];
+const topKeysAreAll: Exact<(typeof TOP_KEYS)[number], Exclude<keyof OpsUiStrings, "datePicker" | (typeof OPTIONAL_KEYS)[number]>> = true;
+type OptionalKeys = { [K in keyof OpsUiStrings]-?: undefined extends OpsUiStrings[K] ? K : never }[keyof OpsUiStrings];
+const optionalKeysAreAll: Exact<(typeof OPTIONAL_KEYS)[number], OptionalKeys> = true;
 const datePickerKeysAreAll: Exact<(typeof DATE_PICKER_KEYS)[number], keyof OpsUiStrings["datePicker"]> = true;
 
 describe("config/strings (spec §6.1)", () => {
@@ -63,6 +67,20 @@ describe("config/strings (spec §6.1)", () => {
     expect(DATE_PICKER_KEYS).toHaveLength(16);
     expect(Object.keys(EN_STRINGS).sort()).toEqual([...TOP_KEYS, "datePicker"].sort());
     expect(Object.keys(EN_STRINGS.datePicker).sort()).toEqual([...DATE_PICKER_KEYS].sort());
+  });
+
+  it("1.1's optional strings: exactly tabs, appSwitcher, validity, each with an English default outside EN_STRINGS", () => {
+    expect(optionalKeysAreAll).toBe(true);
+    // EN_STRINGS stays the apps' 1.0 `common` words; the defaults live beside it.
+    for (const key of OPTIONAL_KEYS) expect(key in EN_STRINGS, key).toBe(false);
+    expect(Object.keys(EN_OPTIONAL_STRINGS).sort()).toEqual([...OPTIONAL_KEYS].sort());
+    expect(EN_OPTIONAL_STRINGS).toEqual({
+      tabs: "Tabs",
+      appSwitcher: { label: "Switch app", current: "Current app" },
+      // Workforce Ops' en words (workers.compliance.expiredAgo / expiresIn, compliance.desk.unknown,
+      // statuses.expiry.no_expiry).
+      validity: { expiredAgo: "expired {days} d ago", expiresIn: "in {days} d", unknown: "Validity unknown", noExpiry: "No expiry" },
+    });
   });
 
   it("every English string is a non-empty string", () => {
@@ -86,8 +104,9 @@ describe("config/strings (spec §6.1)", () => {
     expect(read("src/components/toast.tsx")).toContain(`closeLabel = "${EN_STRINGS.close}"`);
     expect(read("src/components/glance-card.tsx")).toContain(`openLabel = "${EN_STRINGS.open}"`);
     expect(read("src/components/toast.tsx")).toMatch(new RegExp(`closeLabel = "${EN_STRINGS.close}"[^]*closeLabel = "${EN_STRINGS.close}"`));
-    // "Tabs" has no EN_STRINGS key in 1.0: it becomes the optional strings.tabs (default "Tabs") in 1.1.
-    expect(read("src/components/tabs.tsx")).toContain('aria-label="Tabs"');
+    // "Tabs" had no EN_STRINGS key in 1.0; since 1.1 it is the optional strings.tabs, read by
+    // the client leaf the server-safe Tabs renders its links into.
+    expect(read("src/config/tabs-nav.tsx")).toContain("strings.tabs ?? EN_OPTIONAL_STRINGS.tabs");
   });
 
   it("every string the kit reads is a key of OpsUiStrings", () => {
@@ -103,10 +122,12 @@ describe("config/strings (spec §6.1)", () => {
       "month-nav",
       "sheet",
       "toast",
+      "app-switcher",
+      "validity-cell",
     ]) {
       for (const m of read(`src/components/${file}.tsx`).matchAll(/\bstrings\.([a-zA-Z]+)/g)) used.add(m[1]);
     }
-    expect([...used].filter((key) => !(key in EN_STRINGS))).toEqual([]);
+    expect([...used].filter((key) => !(key in EN_STRINGS) && !(key in EN_OPTIONAL_STRINGS))).toEqual([]);
     expect(used.size).toBeGreaterThan(10);
   });
 });

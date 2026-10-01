@@ -17,7 +17,7 @@ describe("DialogFooter", () => {
   it("ghost Cancel first, the commit rightmost, secondary by default", () => {
     const html = renderToStaticMarkup(<DialogFooter onClose={noop} submitLabel="Save changes" />);
     expect(buttons(html)).toEqual(["Cancel", "Save changes"]);
-    expect(html).toMatch(/<button class="[^"]*border-border-strong[^"]*" type="submit">/);
+    expect(html).toMatch(/<button class="[^"]*border-border-strong[^"]*" type="submit" data-ops-commit="">/);
     expect(html).toContain('data-action-icon="close"');
     expect(html).toContain('data-action-icon="check"');
   });
@@ -36,6 +36,24 @@ describe("DialogFooter", () => {
     const html = renderToStaticMarkup(<DialogFooter onClose={noop} submitLabel="Confirm" closeLabel="Back to form" />);
     expect(buttons(html)).toEqual(["Back to form", "Confirm"]);
     expect(html).toContain('data-action-icon="back"');
+    // It keeps the user's work: not a dismiss (1.1 markers, spec §12.4).
+    expect(html).not.toContain("data-ops-dismiss");
+    expect(html.match(/data-ops-commit=""/g)).toHaveLength(1);
+  });
+
+  it("1.1 markers: the Cancel is data-ops-dismiss, the commit data-ops-commit (attributes only)", () => {
+    const tagOf = (html: string, label: string) => {
+      const m = new RegExp(`<button([^>]*)>(?:(?!</button>).)*${label}</button>`).exec(html);
+      return m?.[1] ?? "";
+    };
+    const html = renderToStaticMarkup(<DialogFooter onClose={noop} onSubmit={noop} submitLabel="Save changes" />);
+    expect(tagOf(html, "Cancel")).toContain('data-ops-dismiss=""');
+    expect(tagOf(html, "Cancel")).not.toContain("data-ops-commit");
+    expect(tagOf(html, "Save changes")).toContain('data-ops-commit=""');
+    expect(tagOf(html, "Save changes")).not.toContain("data-ops-dismiss");
+    // Without the markers the markup is the 1.0 markup.
+    const strip = (s: string) => s.replace(/ data-ops-(dismiss|commit)=""/g, "");
+    expect(strip(html)).not.toContain("data-ops");
   });
 
   it("speaks the provider's words", () => {
@@ -70,6 +88,9 @@ describe("Dialog and ConfirmDialog on the server", () => {
     expect(html).toContain("Delete A1 for Hodžić?");
     expect(buttons(html).slice(-2)).toEqual(["Cancel", "Delete"]);
     expect(html).toContain("bg-danger");
+    // Its buttons are DialogFooter's, so they carry the 1.1 markers too.
+    expect(html.match(/data-ops-dismiss=""/g)).toHaveLength(1);
+    expect(html.match(/data-ops-commit=""/g)).toHaveLength(1);
   });
 
   it("InlineConfirm: one quiet button, then the question in place", () => {

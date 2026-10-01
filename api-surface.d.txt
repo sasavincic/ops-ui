@@ -14,6 +14,16 @@ export declare function ActionIcon({ name, className, always, }: {
     always?: boolean;
 }): import("react").JSX.Element | null;
 
+// src/components/app-switcher.d.ts
+import { type OpsApp, type OpsAppId } from "../lib/apps";
+export type { OpsApp, OpsAppId };
+export declare function AppSwitcher({ current, mark, apps, className, }: {
+    current: OpsAppId;
+    mark: React.ReactNode;
+    apps?: readonly OpsApp[];
+    className?: string;
+}): import("react").JSX.Element;
+
 // src/components/attention-list.d.ts
 import { type StatusIconName } from "./status-icon";
 export type AttentionItem = {
@@ -540,6 +550,24 @@ export declare function UrlSelect({ param, value, options, label, reset, classNa
     className?: string;
 }): import("react").JSX.Element;
 
+// src/components/validity-cell.d.ts
+export declare function ValidityNote({ date, today, noExpiry, warnDays, label, className, }: {
+    date: string | null;
+    today: string;
+    noExpiry?: boolean;
+    warnDays?: number;
+    label?: string;
+    className?: string;
+}): import("react").JSX.Element | null;
+export declare function ValidityCell({ date, today, noExpiry, warnDays, label, className, }: {
+    date: string | null;
+    today: string;
+    noExpiry?: boolean;
+    warnDays?: number;
+    label?: string;
+    className?: string;
+}): import("react").JSX.Element;
+
 // src/config/provider.d.ts
 import { type OpsUiStrings } from "./strings";
 export type OpsUiConfig = {
@@ -596,8 +624,36 @@ export type OpsUiStrings = {
         earliest: string;
         latest: string;
     };
+    tabs?: string;
+    appSwitcher?: {
+        label: string;
+        current: string;
+    };
+    validity?: {
+        expiredAgo: string;
+        expiresIn: string;
+        unknown: string;
+        noExpiry: string;
+    };
 };
 export declare const EN_STRINGS: OpsUiStrings;
+export declare const EN_OPTIONAL_STRINGS: Required<Pick<OpsUiStrings, "tabs" | "appSwitcher" | "validity">>;
+
+// src/config/tabs-nav.d.ts
+export declare function TabsNav({ className, children }: {
+    className?: string;
+    children: React.ReactNode;
+}): import("react").JSX.Element;
+
+// src/lib/apps.d.ts
+export type OpsAppId = "workforce" | "finaops" | "prefab";
+export type OpsApp = {
+    id: OpsAppId;
+    name: string;
+    href: string | null;
+    color: string;
+};
+export declare const OPS_APPS: readonly OpsApp[];
 
 // src/lib/cn.d.ts
 import { type ClassValue } from "clsx";
@@ -654,6 +710,15 @@ export declare function buildHaystack(...parts: (string | null | undefined)[]): 
 import { type RefObject } from "react";
 export declare function useDismissable(open: boolean, ref: RefObject<HTMLElement | null>, onClose: () => void): void;
 
+// src/lib/validity.d.ts
+export type ValidityState = "valid" | "due" | "expired" | "unknown" | "no_expiry";
+export type ValidityOptions = {
+    noExpiry?: boolean;
+    warnDays?: number;
+};
+export declare function daysBetween(fromIso: string, toIso: string): number;
+export declare function validityState(date: string | null, today: string, { noExpiry, warnDays }?: ValidityOptions): ValidityState;
+
 // src/navigation/history.d.ts
 import { type NavTrailState } from "./trail";
 export declare const NAVIGATION_STATE_KEY = "__workforceNavigation";
@@ -692,6 +757,10 @@ export declare function navigateTrail(state: NavTrailState, url: string, mode: "
 export declare function backTarget(state: NavTrailState | null, path: string, fallback: string): BackDestination;
 
 // src/stories/action-icon.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/app-switcher.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
 
@@ -864,6 +933,10 @@ import type { Story } from "./index";
 export declare const stories: Story[];
 
 // src/stories/url-select.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/validity-cell.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TabsNav } from "../config/tabs-nav";
 import { cn } from "../lib/cn";
 
 export type TabItem = {
@@ -42,10 +43,8 @@ export function Tabs({
         aria-hidden
         className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-bg to-transparent sm:hidden"
       />
-      <nav
-        className="relative flex gap-1 overflow-x-auto overflow-y-hidden"
-        aria-label="Tabs"
-      >
+      {/* Named by strings.tabs (1.1), default "Tabs": a client leaf reads it. */}
+      <TabsNav className="relative flex gap-1 overflow-x-auto overflow-y-hidden">
       {items.map((item) => {
         const isActive = item.key === active;
         return (
@@ -108,7 +107,7 @@ export function Tabs({
           </Link>
         );
       })}
-      </nav>
+      </TabsNav>
     </div>
   );
 }

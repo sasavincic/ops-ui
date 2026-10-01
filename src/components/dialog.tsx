@@ -220,7 +220,17 @@ export function DialogFooter({
       {note && (
         <span className="mr-auto text-detail text-ink-muted">{note}</span>
       )}
-      <Button icon={closeLabel ? "back" : "close"} type="button" variant="ghost" onClick={onClose}>
+      {/* data-ops-dismiss / data-ops-commit (1.1, attributes only): the
+          markers the 2.0 discard guard will match instead of the "Cancel"
+          label. A relabelled escape keeps the user's work, so it is not a
+          dismiss (the guard ignores it today too). */}
+      <Button
+        icon={closeLabel ? "back" : "close"}
+        type="button"
+        variant="ghost"
+        onClick={onClose}
+        data-ops-dismiss={closeLabel ? undefined : ""}
+      >
         {closeLabel ?? strings.cancel}
       </Button>
       <Button
@@ -230,6 +240,7 @@ export function DialogFooter({
         icon={submitIcon}
         disabled={pending || disabled}
         onClick={onSubmit}
+        data-ops-commit=""
       >
         {pending ? (pendingLabel ?? strings.saving) : submitLabel}
       </Button>
