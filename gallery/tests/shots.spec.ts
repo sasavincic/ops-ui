@@ -61,6 +61,18 @@ async function hostFontGlyphs(page: Page): Promise<string[]> {
 }
 
 /**
+ * Opening a story may start a Web Animation (riseSheet: a phone Dialog or the touch calendar
+ * rising, its ::backdrop fading in). With the page clock paused they would stop wherever the
+ * pause caught them, and Playwright's `animations: "disabled"` does not reach a ::backdrop
+ * animation, so every unfinished animation is finished here: the shot is the end state, always.
+ */
+async function settleAnimations(page: Page) {
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) if (animation.playState !== "finished") animation.finish();
+  });
+}
+
+/**
  * The gate (gallery/shot-options.ts): `toHaveScreenshot` has waited for a stable page, compared
  * with Playwright's comparator and, under `shots:accept`, written the baseline. That comparator
  * skips every pixel it takes for anti-aliasing, so the same page is shot once more and compared
@@ -227,6 +239,7 @@ for (const brand of BRANDS) {
         await page.clock.pauseAt(FIXED_NOW);
         await loadGalleryFonts(page);
         if (story.open) await page.locator(story.open).first().click();
+        await settleAnimations(page);
         await expect(page).toHaveScreenshot([brand, `${id}.png`], { fullPage: true });
         await expectExactShot(page, testInfo, [brand, `${id}.png`]);
         // Glyph coverage does not depend on the brand: asked once per story and width.
