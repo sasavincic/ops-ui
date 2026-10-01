@@ -27,7 +27,8 @@ const SERVER_SAFE = [
 ].map((name) => `src/components/${name}.tsx`);
 
 /** The server-safe components added after 1.0 (1.2.0: the primitives, styling programme §4.4). */
-const SERVER_SAFE_LATER = ["cluster", "heading", "stack", "text", "text-link"].map((name) => `src/components/${name}.tsx`);
+// 1.6.0: grid and split-layout join the server-safe primitives.
+const SERVER_SAFE_LATER = ["cluster", "grid", "heading", "split-layout", "stack", "text", "text-link"].map((name) => `src/components/${name}.tsx`);
 
 const SOURCES = filesUnder("src").filter((f) => /\.(ts|tsx)$/.test(f));
 const code = (file: string) => stripCommentsAndStrings(readSource(file));
@@ -85,7 +86,7 @@ describe("client-directive", () => {
 
   it("the other component files are client modules", () => {
     const components = SOURCES.filter((f) => f.startsWith("src/components/"));
-    expect(components).toHaveLength(43); // 1.4.0: year-input
+    expect(components).toHaveLength(48); // 1.6.0: grid, radio, split-layout, tag-remove, text-button
     const clients = components.filter((f) => !SERVER_SAFE.includes(f) && !SERVER_SAFE_LATER.includes(f));
     expect(clients.filter((f) => !hasUseClient(readSource(f)))).toEqual([]);
   });

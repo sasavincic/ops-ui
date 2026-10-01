@@ -118,6 +118,23 @@ describe("styleFindings", () => {
     expect(kinds(source, "src/components/operationsx/a.tsx", allowed).length).toBe(4);
   });
 
+  it("raw controls (1.6.0): a hidden input is not one, in any spelling; the type is read from its own tag only", () => {
+    const source = [
+      '<input type="hidden" name="a" value={v} />',
+      "<input name='b' type='hidden' />",
+      '<input\n  ref={input}\n  type={"hidden"}\n  name={name}\n  value={value}\n/>',
+      "<input onChange={(e) => set(e.target.value > 1)} type=\"hidden\" />",
+      '<input type="radio" className="sr-only" />',
+      '<input name="c" />\n<span data-type="hidden" />',
+      '<input aria-label="type=\\"hidden\\"" />',
+    ].join("\n");
+    expect(kinds(source).filter((k) => k.startsWith("raw-control"))).toEqual([
+      "raw-control 10 <input>",
+      "raw-control 11 <input>",
+      "raw-control 13 <input>",
+    ]);
+  });
+
   it("comments are blanked; strings and lines are kept; an apostrophe in JSX text swallows nothing", () => {
     const source = "a // b\n/* c\nd */ e\n<p>don't</p>\n<div className=\"bg-[#fff]\" />\nconst u = \"https://x\";";
     const blanked = blankTsxComments(source);

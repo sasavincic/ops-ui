@@ -401,10 +401,28 @@ test.describe("desktop behaviour", () => {
     await button.click();
     const menu = page.getByRole("menu");
     await expect(menu).toBeVisible();
-    let [b, m] = [await button.boundingBox(), await menu.boundingBox()];
-    expect(m!.y + m!.height).toBeLessThanOrEqual(b!.y);
-    // Right edges lined up (the ⋯ is at the right of its row).
-    expect(Math.abs(m!.x + m!.width - (b!.x + b!.width))).toBeLessThanOrEqual(1);
+    // Deterministic under load (1.6.0): the button and the menu are measured in ONE frame, after two
+    // real animation frames, and polled until the menu sits where it belongs. Two separate
+    // boundingBox() calls could straddle the menu's re-render after a scroll (it repositions from a
+    // scroll listener through React state), which flaked the follow-scroll half under load.
+    const geometry = () =>
+      page.evaluate(
+        () =>
+          new Promise<{ buttonTop: number; gap: number; rightEdges: number }>((resolve) =>
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => {
+                const b = document.querySelector('[aria-label="Review actions"]')!.getBoundingClientRect();
+                const m = document.querySelector('[role="menu"]')!.getBoundingClientRect();
+                resolve({ buttonTop: b.top, gap: b.top - m.bottom, rightEdges: Math.abs(m.right - b.right) });
+              }),
+            ),
+          ),
+      );
+    // Upward: the menu's bottom is at or above the button's top; right edges lined up (the ⋯ is
+    // at the right of its row).
+    const placed = (g: { gap: number; rightEdges: number }) => g.gap >= 0 && g.rightEdges <= 1;
+    await expect.poll(async () => placed(await geometry())).toBe(true);
+    const before = await geometry();
     await expect(menu.getByRole("group")).toHaveCount(3);
     await expect(menu.getByRole("menuitem", { name: "Delete" })).toBeVisible();
     // Follow-scroll: make the page scroll, scroll it, the menu moves with its button.
@@ -414,10 +432,12 @@ test.describe("desktop behaviour", () => {
       document.body.append(spacer);
       window.scrollTo(0, 200);
     });
-    await expect.poll(async () => (await button.boundingBox())!.y).toBeLessThan(b!.y);
-    [b, m] = [await button.boundingBox(), await menu.boundingBox()];
-    expect(Math.abs(m!.x + m!.width - (b!.x + b!.width))).toBeLessThanOrEqual(1);
-    expect(m!.y + m!.height).toBeLessThanOrEqual(b!.y);
+    await expect.poll(async () => {
+      const g = await geometry();
+      return g.buttonTop < before.buttonTop && placed(g);
+    }).toBe(true);
+    const after = await geometry();
+    expect(after.gap).toBeCloseTo(before.gap, 0);
     await expect(menu).toBeVisible();
   });
 

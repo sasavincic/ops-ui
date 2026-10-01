@@ -18,6 +18,8 @@ export const TEXT_LINK_VARIANT = {
   plain: "hover:underline",
   /** A record's name outside a table (RowLink's classes). */
   strong: "font-medium text-ink hover:underline",
+  /** 1.6.0: secondary ink, primary on hover (the sign-in pages' secondary actions). */
+  muted: "text-ink-secondary hover:text-primary",
 } as const;
 
 export type TextLinkVariant = keyof typeof TEXT_LINK_VARIANT;

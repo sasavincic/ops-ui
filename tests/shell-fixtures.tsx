@@ -378,7 +378,8 @@ export function libraryProps(app: AppKey, navModule: NavModule, mark: ReactNode)
  * replacements on the app's markup, each with the number of times it must apply. Nothing else
  * may differ.
  */
-export type MarkupDifference = { app: AppKey; from: string; to: string; count: number; why: string };
+/** `part: "frame"`: only in a render of the whole frame (the content column, `data-pull-content`). */
+export type MarkupDifference = { app: AppKey; from: string; to: string; count: number; why: string; part?: "frame" };
 
 export const INTENTIONAL_DIFFERENCES: readonly MarkupDifference[] = [
   {
@@ -389,11 +390,30 @@ export const INTENTIONAL_DIFFERENCES: readonly MarkupDifference[] = [
     why:
       "The sidebar's mark row centres its one child (FinaOps' row). The child alone sets the row's height, so stretch and centre lay it out the same: 0 changed pixels.",
   },
+  {
+    app: "wfo",
+    from: " max-w-5xl ",
+    to: " max-w-[64rem] ",
+    count: 1,
+    part: "frame",
+    why:
+      "1.6.0: the content column's width as its value (64rem = Tailwind's max-w-5xl), so the library declares no --container-5xl theme variable in an app that never renders it: 0 changed pixels.",
+  },
+  {
+    app: "finaops",
+    from: " max-w-6xl ",
+    to: " max-w-[72rem] ",
+    count: 1,
+    part: "frame",
+    why:
+      "1.6.0: the content column's width as its value (72rem = Tailwind's max-w-6xl), so the library declares no --container-6xl theme variable in an app that never renders it: 0 changed pixels.",
+  },
 ];
 
 export function applyDifferences(app: AppKey, html: string): string {
   let out = html;
   for (const d of INTENTIONAL_DIFFERENCES.filter((x) => x.app === app)) {
+    if (d.part === "frame" && !html.includes("data-pull-content")) continue;
     const count = out.split(d.from).length - 1;
     if (count !== d.count) throw new Error(`${app}: intentional difference found ${count} times, expected ${d.count}: ${d.from}`);
     out = out.split(d.from).join(d.to);

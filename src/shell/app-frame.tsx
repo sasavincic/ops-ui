@@ -22,9 +22,16 @@ import { Sidebar, type ShellChromeProps } from "./sidebar";
 /** The content column's reading width; a page with a [data-page-full-width] marker escapes it. */
 export type ContentWidth = "5xl" | "6xl";
 
+/**
+ * 1.6.0: the widths as values (Tailwind's 64rem and 72rem), not the named container sizes. Tailwind
+ * declares a theme variable for every scanned class that reads one, and an app scans this file
+ * (comments included: never spell such a class name here), so the two named sizes made every app
+ * declare both container variables although it renders one (G3 saw the other). Same computed
+ * max-width, no theme variable (styling programme §4.6).
+ */
 const CONTENT_WIDTH: Record<ContentWidth, string> = {
-  "5xl": "max-w-5xl",
-  "6xl": "max-w-6xl",
+  "5xl": "max-w-[64rem]",
+  "6xl": "max-w-[72rem]",
 };
 
 export type AppFrameProps<I> = ShellChromeProps & {

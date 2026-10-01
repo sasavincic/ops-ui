@@ -64,4 +64,28 @@ export const stories: Story[] = [
       </Stack>
     ),
   },
+  {
+    name: "Nowrap and tabular",
+    render: () => (
+      <Stack>
+        <Row label="nowrap (1.6.0): the date never breaks" className="items-start">
+          <span className="w-24 text-detail text-ink-secondary">
+            Due <Text size="detail" nowrap>01-10-2026</Text>
+          </span>
+          <Text mono size="detail" nowrap>
+            VA-2026-0042
+          </Text>
+        </Row>
+        <Row label="tabular (1.6.0): figures line up row under row" className="block">
+          <div className="flex w-40 flex-col items-end">
+            <Text tabular>1,111.11</Text>
+            <Text tabular>8,888.88</Text>
+            <Text tabular size="detail" tone="muted">
+              12,5 h
+            </Text>
+          </div>
+        </Row>
+      </Stack>
+    ),
+  },
 ];

@@ -320,9 +320,12 @@ type AdornmentProps = {
 };
 export declare function Input({ className, readOnlySafe, size, prefix, suffix, wrapperClassName, ...props }: Omit<React.ComponentProps<"input">, "size" | "prefix"> & ReadOnlyProps & SizeProps & AdornmentProps): import("react").JSX.Element;
 export declare function Select({ className, readOnlySafe, size, ...props }: Omit<React.ComponentProps<"select">, "size"> & ReadOnlyProps & SizeProps): import("react").JSX.Element;
-export declare function Checkbox({ label, className, readOnlySafe, ...props }: React.ComponentProps<"input"> & {
+export declare function Checkbox({ label, className, readOnlySafe, ...props }: React.ComponentProps<"input"> & ({
     label: string;
-} & ReadOnlyProps): import("react").JSX.Element;
+} | {
+    label?: undefined;
+    "aria-label": string;
+}) & ReadOnlyProps): import("react").JSX.Element;
 export declare function CheckTile({ label, hint, icon, className, readOnlySafe, ...props }: React.ComponentProps<"input"> & {
     label: string;
     hint?: string;
@@ -358,6 +361,33 @@ export declare function GlanceCard({ title, href, openLabel, children, }: {
     openLabel?: string;
     children: React.ReactNode;
 }): import("react").JSX.Element;
+
+// src/components/grid.d.ts
+import { type Gap } from "../lib/gap";
+export type GridTag = "div" | "section" | "ul" | "ol" | "dl" | "form" | "fieldset";
+export type GridCols = 2 | 3;
+export type GridFrom = "sm" | "lg";
+export declare const GRID_COLS: {
+    readonly 2: {
+        readonly base: "grid-cols-2";
+        readonly sm: "sm:grid-cols-2";
+        readonly lg: "lg:grid-cols-2";
+    };
+    readonly 3: {
+        readonly base: "grid-cols-3";
+        readonly sm: "sm:grid-cols-3";
+        readonly lg: "lg:grid-cols-3";
+    };
+};
+export type GridProps<T extends GridTag = "div"> = {
+    as?: T;
+    gap?: Gap;
+    cols?: GridCols;
+    from?: GridFrom;
+    align?: "start";
+    className?: string;
+} & Omit<React.ComponentProps<T>, "className" | "as" | "gap" | "cols">;
+export declare function Grid<T extends GridTag = "div">({ as, gap, cols, from, align, className, ...props }: GridProps<T>): import("react").JSX.Element;
 
 // src/components/heading.d.ts
 export declare const HEADING_LEVEL: {
@@ -420,6 +450,36 @@ export declare function PageHelp({ label, children }: {
     label: string;
     children: React.ReactNode;
 }): import("react").JSX.Element;
+
+// src/components/radio.d.ts
+import { type Gap } from "../lib/gap";
+type ReadOnlyProps = {
+    readOnlySafe?: boolean;
+};
+export type RadioGroupOrientation = "vertical" | "horizontal";
+export declare function RadioGroup({ as, name, value, onChange, orientation, gap, className, children, ...props }: {
+    as?: "div" | "fieldset";
+    name?: string;
+    value?: string;
+    onChange?: (value: string) => void;
+    orientation: RadioGroupOrientation;
+    gap?: Gap;
+    disabled?: boolean;
+    className?: string;
+    children: React.ReactNode;
+} & Omit<React.ComponentProps<"div">, "onChange" | "className" | "children">): import("react").JSX.Element;
+export declare function Radio({ label, className, readOnlySafe, ...props }: Omit<React.ComponentProps<"input">, "type"> & {
+    label: React.ReactNode;
+} & ReadOnlyProps): import("react").JSX.Element;
+export type ChoiceTileLayout = "row" | "compact" | "stacked";
+export declare const CHOICE_TILE_LAYOUT: Record<ChoiceTileLayout, string>;
+export declare const CHOICE_TILE_FRAME = "cursor-pointer rounded-control border transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60";
+export declare function ChoiceTile({ layout, title, className, readOnlySafe, children, ...props }: Omit<React.ComponentProps<"input">, "type" | "title" | "children"> & {
+    layout?: ChoiceTileLayout;
+    title?: string;
+    children: React.ReactNode;
+} & ReadOnlyProps): import("react").JSX.Element;
+export {};
 
 // src/components/record-tab.d.ts
 export declare function RecordTab({ intro, action, children, }: {
@@ -530,6 +590,15 @@ export declare function SheetFooter({ children, className, }: {
     className?: string;
 }): import("react").JSX.Element;
 
+// src/components/split-layout.d.ts
+export type SplitLayoutTag = "div" | "section" | "form";
+export type SplitLayoutProps<T extends SplitLayoutTag = "div"> = {
+    as?: T;
+    className?: string;
+} & Omit<React.ComponentProps<T>, "className" | "as">;
+export declare const SPLIT_LAYOUT_CLASSES = "grid items-start gap-6 lg:grid-cols-[1fr_minmax(20rem,26rem)]";
+export declare function SplitLayout<T extends SplitLayoutTag = "div">({ as, className, ...props }: SplitLayoutProps<T>): import("react").JSX.Element;
+
 // src/components/stack.d.ts
 import { type Gap } from "../lib/gap";
 export type StackTag = "div" | "span" | "section" | "ul" | "ol" | "li" | "form" | "fieldset";
@@ -598,6 +667,12 @@ export declare function Tabs({ items, active, hrefFor, }: {
     hrefFor: (key: string) => string;
 }): import("react").JSX.Element;
 
+// src/components/tag-remove.d.ts
+export declare function TagRemove({ label, readOnlySafe, className, children, ...props }: {
+    label: string;
+    readOnlySafe?: boolean;
+} & Omit<React.ComponentProps<"button">, "aria-label">): import("react").JSX.Element | null;
+
 // src/components/tag.d.ts
 export declare function Tag({ icon, tone, className, title, children, }: {
     icon?: React.ReactNode;
@@ -607,6 +682,16 @@ export declare function Tag({ icon, tone, className, title, children, }: {
     children: React.ReactNode;
 }): import("react").JSX.Element;
 
+// src/components/text-button.d.ts
+import { type TextSize, type TextTone } from "./text";
+import { type TextLinkVariant } from "./text-link";
+export declare function TextButton({ variant, size, tone, readOnlySafe, className, ...props }: {
+    variant: TextLinkVariant;
+    size?: TextSize;
+    tone?: TextTone;
+    readOnlySafe?: boolean;
+} & React.ComponentProps<"button">): import("react").JSX.Element | null;
+
 // src/components/text-link.d.ts
 import { type TextSize } from "./text";
 export declare const TEXT_LINK_VARIANT: {
@@ -615,6 +700,7 @@ export declare const TEXT_LINK_VARIANT: {
     readonly primary: "text-primary hover:underline";
     readonly plain: "hover:underline";
     readonly strong: "font-medium text-ink hover:underline";
+    readonly muted: "text-ink-secondary hover:text-primary";
 };
 export type TextLinkVariant = keyof typeof TEXT_LINK_VARIANT;
 export declare function isExternalHref(href: string): boolean;
@@ -654,13 +740,15 @@ export type TextStyleProps = {
     mono?: boolean;
     block?: boolean;
     truncate?: boolean;
+    nowrap?: boolean;
+    tabular?: boolean;
 };
-export declare function textClasses({ size, tone, weight, mono, block, truncate }: TextStyleProps): string[];
+export declare function textClasses({ size, tone, weight, mono, block, truncate, nowrap, tabular }: TextStyleProps): string[];
 export type TextProps<T extends TextTag = "span"> = TextStyleProps & {
     as?: T;
     className?: string;
 } & Omit<React.ComponentProps<T>, "className" | keyof TextStyleProps | "as">;
-export declare function Text<T extends TextTag = "span">({ as, size, tone, weight, mono, block, truncate, className, ...props }: TextProps<T>): import("react").JSX.Element;
+export declare function Text<T extends TextTag = "span">({ as, size, tone, weight, mono, block, truncate, nowrap, tabular, className, ...props }: TextProps<T>): import("react").JSX.Element;
 
 // src/components/toast.d.ts
 import type { ToastAction, ToastTone } from "../types";
@@ -1249,6 +1337,10 @@ export declare const stories: Story[];
 import type { Story } from "./index";
 export declare const stories: Story[];
 
+// src/stories/grid.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
 // src/stories/heading.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
@@ -1291,6 +1383,10 @@ export declare const stories: Story[];
 import type { Story } from "./index";
 export declare const stories: Story[];
 
+// src/stories/radio.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
 // src/stories/record-tab.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
@@ -1312,6 +1408,10 @@ import type { Story } from "./index";
 export declare const stories: Story[];
 
 // src/stories/sheet.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/split-layout.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
 
@@ -1353,7 +1453,15 @@ export declare const stories: Story[];
 import type { Story } from "./index";
 export declare const stories: Story[];
 
+// src/stories/tag-remove.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
 // src/stories/tag.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/text-button.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
 

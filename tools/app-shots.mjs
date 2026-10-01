@@ -14,7 +14,7 @@
 //           email sign-ins a minute per client. After each sign-in it checks that the page left
 //           login.path within the login timeout (--login-timeout <ms>, else visual.loginTimeout,
 //           else 60 s: a dev server compiles the landing route on its first request) and landed
-//           on no gate page. Every route of visual.routes, at each of
+//           on no gate page. Every route of visual.routes (a string, or an object: below), at each of
 //           visual.widths and at 375-touch (a phone: touch, a coarse pointer, no hover), with
 //           reduced motion, the caret hidden, visual.mask masked and a clock fixed at the
 //           capture's start and paused once the route is ready. Every route must land where it
@@ -28,8 +28,22 @@
 //           internals excepted), each with `declared` and, when declared, its value (colours read
 //           through a fresh, transition-free probe element per name). Writes
 //           $TMPDIR/ops-ui-shots/<app>/<label>/.
+//           A page is shot until two screenshots in a row are identical, at most 1 + tries times
+//           (visual.settleTries, default 10). A route OBJECT (1.6.0) instead of a string:
+//             { "path": "/transactions/:first",                 the route's key in the capture
+//               "resolve": { "from": "/transactions",            a list page opened first ...
+//                            "selector": "a[href^='/transactions/']" },  ... whose first match's
+//                                                               href is the route shot (a fixture
+//                                                               id read at capture time)
+//               "noise": { "pixels": 40, "reason": "…" },        a page that never settles: two
+//                                                               shots differing by at most this
+//                                                               many pixels count as settled, and
+//                                                               compare lets the page differ by as
+//                                                               many (reported, never silent)
+//               "tries": 20 }                                   this route's settle tries
 // compare   G2: every page of A and B compared with the gallery's gate, exactDiff of
-//           gallery/shot-options.ts (every RGBA byte; 0 changed pixels), red-overlay diffs written
+//           gallery/shot-options.ts (every RGBA byte; 0 changed pixels, or at most the route's
+//           `noise.pixels` when either capture recorded one), red-overlay diffs written
 //           to $TMPDIR/ops-ui-shots/<app>/<A>-vs-<B>/. G3: every name declared in A declared in B
 //           with an identical value. Anything else passes only when --expect lists it:
 //             route <route>                 a route only B has (a 404 or absent in A)
@@ -61,7 +75,8 @@ export const GATE_PAGES = ["/login", "/two-factor", "/password", "/read-only"];
  * except names with this prefix: Tailwind's per-utility internals (spec §11.4).
  */
 export const DUMP_SKIPPED_PREFIX = "--tw-";
-const STABLE_TRIES = 10;
+/** Extra screenshots a page gets to settle, by default (visual.settleTries, a route's `tries`). */
+export const DEFAULT_SETTLE_TRIES = 10;
 const STORY_TIMEOUT = 20_000;
 /**
  * How long a sign-in may take to leave the login page, by default (visual.loginTimeout or
@@ -83,8 +98,44 @@ class UsageError extends Error {}
 
 /**
  * @typedef {{ path: string, userEnv: string, passwordEnv: string, userSelector?: string, passwordSelector?: string, submitSelector?: string }} Login
- * @typedef {{ baseUrl: string, login: Login, readonlyLogin?: Omit<Login, "path"> & { path?: string }, widths: number[], routes: string[], readonlyRoutes?: string[], redirects?: Record<string, string>, mask?: string[], loginTimeout?: number }} Visual
+ * @typedef {{ pixels: number, reason: string }} Noise
+ * @typedef {{ path: string, resolve?: { from: string, selector: string }, noise?: Noise, tries?: number }} RouteObject
+ * @typedef {string | RouteObject} RouteEntry
+ * @typedef {{ baseUrl: string, login: Login, readonlyLogin?: Omit<Login, "path"> & { path?: string }, widths: number[], routes: RouteEntry[], readonlyRoutes?: RouteEntry[], redirects?: Record<string, string>, mask?: string[], loginTimeout?: number, settleTries?: number }} Visual
  */
+
+/**
+ * A route entry's problems (1.6.0: a string, or `{ path, resolve?, noise?, tries? }`), each a
+ * sentence; none = valid.
+ * @param {unknown} entry
+ * @param {string} where e.g. "visual.routes[2]"
+ * @returns {string[]}
+ */
+export function routeEntryProblems(entry, where) {
+  if (typeof entry === "string") return entry.startsWith("/") ? [] : [`${where} starts with /`];
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [`${where} is a route or a route object`];
+  const r = /** @type {Record<string, any>} */ (entry);
+  const problems = [];
+  for (const key of Object.keys(r)) if (!["path", "resolve", "noise", "tries"].includes(key)) problems.push(`${where}: unknown key "${key}" (path, resolve, noise, tries)`);
+  if (typeof r.path !== "string" || !r.path.startsWith("/")) problems.push(`${where}.path starts with /`);
+  if (r.resolve !== undefined) {
+    if (typeof r.resolve?.from !== "string" || !r.resolve.from.startsWith("/") || typeof r.resolve?.selector !== "string" || !r.resolve.selector.trim()) {
+      problems.push(`${where}.resolve is { "from": "/<list route>", "selector": "<css selector of a link>" }`);
+    }
+  }
+  if (r.noise !== undefined) {
+    if (!Number.isInteger(r.noise?.pixels) || r.noise.pixels < 1 || typeof r.noise?.reason !== "string" || !r.noise.reason.trim()) {
+      problems.push(`${where}.noise is { "pixels": <a positive whole number>, "reason": "<why this page never settles>" }`);
+    }
+  }
+  if (r.tries !== undefined && !(Number.isInteger(r.tries) && r.tries >= 1)) problems.push(`${where}.tries is a positive whole number`);
+  return problems;
+}
+
+/** A route entry as an object. @param {RouteEntry} entry @returns {RouteObject} */
+export function routeObject(entry) {
+  return typeof entry === "string" ? { path: entry } : entry;
+}
 
 /**
  * Reads `visual` and `extensions` from the capture config.
@@ -114,8 +165,17 @@ export function readCaptureConfig(appRoot, configFile) {
   if (!Array.isArray(visual.widths) || visual.widths.length === 0 || !visual.widths.every((w) => Number.isInteger(w) && w > 0)) {
     problems.push("visual.widths is a list of pixel widths");
   }
-  if (!Array.isArray(visual.routes) || visual.routes.length === 0 || !visual.routes.every((r) => typeof r === "string" && r.startsWith("/"))) {
+  if (!Array.isArray(visual.routes) || visual.routes.length === 0) {
     problems.push("visual.routes is a list of routes starting with /");
+  } else {
+    visual.routes.forEach((r, i) => problems.push(...routeEntryProblems(r, `visual.routes[${i}]`)));
+  }
+  if (visual.readonlyRoutes !== undefined) {
+    if (!Array.isArray(visual.readonlyRoutes)) problems.push("visual.readonlyRoutes is a list of routes");
+    else visual.readonlyRoutes.forEach((r, i) => problems.push(...routeEntryProblems(r, `visual.readonlyRoutes[${i}]`)));
+  }
+  if (visual.settleTries !== undefined && !(Number.isInteger(visual.settleTries) && visual.settleTries >= 1)) {
+    problems.push("visual.settleTries is a positive whole number");
   }
   if (visual.readonlyRoutes?.length && (!visual.readonlyLogin?.userEnv || !visual.readonlyLogin?.passwordEnv)) {
     problems.push("visual.readonlyRoutes needs visual.readonlyLogin (userEnv, passwordEnv)");
@@ -189,7 +249,7 @@ export function slug(/** @type {string} */ key) {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * @typedef {{ route: string, user: "editor" | "readonly", status: number, landed: string, file?: string, story?: string }} RouteShot
+ * @typedef {{ route: string, user: "editor" | "readonly", status: number, landed: string, file?: string, story?: string, resolved?: string, noise?: number, settledWithin?: number }} RouteShot
  * @typedef {{ app: string, label: string, config: string, baseUrl: string, capturedAt: string, complete: boolean, failures: string[], projects: Record<string, { routes: Record<string, RouteShot>, tokens: string | null }> }} Manifest
  */
 
@@ -295,25 +355,70 @@ async function signIn(browser, baseUrl, login, who, timeout) {
 }
 
 /**
- * Shoots until two screenshots in a row are identical: the page has settled.
- * @param {import("playwright-core").Page} page
- * @param {string[]} mask
+ * Settles a sequence of screenshots: the first shot that equals the one before it, or (with a
+ * noise allowance) differs from it by at most `noise` pixels. Pure over a shot source, so it is
+ * tested without a browser.
+ * @param {() => Promise<Buffer>} shoot
+ * @param {{ tries: number, noise?: number, diff?: (a: Buffer, b: Buffer) => { changed: number } }} options
+ * @returns {Promise<{ png: Buffer, changed: number } | null>} null: never settled
  */
-async function stableShot(page, mask) {
-  const options = /** @type {const} */ ({ fullPage: true, animations: "disabled", caret: "hide", scale: "css" });
-  const masks = mask.map((selector) => page.locator(selector));
-  let previous = await page.screenshot({ ...options, mask: masks });
-  for (let i = 0; i < STABLE_TRIES; i++) {
-    const next = await page.screenshot({ ...options, mask: masks });
-    if (next.equals(previous)) return next;
+export async function settle(shoot, { tries, noise = 0, diff }) {
+  let previous = await shoot();
+  for (let i = 0; i < tries; i++) {
+    const next = await shoot();
+    if (next.equals(previous)) return { png: next, changed: 0 };
+    if (noise > 0 && diff) {
+      const changed = diff(next, previous).changed;
+      if (changed <= noise) return { png: next, changed };
+    }
     previous = next;
   }
   return null;
 }
 
 /**
- * @param {{ context: import("playwright-core").BrowserContext, visual: Visual, dir: string, now: Date, failures: string[] }} run
- * @param {{ route: string, key: string, user: "editor" | "readonly", story?: { id: string, open?: string }, tokens?: string[] }} target
+ * Shoots until two screenshots in a row are identical (or within the route's noise): settled.
+ * @param {import("playwright-core").Page} page
+ * @param {string[]} mask
+ * @param {{ tries: number, noise?: number, diff?: (a: Buffer, b: Buffer) => { changed: number } }} options
+ */
+async function stableShot(page, mask, options) {
+  const shotOptions = /** @type {const} */ ({ fullPage: true, animations: "disabled", caret: "hide", scale: "css" });
+  const masks = mask.map((selector) => page.locator(selector));
+  return settle(() => page.screenshot({ ...shotOptions, mask: masks }), options);
+}
+
+/**
+ * Opens the route's `resolve.from` page and returns the path and query of the first element
+ * matching `resolve.selector` (its href), or a failure sentence.
+ * @param {import("playwright-core").BrowserContext} context
+ * @param {string} baseUrl
+ * @param {RouteObject} route
+ * @returns {Promise<{ route: string } | { problem: string }>}
+ */
+async function resolveRoute(context, baseUrl, route) {
+  const resolve = /** @type {{ from: string, selector: string }} */ (route.resolve);
+  const page = await context.newPage();
+  page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT);
+  try {
+    await page.goto(new URL(resolve.from, baseUrl).href, { waitUntil: "load" });
+    await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+    const href = await page
+      .locator(resolve.selector)
+      .first()
+      .getAttribute("href", { timeout: 10_000 })
+      .catch(() => null);
+    if (!href) return { problem: `${route.path}: resolve found no "${resolve.selector}" with an href on ${resolve.from}` };
+    return { route: pathAndQuery(href, baseUrl) };
+  } finally {
+    await page.close();
+  }
+}
+
+/**
+ * @param {{ context: import("playwright-core").BrowserContext, visual: Visual, dir: string, now: Date, failures: string[], diff: (a: Buffer, b: Buffer) => { changed: number } }} run
+ * @param {{ route: string, key: string, user: "editor" | "readonly", story?: { id: string, open?: string }, tokens?: string[], path?: string, settle?: { tries?: number, noise?: Noise } }} target
+ *   `route` is the URL shot; `path` the route's own key form when `resolve` replaced it
  * @returns {Promise<{ shot: RouteShot, tokens: Record<string, { declared: boolean, value?: string }> | null, storyLinks: { id: string, open?: string }[] }>}
  */
 async function captureRoute(run, target) {
@@ -328,7 +433,8 @@ async function captureRoute(run, target) {
     const status = response?.status() ?? 0;
     const landed = pathAndQuery(page.url());
     /** @type {RouteShot} */
-    const shot = { route: target.route, user: target.user, status, landed };
+    const shot = { route: target.path ?? target.route, user: target.user, status, landed };
+    if (target.path !== undefined && target.path !== target.route) shot.resolved = target.route;
     if (target.story) shot.story = target.story.id;
     const problem = landingProblem(target.route, page.url(), visual.redirects);
     if (problem) {
@@ -351,13 +457,20 @@ async function captureRoute(run, target) {
     await page.clock.pauseAt(now);
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
     if (target.story?.open) await page.locator(target.story.open).first().click();
-    const png = await stableShot(page, visual.mask ?? []);
-    if (!png) {
-      failures.push(`${target.key}: the page never settled (${STABLE_TRIES + 1} screenshots, no two identical)`);
+    const tries = target.settle?.tries ?? visual.settleTries ?? DEFAULT_SETTLE_TRIES;
+    const noise = target.settle?.noise?.pixels ?? 0;
+    const settled = await stableShot(page, visual.mask ?? [], { tries, noise, diff: run.diff });
+    if (!settled) {
+      const within = noise > 0 ? ` within ${noise} pixel(s)` : " identical";
+      failures.push(`${target.key}: the page never settled (${tries + 1} screenshots, no two${within}; raise "tries", or give the route a "noise" allowance with its reason)`);
       return { shot, tokens: null, storyLinks: [] };
     }
+    if (noise > 0) {
+      shot.noise = noise;
+      shot.settledWithin = settled.changed;
+    }
     shot.file = `${slug(target.key)}.png`;
-    writeFileSync(path.join(dir, shot.file), png);
+    writeFileSync(path.join(dir, shot.file), settled.png);
     const tokens = target.tokens ? await page.evaluate(readTokens, { names: target.tokens, internal: DUMP_SKIPPED_PREFIX }) : null;
     const storyLinks = await page.$$eval("a[data-story-id]", (links) =>
       links.map((a) => ({ id: /** @type {string} */ (a.getAttribute("data-story-id")), open: a.getAttribute("data-story-open") ?? undefined })),
@@ -405,6 +518,7 @@ export async function capture(options, log) {
   const manifest = { app: appName(appRoot), label, config: file, baseUrl: visual.baseUrl, capturedAt: now.toISOString(), complete: false, failures, projects: {} };
   const names = dumpNames(extensions);
   const loginTimeout = options.loginTimeout ?? visual.loginTimeout ?? DEFAULT_LOGIN_TIMEOUT;
+  const diff = await loadExactDiff();
   const browser = await launch();
   try {
     // One sign-in per user for the whole capture; every project's context reuses its session.
@@ -421,7 +535,7 @@ export async function capture(options, log) {
       /** @type {Record<string, RouteShot>} */
       const routes = {};
       let tokensFile = /** @type {string | null} */ (null);
-      /** @param {"editor" | "readonly"} user @param {string[]} list */
+      /** @param {"editor" | "readonly"} user @param {RouteEntry[]} list */
       const shoot = async (user, list) => {
         const storageState = sessions[user] ?? undefined;
         const context = await browser.newContext({
@@ -434,11 +548,23 @@ export async function capture(options, log) {
           storageState,
         });
         try {
-          const run = { context, visual, dir: projectDir, now, failures };
-          for (const route of list) {
-            const key = user === "readonly" ? `readonly:${route}` : route;
+          const run = { context, visual, dir: projectDir, now, failures, diff };
+          for (const entry of list) {
+            const routeEntry = routeObject(entry);
+            const key = user === "readonly" ? `readonly:${routeEntry.path}` : routeEntry.path;
+            let route = routeEntry.path;
+            if (routeEntry.resolve) {
+              const resolved = await resolveRoute(context, visual.baseUrl, routeEntry);
+              if ("problem" in resolved) {
+                failures.push(`${user === "readonly" ? "read-only " : ""}${resolved.problem}`);
+                routes[key] = { route: routeEntry.path, user, status: 0, landed: "" };
+                continue;
+              }
+              route = resolved.route;
+            }
             const wantTokens = user === "editor" && tokensFile === null;
-            const result = await captureRoute(run, { route, key, user, tokens: wantTokens ? names : undefined });
+            const settleOptions = { tries: routeEntry.tries, noise: routeEntry.noise };
+            const result = await captureRoute(run, { route, path: routeEntry.path, key, user, tokens: wantTokens ? names : undefined, settle: settleOptions });
             routes[key] = result.shot;
             if (result.tokens) {
               tokensFile = "tokens.json";
@@ -614,6 +740,14 @@ export async function compare(options, log) {
         const result = exactDiff(readFileSync(bShot), readFileSync(aShot));
         if (result.changed === 0) {
           identical += 1;
+          continue;
+        }
+        // A route that never settles (its `noise`, recorded by either capture) may differ by as
+        // many pixels; never silently, and never in size.
+        const noise = Math.max(a?.noise ?? 0, b?.noise ?? 0);
+        if (noise > 0 && !result.sizeMismatch && result.changed <= noise) {
+          identical += 1;
+          report.push(`${project} ${key}: ${result.changed} pixel(s) differ, within the route's noise allowance of ${noise}`);
           continue;
         }
         let diffNote = "";

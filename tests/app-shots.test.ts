@@ -14,7 +14,10 @@ import {
   parseExpect,
   pathAndQuery,
   projectsFor,
+  routeEntryProblems,
   routeMatches,
+  routeObject,
+  settle,
   slug,
 } from "../tools/app-shots.mjs";
 import { ROOT } from "./source-files";
@@ -58,7 +61,7 @@ function disc(edit?: (png: PNG) => void) {
   return PNG.sync.write(png);
 }
 
-type Route = { png?: Buffer; status?: number; user?: "editor" | "readonly" };
+type Route = { png?: Buffer; status?: number; user?: "editor" | "readonly"; noise?: number };
 type Capture = { routes: Record<string, Route>; tokens?: Record<string, { declared: boolean; value?: string }>; complete?: boolean; projects?: string[] };
 
 function writeCapture(root: string, label: string, capture: Capture) {
@@ -70,6 +73,7 @@ function writeCapture(root: string, label: string, capture: Capture) {
     const routes: Record<string, unknown> = {};
     for (const [key, route] of Object.entries(capture.routes)) {
       const entry: Record<string, unknown> = { route: key.replace(/^readonly:/, ""), user: route.user ?? "editor", status: route.status ?? 200, landed: key };
+      if (route.noise) entry.noise = route.noise;
       if (route.png) {
         entry.file = `${slug(key)}.png`;
         writeFileSync(path.join(projectDir, entry.file as string), route.png);
@@ -149,6 +153,28 @@ describe("app-shots compare (synthetic captures)", () => {
     r = await compareWith(BASE, branch, "page /dev/kit/*\n");
     expect(r.code, r.err).toBe(0);
     expect(r.out).toContain("expected change (--expect line 1): 1440 /dev/kit/button--matrix: 1 pixel(s) differ");
+  });
+
+  it("a route's noise allowance (1.6.0) lets that page differ by at most so many pixels, reported; other pages stay exact", async () => {
+    const jitter = (n: number) =>
+      disc((png) => {
+        for (let k = 0; k < n; k++) png.data[k * 4] = 7; // the first n pixels of the top row
+      });
+    const main: Capture = { ...BASE, routes: { ...BASE.routes, "/jitter": { png: disc(), noise: 4 } } };
+    let r = await compareWith(main, { ...BASE, routes: { ...BASE.routes, "/jitter": { png: jitter(4), noise: 4 } } });
+    expect(r.code, r.err).toBe(0);
+    expect(r.out).toContain("1440 /jitter: 4 pixel(s) differ, within the route's noise allowance of 4");
+    expect(r.out).toContain("1440: 5 of 5 page(s) identical");
+    // Recorded by one side only (a route that gained the allowance on the branch) still counts.
+    r = await compareWith({ ...BASE, routes: { ...BASE.routes, "/jitter": { png: disc() } } }, { ...BASE, routes: { ...BASE.routes, "/jitter": { png: jitter(3), noise: 4 } } });
+    expect(r.code, r.err).toBe(0);
+    r = await compareWith(main, { ...BASE, routes: { ...BASE.routes, "/jitter": { png: jitter(5), noise: 4 } } });
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("1440 /jitter: 5 pixel(s) differ");
+    // The allowance is the route's own: another page with one changed pixel still fails.
+    r = await compareWith(main, { ...BASE, routes: { ...BASE.routes, "/": { png: jitter(1) }, "/jitter": { png: disc(), noise: 4 } } });
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("1440 /: 1 pixel(s) differ");
   });
 
   it("a page of another size fails", async () => {
@@ -263,6 +289,35 @@ describe("app-shots helpers", () => {
     expect(routeMatches("/workers/*", "readonly:/workers/1")).toBe(false);
   });
 
+  it("route entries (1.6.0): a string, or { path, resolve, noise, tries } with every key checked", () => {
+    expect(routeEntryProblems("/home", "r")).toEqual([]);
+    expect(routeEntryProblems("home", "r")).toEqual(["r starts with /"]);
+    expect(routeEntryProblems({ path: "/transactions/:first", resolve: { from: "/transactions", selector: "a[href^='/transactions/']" } }, "r")).toEqual([]);
+    expect(routeEntryProblems({ path: "/x", noise: { pixels: 40, reason: "the clock's seconds hand" }, tries: 20 }, "r")).toEqual([]);
+    expect(routeEntryProblems({ path: "/x", noise: { pixels: 40 } }, "r")).toEqual(['r.noise is { "pixels": <a positive whole number>, "reason": "<why this page never settles>" }']);
+    expect(routeEntryProblems({ path: "/x", noise: { pixels: 0, reason: "y" } }, "r")).toHaveLength(1);
+    expect(routeEntryProblems({ path: "/x", resolve: { from: "x", selector: "a" } }, "r")).toEqual(['r.resolve is { "from": "/<list route>", "selector": "<css selector of a link>" }']);
+    expect(routeEntryProblems({ path: "/x", tries: 0 }, "r")).toEqual(["r.tries is a positive whole number"]);
+    expect(routeEntryProblems({ path: "/x", wait: 1 }, "r")).toEqual(['r: unknown key "wait" (path, resolve, noise, tries)']);
+    expect(routeEntryProblems(["/x"], "r")).toEqual(["r is a route or a route object"]);
+    expect(routeObject("/a")).toEqual({ path: "/a" });
+    expect(routeObject({ path: "/a", tries: 3 })).toEqual({ path: "/a", tries: 3 });
+  });
+
+  it("settle: identical twice in a row, or within the noise; null after 1 + tries shots", async () => {
+    const shots = (values: number[]) => {
+      let i = 0;
+      return async () => Buffer.from([values[Math.min(i++, values.length - 1)]]);
+    };
+    const diff = (a: Buffer, b: Buffer) => ({ changed: Math.abs(a[0] - b[0]) });
+    expect(await settle(shots([1, 2, 2]), { tries: 10 })).toEqual({ png: Buffer.from([2]), changed: 0 });
+    expect(await settle(shots([1, 2, 3, 4, 5]), { tries: 3 })).toBeNull();
+    expect(await settle(shots([1, 9, 12, 14]), { tries: 10, noise: 2, diff })).toEqual({ png: Buffer.from([14]), changed: 2 });
+    expect(await settle(shots([1, 9, 17, 25, 33]), { tries: 4, noise: 2, diff })).toBeNull();
+    // Without a diff function the noise cannot be measured: only identical shots settle.
+    expect(await settle(shots([1, 2, 3, 3]), { tries: 10, noise: 5 })).toEqual({ png: Buffer.from([3]), changed: 0 });
+  });
+
   it("knows gate pages, landings and projects", () => {
     for (const gate of ["/login", "/login?error=1", "/two-factor", "/two-factor/setup", "/password", "/read-only?area=x"]) {
       expect(isGatePage(`http://localhost:3000${gate}`, "/login"), gate).toBe(true);
@@ -366,6 +421,18 @@ function fakeApp(css: string) {
         return redirect("/two-factor/setup");
       case "/dev/kit":
         return html('<ul><li><a href="/dev/kit/alpha" data-story-id="alpha">alpha</a></li><li><a href="/dev/kit/beta" data-story-id="beta" data-story-open="#open">beta</a></li></ul>');
+      case "/list":
+        return html('<ul><li><a href="/about">About</a></li><li><a class="item" href="/items/42?tab=lines">Item 42</a></li><li><a class="item" href="/items/7">Item 7</a></li></ul>');
+      case "/items/42":
+        return html(`<h1>Item 42</h1><p>${url.search}</p>`);
+      case "/jitter":
+        // Never settles: a 2x2 square takes a new colour on every message (a message channel runs
+        // under the capture's paused clock, like React's scheduler), so no two shots are equal and
+        // each pair differs by exactly 4 pixels.
+        return html(
+          '<h1>Jitter</h1><div id="j" style="width:2px;height:2px;background:#000"></div>' +
+            '<script>let n = 0; const c = new MessageChannel(); c.port1.onmessage = () => { n = (n + 1) % 16777216; j.style.background = "#" + n.toString(16).padStart(6, "0"); c.port2.postMessage(0); }; addEventListener("load", () => c.port2.postMessage(0));</script>',
+        );
       case "/dev/kit/alpha":
         return html(`<div data-story="alpha">Alpha</div>${READY("alpha")}`);
       case "/dev/kit/beta":
@@ -638,5 +705,46 @@ describe.concurrent("app-shots capture (the real script against a local server)"
     expect(r.status).toBe(2);
     expect(r.stderr).toContain("set the environment variable OPS_UI_SHOTS_RO_USER");
     expect(existsSync(r.out)).toBe(false);
+  });
+  it("a route object resolves its fixture id at capture time: the first match's href is shot under the route's own key", T, async ({ expect }) => {
+    const app = appDir(
+      config({
+        routes: [
+          "/home",
+          { path: "/items/:first", resolve: { from: "/list", selector: "a.item" } },
+          { path: "/items/:none", resolve: { from: "/list", selector: "a.missing" } },
+        ],
+      }),
+    );
+    const r = await captureRun(app, [], withoutReadonlyCredentials());
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('/items/:none: resolve found no "a.missing" with an href on /list');
+    const manifest = JSON.parse(readFileSync(path.join(r.out, "manifest.json"), "utf8"));
+    const shot = manifest.projects["1440"].routes["/items/:first"];
+    expect(shot).toMatchObject({ route: "/items/:first", resolved: "/items/42?tab=lines", landed: "/items/42?tab=lines", status: 200 });
+    expect(shot.file).toBe(`${slug("/items/:first")}.png`);
+    expect(existsSync(path.join(r.out, "1440", shot.file))).toBe(true);
+    expect(manifest.projects["375-touch"].routes["/items/:first"].resolved).toBe("/items/42?tab=lines");
+  });
+
+  it("a page that never settles fails, unless its route allows that much noise (recorded for compare)", T, async ({ expect }) => {
+    let r = await captureRun(appDir(config({ routes: ["/home", { path: "/jitter", tries: 3 }] })), [], withoutReadonlyCredentials());
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("/jitter: the page never settled (4 screenshots, no two identical");
+    r = await captureRun(appDir(config({ routes: ["/home", { path: "/jitter", tries: 3, noise: { pixels: 3, reason: "a 2x2 square" } }] })), [], withoutReadonlyCredentials());
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("/jitter: the page never settled (4 screenshots, no two within 3 pixel(s)");
+    r = await captureRun(appDir(config({ routes: ["/home", { path: "/jitter", noise: { pixels: 4, reason: "a 2x2 square" } }] })), [], withoutReadonlyCredentials());
+    expect(r.status, r.stderr).toBe(0);
+    const manifest = JSON.parse(readFileSync(path.join(r.out, "manifest.json"), "utf8"));
+    expect(manifest.projects["1440"].routes["/jitter"].noise).toBe(4);
+    expect(manifest.projects["1440"].routes["/jitter"].settledWithin).toBeLessThanOrEqual(4);
+    expect(manifest.projects["1440"].routes["/home"].noise).toBeUndefined();
+  });
+
+  it("a malformed route object is a usage error (exit 2)", T, async ({ expect }) => {
+    const r = await captureRun(appDir(config({ routes: [{ path: "/x", noise: { pixels: 4 } }] })), [], withoutReadonlyCredentials());
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('visual.routes[0].noise is { "pixels"');
   });
 });

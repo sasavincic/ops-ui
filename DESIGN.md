@@ -159,10 +159,16 @@ shared one, build an app pattern, build a special) and reach for these first:
 | `<Link className="underline underline-offset-2 hover:text-ink">` | `<TextLink variant="quiet">` |
 | `<TH className="hidden sm:table-cell text-right">` | `<TH hideBelow="sm" alignRight>` |
 | `<TD className="font-mono text-right">` | `<TD numeric>` |
+| `<button className="text-detail text-ink-muted underline underline-offset-2 hover:text-ink">` | `<TextButton variant="quiet" size="detail" tone="muted">` (1.6) |
+| `<div className="grid gap-3 sm:grid-cols-2">` | `<Grid gap={3} cols={2} from="sm">` (1.6) |
+| `<div className="grid items-start gap-6 lg:grid-cols-[1fr_minmax(20rem,26rem)]">` | `<SplitLayout>` (1.6) |
+| `<span className="text-detail whitespace-nowrap">` | `<Text size="detail" nowrap>` (1.6) |
 
 - **`Text`** carries one `size` (`body` 14px, `detail` 13px, `micro` 11px: the type scale
   below), one `tone` (ink, secondary, muted, or the warning / danger / success hue for a line
-  that is itself an attention line) and one `weight`; `mono`, `block`, `truncate` as flags.
+  that is itself an attention line) and one `weight`; `mono`, `block`, `truncate` as flags, and
+  since 1.6 `nowrap` (a date, an amount, a code that must not break) and `tabular` (figures of
+  equal width, so a column of numbers lines up).
 - **`Heading`** has three levels: `title` (a stand-alone card's title, the sign-in pages),
   `section` (a section of a page or a card) and `subsection` (a group inside a section or a
   sheet). A page's own title is `PageHeader`'s; an uppercase label is `Kicker`.
@@ -171,8 +177,21 @@ shared one, build an app pattern, build a special) and reach for these first:
 - **`TextLink`** is a link inside text: `quiet` (underlined, ink on hover), `underline`,
   `primary` (the link colour), `plain` (underline on hover), `strong` (a record's name outside a
   table; inside a table that is `RowLink`).
+- **`TextButton`** (1.6) is a `<button>` that reads as a link inside text ("+ alternative rate",
+  "Show all", "Use a backup code"): `TextLink`'s variants (plus `muted`: secondary ink, primary on
+  hover, the sign-in pages' secondary actions, on `TextLink` too), `size` and `tone` as `Text`. A
+  button, so it hides in a read-only scope unless `readOnlySafe` (as `Button`); pass `type="button"`
+  inside a form. An action with consequences is still a `Button` (Actions): a TextButton is for a
+  small step inside a sentence or under a field.
 - **Table columns** hide below a breakpoint with `hideBelow`, align right with `alignRight`, and
   a number or money column is `numeric` (right-aligned, monospace).
+- **`Grid`** (1.6) is the grid that recurs: `cols` 2 or 3, from a breakpoint (`from` `sm` | `lg`,
+  none = always), `gap`, `align="start"`. Form fields sit in `<Grid gap={3} cols={2} from="sm">`
+  (or gap 4 for a record's form); a field that spans both keeps `className="sm:col-span-2"`.
+  Two cards side by side on a record page are `<Grid gap={6} cols={2} from="lg" align="start">`.
+- **`SplitLayout`** (1.6) is a page's main column with a side column (20-26rem) beside it from
+  `lg`: a form beside its preview, a document beside its facts. Main first, side second. Another
+  side width goes in `className` (`lg:grid-cols-[…]` replaces the template).
 
 Each renders exactly the classes it names, so moving a screen onto them changes no pixel. Spacing
 that belongs to the surroundings (`mt-1`, `min-w-0`) stays in `className`. What is not a recipe
@@ -195,8 +214,24 @@ A **multi-pick from a vocabulary** is a grid of `CheckTile`s: the whole bordered
 target, the tick sits in a drawn box, a picked tile turns primary-subtle. A tile may carry the
 vocabulary's own glyph and a muted one-line hint that says why it is fixed or what it depends on;
 a dependency is stated, never drawn as an indent. A bare `Checkbox` stays for a single boolean
-beside its label. A boolean that changes how the record reads (a paper that never expires) is
-the `Switch`: the whole row is the target, and it hides or reveals the field it makes moot.
+beside its label; without a label (1.6) it is the bare box of a list's selection column, which
+names its row through `aria-label`. A boolean that changes how the record reads (a paper that
+never expires) is the `Switch`: the whole row is the target, and it hides or reveals the field it
+makes moot.
+
+**One of a few** (1.6) is a radio group. `RadioGroup` holds the group's `name`, `value` and
+`onChange` and lays its options out as a column (`vertical`) or a wrapping row (`horizontal`);
+each option says only its own `value`. A `Radio` is a radio with its label (the `Checkbox` look,
+a round mark): two or three plain options in a dialog. A `ChoiceTile` is an option drawn as a
+bordered tile, the whole tile the target, the radio itself hidden, a picked tile primary-subtle
+with a primary border and the keyboard focus drawn around the tile: a pick whose options are
+records or carry a mark (the issuing company, the employer, the quote type). Layouts: `row` (a
+mark and a name), `compact` (the mark alone on a phone, mark and name from sm), `stacked` (a short
+word on a phone, the long name from sm). A multi-pick is still `CheckTile`s.
+
+**A chip that can be taken away** (1.6) ends in a `TagRemove`: the small ✕ inside a `Tag` (give
+the Tag `className="pr-1"`), labelled with what it removes. Removing changes data, so it hides in
+a read-only scope like a button.
 
 **Dates are the kit `DateInput`**, never `<input type="date">`. It shows and takes DD-MM-YYYY
 (typed leniently: "28.9.26", "280926"; digits alone gain their dashes; unreadable text returns to
@@ -234,6 +269,16 @@ row is skipped), Enter picks and never submits the form, Escape closes the list.
 
 A **month** is chosen with `MonthNav`: ghost chevrons either side and the month itself as a
 button that opens a year + month grid. Link-based: the month lives in the URL.
+
+## Library classes and theme variables (1.6)
+
+An app's Tailwind scans the vendored library, comments included, and declares a theme variable
+for every class it finds that reads one (`max-w-6xl` → `--container-6xl`). So a library class that
+names a size only some apps render puts a variable into every app's CSS and its G3 token dump:
+1.5.0's AppFrame named both content widths, and each app declared the one it never uses. A
+library component therefore takes a size from the spacing scale or as a value (`max-w-[72rem]`),
+never a named size an app may not use, and never spells such a class name in a comment.
+`tests/theme-variables.test.ts` pins the container sizes the library declares.
 
 ## Actions
 

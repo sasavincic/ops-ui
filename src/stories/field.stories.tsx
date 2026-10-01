@@ -166,6 +166,35 @@ function Adornments() {
   );
 }
 
+/** 1.6.0: a Checkbox without `label` is the bare box of a list's selection column. */
+function BareCheckboxes() {
+  const [picked, setPicked] = useState<string[]>(["2"]);
+  const rows = [
+    ["1", "Kraftwerk Bau GmbH", "€4,280.00"],
+    ["2", "OTP banka, fee", "€12.50"],
+    ["3", "Fuel card, September", "€1,104.37"],
+  ];
+  return (
+    <div className="flex max-w-md flex-col divide-y divide-border rounded-container border border-border">
+      {rows.map(([id, name, amount]) => (
+        <div key={id} className="flex items-center gap-3 px-4 py-3 text-sm text-ink">
+          <Checkbox
+            aria-label={`Select ${name}`}
+            checked={picked.includes(id)}
+            onChange={() => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))}
+          />
+          <span className="min-w-0 flex-1 truncate">{name}</span>
+          <span className="font-mono text-detail">{amount}</span>
+        </div>
+      ))}
+      <div className="flex items-center gap-3 px-4 py-3 text-sm text-ink-muted">
+        <Checkbox aria-label="Select a booked line" disabled />
+        <span>Booked, not selectable</span>
+      </div>
+    </div>
+  );
+}
+
 export const stories: Story[] = [
   { name: "States", render: () => <States /> },
   { name: "Controls", render: () => <Controls /> },
@@ -173,6 +202,7 @@ export const stories: Story[] = [
   { name: "Switch", render: () => <Switches /> },
   { name: "Large", render: () => <Large /> },
   { name: "Adornments", render: () => <Adornments /> },
+  { name: "Bare checkbox", render: () => <BareCheckboxes /> },
   {
     name: "In a read-only scope",
     render: () => (

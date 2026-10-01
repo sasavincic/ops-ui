@@ -358,7 +358,8 @@ export function bareUtility(token: string): string;
  * - `style`: a `style={{` whose line has no `runtime:` comment and whose object sets anything but
  *   CSS variables (files on `allowlist.styles` are exempt);
  * - `raw-control`: a `<button`, `<select`, `<input` or `<table` outside RAW_CONTROL_FOLDERS and
- *   `allowlist.rawControls`.
+ *   `allowlist.rawControls`; an `<input type="hidden">` is not one (1.6.0: it renders nothing and
+ *   has no read-only or touch behaviour to skip).
  * @param {string} source
  * @param {string} file
  * @param {{ allowlist?: StyleAllowlist }} [options]

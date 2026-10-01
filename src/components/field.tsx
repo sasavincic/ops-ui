@@ -240,16 +240,32 @@ export function Select({
   );
 }
 
+/**
+ * A checkbox with its label. 1.6.0: without `label` it is the bare box (a row's selection in a
+ * list), which then needs `aria-label`; `className` then styles the box itself.
+ */
 export function Checkbox({
   label,
   className,
   readOnlySafe,
   ...props
-}: React.ComponentProps<"input"> & { label: string } & ReadOnlyProps) {
+}: React.ComponentProps<"input"> &
+  ({ label: string } | { label?: undefined; "aria-label": string }) &
+  ReadOnlyProps) {
   // Hook first, || second: `props.disabled || useLocked(...)` would skip the
   // hook whenever the field is already disabled — a conditional hook call.
   const locked = useLocked(readOnlySafe);
   const disabled = props.disabled || locked;
+  if (label === undefined) {
+    return (
+      <input
+        type="checkbox"
+        className={cn("size-4 accent-primary", className)}
+        {...props}
+        disabled={disabled}
+      />
+    );
+  }
   return (
     <label
       className={cn(

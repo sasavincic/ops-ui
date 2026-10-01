@@ -1827,6 +1827,33 @@ const HEX_COLOUR = /(?<![\w&])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4}
 const COLOUR_FUNCTION = /(?<![\w-])(?:rgba?|hsla?|oklch|oklab)\(/g;
 const RAW_CONTROL = /<(button|select|input|table)(?=[\s/>])/g;
 
+/**
+ * Is the `<input` at `start` (comment-blanked code) a hidden input: `type="hidden"`, `type='hidden'`
+ * or `type={"hidden"}` among the attributes of its opening tag? The tag ends at the first `>` outside
+ * braces and quotes.
+ * @param {string} code
+ * @param {number} start
+ */
+function isHiddenInput(code, start) {
+  let depth = 0;
+  let end = code.length;
+  for (let j = start + 1; j < code.length; j++) {
+    const c = code[j];
+    if (c === '"' || c === "'" || c === "`") {
+      j += 1;
+      while (j < code.length && code[j] !== c) j += code[j] === "\\" ? 2 : 1;
+      continue;
+    }
+    if (c === "{") depth++;
+    else if (c === "}") depth--;
+    else if (c === ">" && depth === 0) {
+      end = j;
+      break;
+    }
+  }
+  return /\stype=(?:"hidden"|'hidden'|\{\s*["'`]hidden["'`]\s*\})/.test(code.slice(start, end));
+}
+
 /** The utility without its variant prefixes and important mark: `sm:!w-[3px]` → `w-[3px]`. */
 export function bareUtility(/** @type {string} */ token) {
   return token.replace(/^(?:[\w-]+(?:-\[[^\]]*\]+)?:)*!?/, "");
@@ -1891,7 +1918,8 @@ function styleObjectKeys(code, open) {
  * - `style`: a `style={{` whose line has no `runtime:` comment and whose object sets anything but
  *   CSS variables (files on `allowlist.styles` are exempt);
  * - `raw-control`: a `<button`, `<select`, `<input` or `<table` outside RAW_CONTROL_FOLDERS and
- *   `allowlist.rawControls`.
+ *   `allowlist.rawControls`; an `<input type="hidden">` is not one (1.6.0: it renders nothing and
+ *   has no read-only or touch behaviour to skip).
  * @param {string} source
  * @param {string} file
  * @param {{ allowlist?: StyleAllowlist }} [options]
@@ -1933,7 +1961,10 @@ export function styleFindings(source, file, options = {}) {
   }
   const rawAllowed = [...RAW_CONTROL_FOLDERS, ...allowlist.rawControls.map((e) => e.value)];
   if (!rawAllowed.some((folder) => underPath(file, folder))) {
-    for (const m of code.matchAll(RAW_CONTROL)) add("raw-control", m.index ?? 0, `<${m[1]}>`);
+    for (const m of code.matchAll(RAW_CONTROL)) {
+      if (m[1] === "input" && isHiddenInput(code, m.index ?? 0)) continue;
+      add("raw-control", m.index ?? 0, `<${m[1]}>`);
+    }
   }
   return findings;
 }

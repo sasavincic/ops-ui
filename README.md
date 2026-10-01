@@ -106,7 +106,11 @@ describe("style guards", () => {
 
 `arbitrary` values are class tokens (matched with or without variant prefixes: the entry
 `max-h-[…]` also covers `sm:max-h-[…]`); the other three are paths (a file, or a folder). A raw
-control is always allowed under `src/components/ui/` and `src/vendor/`. A `style={{` passes when
+control is always allowed under `src/components/ui/` and `src/vendor/`, and since 1.6 an
+`<input type="hidden">` is never one (it renders nothing; `type="hidden"`, `type='hidden'` or
+`type={"hidden"}` in its own tag). Since 1.6 most of the rest has a kit form: a link-styled
+`<button>` is `TextButton`, a radio `Radio` / `RadioGroup` / `ChoiceTile`, a selection checkbox a
+`Checkbox` without `label`, a chip's ✕ `TagRemove` (CHANGELOG `## 1.6.0` lists the codemods). A `style={{` passes when
 its line carries a `runtime:` comment (`{/* runtime: drag position */}`) or its object sets CSS
 variables only (`style={{ "--w": pct }}` + `w-(--w)`). On day one, generate the file from the
 report's findings (one entry per distinct value or file, with a real reason); each sweep commit
@@ -119,6 +123,16 @@ exactly the classes of the recipe they replace (DESIGN.md → Primitives; the me
 styling programme spec §4.4), so a codemod commit changes no pixel: G2 (`tools/app-shots.mjs`)
 must show 0 changed pixels. Move a class into a prop only when no other class left in
 `className` belongs to the same group (one size, one colour, one weight).
+
+## Adopting 1.6.0
+
+`TextButton`, `Radio` / `RadioGroup` / `ChoiceTile`, the bare `Checkbox`, `TagRemove`,
+`SplitLayout`, `Grid` and `Text` `nowrap` / `tabular` render exactly the measured app recipes
+(styling programme spec §4.6, `tests/primitives-1-6.test.tsx`), so the second sweep is a codemod
+at 0 changed pixels (G2), except where the CHANGELOG says otherwise (FinaOps' native radios take
+the kit's look). Two things to watch: a `TextButton` / `TagRemove` hides in a read-only scope
+unless `readOnlySafe` (add it where the button changes no data), and the sync's G3 shows
+`removed token --container-5xl` and `--container-6xl` once (AppFrame's widths became values).
 
 ## Adopting the shell (1.5.0)
 

@@ -175,7 +175,10 @@ or scratch exports.
 `_PASSWORD`, `OPS_UI_SHOTS_RO_USER` / `_PASSWORD`), the same with `--label branch`
 on the branch, then
 `node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file>]`.
-Captures go to `$TMPDIR/ops-ui-shots/<app>/<label>/`. **Servers** (spec §11.4
+Captures go to `$TMPDIR/ops-ui-shots/<app>/<label>/`. A route may be an object (1.6.0):
+`{ "path": "/transactions/:first", "resolve": { "from": "/transactions", "selector": "…" } }` reads a
+fixture id at capture time; `"noise": { "pixels", "reason" }` lets a page that never settles
+settle (and compare pass it) within that many pixels; `"tries"` / `visual.settleTries` (default 10). **Servers** (spec §11.4
 "Which server"): app pages against a production build (`pnpm build && pnpm
 start`), `/dev/kit` and its stories in a second capture pair against `pnpm dev`
 (the route refuses production). Each user signs in once per capture (the apps
@@ -500,3 +503,20 @@ name changes its CSS with a docs commit: `@source not` them (spec §8.4).
   browser tests for the palette, chords, drawer and pull-to-search. The palette stories open on
   mount and click their own field (`open`) so the shot repaints once (without it the 375 palette
   text flaked between two antialiasing modes).
+- **1.6.0** (2026-10-01, styling programme §4.6, measured on Workforce Ops a5cd0e4 / FinaOps
+  526d1a7): the sweeps' leftovers. `TextButton` (client; a `<button>` with `TextLink`'s classes +
+  `size` / `tone`, read-only like Button), `TextLink` / `TextButton` variant `muted`, `Radio` /
+  `RadioGroup` / `ChoiceTile` (`components/radio.tsx`, client; the group hands name / checked /
+  onChange to its options; tile layouts row / compact / stacked = WFO's three tiles), `Checkbox`
+  without `label` (the bare selection box, `aria-label` required by the type), `SplitLayout` and
+  `Grid` (server-safe; cols 2 | 3 from none / sm / lg), `TagRemove` (client, the ✕ inside a server-safe
+  `Tag`), `Text` `nowrap` / `tabular`. `tests/primitives-1-6.test.tsx` compares each with the app
+  recipe. AppFrame's content widths are values (`max-w-[64rem]` / `[72rem]`): the named sizes made
+  every app declare both container variables (`tests/theme-variables.test.ts` pins the container
+  sizes; never spell a named-size class in a library comment either, Tailwind scans comments).
+  The style guard skips `<input type="hidden">`. `app-shots`: route objects `{ path, resolve,
+  noise, tries }` + `visual.settleTries` (fixture ids resolved at capture; a never-settling page's
+  pixel allowance, also honoured by compare). The RowMenu follow-scroll behaviour test reads both
+  rectangles in one frame (was flaky under load). 8 stories (98), 72 new baselines only. Released
+  with `--compatible Checkbox --compatible Text --compatible textClasses`. The CHANGELOG lists each
+  app's second-sweep codemods.

@@ -33,10 +33,14 @@ export type TextStyleProps = {
   block?: boolean;
   /** One line with an ellipsis (needs a width: a block or a min-w-0 flex child). */
   truncate?: boolean;
+  /** 1.6.0: never wraps (`whitespace-nowrap`): a date, an amount, a short code. */
+  nowrap?: boolean;
+  /** 1.6.0: digits of equal width (`tabular-nums`), so figures line up row under row. */
+  tabular?: boolean;
 };
 
-/** The classes of the style props, in a fixed order (size, tone, weight, mono, block, truncate). */
-export function textClasses({ size, tone, weight, mono, block, truncate }: TextStyleProps): string[] {
+/** The classes of the style props, in a fixed order (size, tone, weight, mono, block, truncate, nowrap, tabular). */
+export function textClasses({ size, tone, weight, mono, block, truncate, nowrap, tabular }: TextStyleProps): string[] {
   return [
     size && TEXT_SIZE[size],
     tone && TEXT_TONE[tone],
@@ -44,6 +48,8 @@ export function textClasses({ size, tone, weight, mono, block, truncate }: TextS
     mono && "font-mono",
     block && "block",
     truncate && "truncate",
+    nowrap && "whitespace-nowrap",
+    tabular && "tabular-nums",
   ].filter((c): c is string => Boolean(c));
 }
 
@@ -60,10 +66,12 @@ export function Text<T extends TextTag = "span">({
   mono,
   block,
   truncate,
+  nowrap,
+  tabular,
   className,
   ...props
 }: TextProps<T>) {
   const Tag = (as ?? "span") as React.ElementType;
-  const classes = cn(textClasses({ size, tone, weight, mono, block, truncate }), className);
+  const classes = cn(textClasses({ size, tone, weight, mono, block, truncate, nowrap, tabular }), className);
   return <Tag className={classes || undefined} {...props} />;
 }
