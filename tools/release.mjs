@@ -3,8 +3,9 @@
 //   pnpm release X.Y.Z [--compatible <declaration name>]… [--trailer <line>]… [--dry-run]
 //
 // Run from the library checkout (the working directory is the repository it releases). A release
-// is ONE commit titled exactly `release: vX.Y.Z` that changes exactly package.json "version" and
-// src/version.ts, plus the branch `release/vX.Y.Z` at it. It never pushes tags: the session git
+// is ONE commit titled exactly `release: vX.Y.Z` that changes exactly package.json "version",
+// src/version.ts and the OPS_UI_VERSION line of api-surface.d.txt, plus the branch
+// `release/vX.Y.Z` at it. It never pushes tags: the session git
 // proxy refuses tag refs (spec §1.1, §4.2 step 7).
 //
 // In order (the spec's step numbers; the cheap checks run before the gates, so a refusal never
@@ -18,7 +19,9 @@
 //          baselines, gallery/playwright.config.ts and gallery/fonts/**) → major;
 //        - api-surface.d.txt: a removed or changed line → major, unless every declaration it
 //          belongs to is named by --compatible (and by a `Compatible:` line of the CHANGELOG
-//          section, which carries the reason); added lines only → minor;
+//          section, which carries the reason); added lines only → minor; the
+//          `export declare const OPS_UI_VERSION = "…";` line counts for nothing (every release
+//          rewrites it);
 //        - new baseline files → minor;
 //        - styles/tokens.css (= TOKENS.md, tests/tokens.test.ts): a new required brand variable,
 //          a removed token or a changed token value → major; a new token → minor;
@@ -31,8 +34,9 @@
 //      The first release (no P) skips step 4.
 //   5. CHANGELOG.md has `## X.Y.Z — YYYY-MM-DD`; a major has `Visible:` and `Upgrade steps:`.
 //   2. Runs `pnpm typecheck && pnpm lint && pnpm test && pnpm shots`.
-//   6. Writes package.json "version" and src/version.ts and commits exactly those two files as
-//      `release: vX.Y.Z` (body: the level, the --compatible names, then each --trailer line).
+//   6. Writes package.json "version", src/version.ts and the OPS_UI_VERSION line of
+//      api-surface.d.txt (so the surface is never stale after a release) and commits exactly those
+//      three files as `release: vX.Y.Z` (body: the level, the --compatible names, then each --trailer line).
 //   7. Creates branch release/vX.Y.Z at that commit and pushes main, then the branch (a refused
 //      branch push is a warning: the commit marker alone is enough for the sync). Network errors
 //      are retried 4 times (2, 4, 8, 16 s).
@@ -241,6 +245,28 @@ export function diffLines(diff) {
   return { removed, added };
 }
 
+/** The surface line of src/version.ts, which every release rewrites: never a level of its own. */
+export const VERSION_LINE = /^export declare const OPS_UI_VERSION = "[^"]*";$/;
+
+/** @param {string} line */
+export function isVersionLine(line) {
+  return VERSION_LINE.test(line.trim());
+}
+
+/**
+ * The surface with its OPS_UI_VERSION line saying `version` (what `pnpm api-surface` writes after
+ * src/version.ts changes), or null when the surface has no such line.
+ * @param {string} surface
+ * @param {string} version
+ */
+export function surfaceWithVersion(surface, version) {
+  const lines = surface.split("\n");
+  const at = lines.findIndex((l) => isVersionLine(l));
+  if (at === -1) return null;
+  lines[at] = `export declare const OPS_UI_VERSION = "${version}";`;
+  return lines.join("\n");
+}
+
 /**
  * Classifies an api-surface diff: which declarations lost or changed a line, and whether lines
  * were added.
@@ -260,7 +286,7 @@ export function classifySurface(before, diff) {
     const text = lines[line - 1] ?? "";
     // Blank lines, the generator's comment lines and tsc's empty `export {};` module marker are
     // not declarations.
-    if (text.trim() === "" || text.startsWith("//") || text.trim() === "export {};") continue;
+    if (text.trim() === "" || text.startsWith("//") || text.trim() === "export {};" || isVersionLine(text)) continue;
     const statement = statements.find((s) => s.start <= line && line <= s.end);
     if (!statement || statement.names.length === 0) {
       unnamed.push(line);
@@ -274,7 +300,7 @@ export function classifySurface(before, diff) {
   return {
     changed: [...changed.values()],
     unnamed,
-    added: added.filter((l) => l.trim() !== "" && !l.startsWith("//") && l.trim() !== "export {};").length,
+    added: added.filter((l) => l.trim() !== "" && !l.startsWith("//") && l.trim() !== "export {};" && !isVersionLine(l)).length,
   };
 }
 
@@ -550,6 +576,11 @@ export function release(repo, options, log) {
   if (!requested) refusals.push(`${version} is not the next patch, minor or major after ${current} (package.json)`);
   const versionTs = readFileSync(path.join(root, "src/version.ts"), "utf8");
   if (!versionTs.includes(`"${current}"`)) refusals.push(`src/version.ts does not say ${current} (package.json)`);
+  const surfacePath = path.join(root, SURFACE_FILE);
+  const surfaceText = readFileSync(surfacePath, "utf8");
+  if (surfaceWithVersion(surfaceText, version) === null) {
+    refusals.push(`${SURFACE_FILE} has no "export declare const OPS_UI_VERSION = …;" line to update (run pnpm api-surface)`);
+  }
   if (refusals.length > 0) throw new Refusal(refusals);
 
   // Step 5 (read now: step 4 reads the section too).
@@ -622,7 +653,7 @@ export function release(repo, options, log) {
   ];
   const message = [`release: v${version}`, "", ...body, ...(options.trailers.length ? ["", ...options.trailers] : [])].join("\n");
   if (options.dryRun) {
-    log(`dry run: would write package.json and src/version.ts (${current} → ${version}), commit "release: v${version}", create release/v${version} and push main and the branch`);
+    log(`dry run: would write package.json, src/version.ts and ${SURFACE_FILE} (${current} → ${version}), commit "release: v${version}", create release/v${version} and push main and the branch`);
     log(message.split("\n").map((l) => `  | ${l}`).join("\n"));
     return 0;
   }
@@ -632,9 +663,16 @@ export function release(repo, options, log) {
   writeFileSync(pkgPath, newPkgText);
   const versionPath = path.join(root, "src/version.ts");
   writeFileSync(versionPath, versionTs.replace(`"${current}"`, `"${version}"`));
-  git(root, ["add", "--", "package.json", "src/version.ts"]);
+  // The declaration surface carries the version too (src/version.d.ts): rewritten in the same
+  // commit, so the surface is never stale after a release and the next one needs no --compatible.
+  writeFileSync(surfacePath, /** @type {string} */ (surfaceWithVersion(surfaceText, version)));
+  const RELEASE_FILES = ["api-surface.d.txt", "package.json", "src/version.ts"];
+  git(root, ["add", "--", ...RELEASE_FILES]);
   const staged = git(root, ["diff", "--cached", "--name-only"]).trim().split("\n").sort();
-  if (staged.join(",") !== "package.json,src/version.ts") throw new Error(`refusing to commit ${staged.join(", ")}`);
+  // (The surface is unstaged only when it already said the new version.)
+  if (!staged.includes("package.json") || !staged.includes("src/version.ts") || staged.some((f) => !RELEASE_FILES.includes(f))) {
+    throw new Error(`refusing to commit ${staged.join(", ")}`);
+  }
   git(root, ["commit", "--quiet", "-m", message]);
   const commit = git(root, ["rev-parse", "HEAD"]).trim();
   log(`committed ${commit.slice(0, 7)} release: v${version}`);

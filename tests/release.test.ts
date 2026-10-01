@@ -11,6 +11,8 @@ import {
   classifySurface,
   classifyTokens,
   componentNames,
+  isVersionLine,
+  surfaceWithVersion,
   interactionLines,
   isPureRebaseline,
   isReviewed,
@@ -77,6 +79,9 @@ const SURFACE = [
   '    size?: "sm" | "md";',
   '}): import("react").JSX.Element;',
   "export type ButtonTone = \"a\" | \"b\";",
+  "",
+  "// src/version.d.ts",
+  'export declare const OPS_UI_VERSION = "0.0.0";',
   "",
 ].join("\n");
 
@@ -216,6 +221,7 @@ describe("release rules (pure)", () => {
       ["src/components/badge.d.ts", ["Badge"]],
       ["src/components/button.d.ts", ["Button"]],
       ["src/components/button.d.ts", ["ButtonTone"]],
+      ["src/version.d.ts", ["OPS_UI_VERSION"]],
     ]);
     // The size union's line (12) belongs to Button.
     const diff = "@@ -12 +12 @@\n-    size?: \"sm\" | \"md\";\n+    size?: \"sm\" | \"md\" | \"lg\";\n@@ -14,0 +15 @@\n+export type ButtonSize = \"sm\";\n";
@@ -226,7 +232,20 @@ describe("release rules (pure)", () => {
     });
     expect(classifySurface(SURFACE, "@@ -14,0 +15 @@\n+export type ButtonSize = \"sm\";\n")).toEqual({ changed: [], unnamed: [], added: 1 });
     // tsc's module marker is not API either way.
-    expect(classifySurface(`${SURFACE}export {};\n`, "@@ -16 +15,0 @@\n-export {};\n")).toEqual({ changed: [], unnamed: [], added: 0 });
+    expect(classifySurface(`${SURFACE}export {};\n`, "@@ -18 +17,0 @@\n-export {};\n")).toEqual({ changed: [], unnamed: [], added: 0 });
+  });
+
+  it("never counts the OPS_UI_VERSION surface line, and rewrites it", () => {
+    const diff = '@@ -17 +17 @@\n-export declare const OPS_UI_VERSION = "0.0.0";\n+export declare const OPS_UI_VERSION = "1.0.0";\n';
+    expect(classifySurface(SURFACE, diff)).toEqual({ changed: [], unnamed: [], added: 0 });
+    expect(SURFACE.split("\n")[16]).toBe('export declare const OPS_UI_VERSION = "0.0.0";');
+    expect(isVersionLine('export declare const OPS_UI_VERSION = "1.2.0";')).toBe(true);
+    expect(isVersionLine("export declare const OPS_UI_VERSIONS: string[];")).toBe(false);
+    expect(surfaceWithVersion(SURFACE, "1.3.0")).toBe(SURFACE.replace('"0.0.0"', '"1.3.0"'));
+    expect(surfaceWithVersion("// nothing\n", "1.3.0")).toBeNull();
+    // The real surface carries the line, at the version of src/version.ts.
+    const version = /OPS_UI_VERSION = "([^"]+)"/.exec(readSource("src/version.ts"))?.[1];
+    expect(readSource("api-surface.d.txt").split("\n").filter(isVersionLine)).toEqual([`export declare const OPS_UI_VERSION = "${version}";`]);
   });
 
   it("reads the real api-surface.d.txt into named statements", () => {
@@ -271,9 +290,15 @@ describe.concurrent("pnpm release (tools/release.mjs against temporary repositor
     expect(git(repo.lib, "rev-parse", "HEAD~1")).toBe(before);
     expect(git(repo.lib, "log", "-1", "--format=%s", "HEAD")).toBe("release: v1.0.0");
     expect(git(repo.lib, "log", "-1", "--format=%b", "HEAD")).toContain("Co-Authored-By: Someone <someone@example.invalid>");
-    expect(git(repo.lib, "show", "--name-only", "--format=", "HEAD").split("\n").sort()).toEqual(["package.json", "src/version.ts"]);
+    expect(git(repo.lib, "show", "--name-only", "--format=", "HEAD").split("\n").sort()).toEqual(["api-surface.d.txt", "package.json", "src/version.ts"]);
     expect(JSON.parse(read(repo.lib, "package.json")).version).toBe("1.0.0");
     expect(read(repo.lib, "src/version.ts")).toBe('/** The released version. */\nexport const OPS_UI_VERSION = "1.0.0";\n');
+    // The surface is regenerated in the same commit: only its OPS_UI_VERSION line changes.
+    expect(read(repo.lib, "api-surface.d.txt")).toBe(SURFACE.replace('OPS_UI_VERSION = "0.0.0"', 'OPS_UI_VERSION = "1.0.0"'));
+    expect(git(repo.lib, "diff", "-U0", "HEAD~1", "HEAD", "--", "api-surface.d.txt").split("\n").filter((l) => /^[-+][^-+]/.test(l))).toEqual([
+      '-export declare const OPS_UI_VERSION = "0.0.0";',
+      '+export declare const OPS_UI_VERSION = "1.0.0";',
+    ]);
     expect(git(repo.origin, "rev-parse", "main")).toBe(head);
     expect(git(repo.origin, "rev-parse", "release/v1.0.0")).toBe(head);
     expect(git(repo.origin, "tag", "--list")).toBe("");
@@ -363,7 +388,7 @@ describe.concurrent("pnpm release (tools/release.mjs against temporary repositor
     const head = git(repo.lib, "rev-parse", "HEAD");
     const r = await release(repo, ["1.0.0", "--dry-run"]);
     expect(r.status, r.stderr).toBe(0);
-    expect(r.stdout).toContain('dry run: would write package.json and src/version.ts (0.0.0 → 1.0.0), commit "release: v1.0.0"');
+    expect(r.stdout).toContain('dry run: would write package.json, src/version.ts and api-surface.d.txt (0.0.0 → 1.0.0), commit "release: v1.0.0"');
     expect(gatesRun(repo)).toEqual(["typecheck", "lint", "test", "shots"]);
     expect(git(repo.lib, "rev-parse", "HEAD")).toBe(head);
     expect(git(repo.lib, "status", "--porcelain")).toBe("");
@@ -391,6 +416,40 @@ describe.concurrent("pnpm release (tools/release.mjs against temporary repositor
     expect(r.status, r.stderr).toBe(0);
     expect(r.stdout).toContain("release 1.0.1: patch; required since v1.0.0");
     expect(git(repo.lib, "log", "-1", "--format=%s")).toBe("release: v1.0.1");
+  });
+
+  it("step 4: a surface whose OPS_UI_VERSION line changed since P is still a patch; the release rewrites it", T, async ({ expect }) => {
+    const repo = await released();
+    // A release by the old script left the surface at the previous version; regenerating it after
+    // the release changes only that line (1.1.0 → 1.2.0 needed --compatible OPS_UI_VERSION).
+    write(repo.lib, "api-surface.d.txt", SURFACE.replace('"0.0.0"', '"0.9.0"'));
+    write(repo.lib, "README.md", "docs\n");
+    addSection(repo, "## 1.0.1 — 2026-10-01\nFixed: the README.\n");
+    commit(repo.lib, "docs and a stale surface line");
+    let r = await release(repo, ["1.0.1"]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toContain("release 1.0.1: patch; required since v1.0.0");
+    expect(read(repo.lib, "api-surface.d.txt")).toBe(SURFACE.replace('"0.0.0"', '"1.0.1"'));
+    expect(git(repo.lib, "show", "--name-only", "--format=", "HEAD").split("\n").sort()).toEqual(["api-surface.d.txt", "package.json", "src/version.ts"]);
+    // --compatible OPS_UI_VERSION has nothing to name any more.
+    write(repo.lib, "README.md", "docs 2\n");
+    addSection(repo, "## 1.0.2 — 2026-10-01\nFixed: the README again.\nCompatible: OPS_UI_VERSION - the version.\n");
+    commit(repo.lib, "docs 2");
+    r = await release(repo, ["1.0.2", "--compatible", "OPS_UI_VERSION"]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("--compatible OPS_UI_VERSION: api-surface.d.txt is unchanged since the previous release");
+    r = await release(repo, ["1.0.2"]);
+    expect(r.status, r.stderr).toBe(0);
+  });
+
+  it("refuses a surface without the OPS_UI_VERSION line, before the gates", T, async ({ expect }) => {
+    const repo = library();
+    write(repo.lib, "api-surface.d.txt", SURFACE.replace('export declare const OPS_UI_VERSION = "0.0.0";\n', ""));
+    commit(repo.lib, "surface without the version");
+    const r = await release(repo, ["1.0.0"]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('api-surface.d.txt has no "export declare const OPS_UI_VERSION = …;" line to update');
+    expect(gatesRun(repo)).toEqual([]);
   });
 
   it("step 4: an added declaration needs a minor", T, async ({ expect }) => {
