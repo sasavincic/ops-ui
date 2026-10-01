@@ -391,3 +391,22 @@ Captures go to `$TMPDIR/ops-ui-shots/<app>/<label>/`.
   both apps' `main` (`docs/extraction-proof-1.0.0.md`); kit-freeze notes are
   in both apps' CLAUDE.md. Next: Phase B (F0-F7, W0-W8) and library 1.1-1.3
   per the styling programme.
+- **1.1.0** (2026-10-01, spec §12.4 "1.1.0", nothing else): `lib/apps.ts`
+  (`OPS_APPS`: Workforce Ops https://workforce-ops.vercel.app `#0b131e`,
+  FinaOps `href: null` `#083a25`, PrefabOps https://prefab-ops-platform.vercel.app
+  `#092a48`) + `components/app-switcher.tsx` (§10; the current app is listed
+  even with a null href, it has no link); `components/validity-cell.tsx`
+  (Workforce Ops 23d7d5c, decoupled; `tests/validity-cell.test.tsx` renders the
+  raw WFO file from `tests/fixtures/wfo-validity-cell` beside it and requires
+  equal markup) + `lib/validity.ts`; optional `strings.tabs` / `appSwitcher` /
+  `validity` with `EN_OPTIONAL_STRINGS` (EN_STRINGS unchanged). Tabs stays
+  server-safe and renders its links into the client leaf `config/tabs-nav.tsx`.
+  `data-ops-dismiss` (not on a relabelled `closeLabel` escape) and
+  `data-ops-commit` on DialogFooter's buttons (so ConfirmDialog's); SheetFooter
+  has no buttons of its own. 4 new stories (64), new baselines only.
+  `tools/diff-against-app.mjs` is the 1.0 proof and reads the library from its
+  checkout, so `tests/diff-against-app.test.ts` pins its tables and end-to-end
+  runs to the `release: v1.0.0` commit (the tool runs from an export of it).
+  Known tooling gap: the release commit writes `src/version.ts` but not
+  `api-surface.d.txt`, so after each release the surface is stale (regenerate in
+  the next commit) and the next release needs `--compatible OPS_UI_VERSION`.
