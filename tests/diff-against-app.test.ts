@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { pathToFileURL } from "node:url";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   EXCERPT_MODULES,
   FINAOPS_AHEAD,
@@ -15,11 +16,10 @@ import {
   newTally,
   readTypesModule,
   relocateTypes,
-  run,
   stringLeaves,
   substitute,
 } from "../tools/diff-against-app.mjs";
-import { ROOT, readSource } from "./source-files";
+import { ROOT } from "./source-files";
 
 // tools/diff-against-app.mjs (spec §12.1 L6): the extraction proof. The unit tests pin each
 // normalization to what the spec calls mechanical; the end-to-end tests run the tool against an
@@ -28,8 +28,18 @@ import { ROOT, readSource } from "./source-files";
 // tests/fixtures/reimport-finaops: button, date-input, dialog, floating-place,
 // sheet-motion, glance-card; spec §12.4 option 1), so the proof is exercised without an app checkout - and a
 // planted change must fail it.
+//
+// The proof is the proof of 1.0.0 (a pure extraction). From 1.1 the library grows past both app
+// kits on purpose (spec §12.4: AppSwitcher, ValidityCell, the data-ops markers, strings.tabs), and
+// tools/diff-against-app.mjs reads the library from its own checkout, so the tables and the end to
+// end runs below are pinned to the 1.0.0 release: the tables read that commit, and the tool runs
+// from an export of it.
 
-const EN = stringLeaves(readSource("src/config/strings.ts"), "strings.ts", "EN_STRINGS");
+/** The 1.0.0 release commit: the library the extraction proof is about. */
+const RELEASE_1_0 = execFileSync("git", ["-C", ROOT, "log", "--format=%H", "--grep=^release: v1.0.0$"], { encoding: "utf8" }).trim().split("\n")[0];
+const atRelease = (p: string) => execFileSync("git", ["-C", ROOT, "show", `${RELEASE_1_0}:${p}`], { encoding: "utf8" });
+
+const EN = stringLeaves(atRelease("src/config/strings.ts"), "strings.ts", "EN_STRINGS");
 
 describe("normalizations", () => {
   it("t.common.x → strings.x, file-wide (comments too), and the hook line becomes one marker", () => {
@@ -87,17 +97,20 @@ describe("normalizations", () => {
   });
 });
 
+it("the 1.0.0 release commit is in history", () => {
+  expect(RELEASE_1_0, "no commit titled 'release: v1.0.0' - the extraction proof cannot be pinned").toMatch(/^[0-9a-f]{40}$/);
+});
+
 describe("the tables", () => {
-  const components = execFileSync("git", ["-C", ROOT, "ls-files", "src/components"], { encoding: "utf8" })
+  const components = execFileSync("git", ["-C", ROOT, "ls-tree", "--name-only", `${RELEASE_1_0}:src/components`], { encoding: "utf8" })
     .split("\n")
-    .filter(Boolean)
-    .map((f) => path.basename(f));
+    .filter(Boolean);
 
   it("§9 lists exactly the library's 35 components, with their directives", () => {
     expect(Object.keys(ROWS).sort()).toEqual(components.sort());
     expect(Object.values(ROWS).map((r) => r.row).sort((a, b) => a - b)).toEqual(Array.from({ length: 35 }, (_, i) => i + 1));
     for (const [file, row] of Object.entries(ROWS)) {
-      expect(readSource(`src/components/${file}`).startsWith('"use client";'), file).toBe(row.kind === "C");
+      expect(atRelease(`src/components/${file}`).startsWith('"use client";'), file).toBe(row.kind === "C");
     }
   });
 
@@ -108,7 +121,7 @@ describe("the tables", () => {
 
   it("each FinaOps-ahead entry names library lines the library really holds (or it could never match)", () => {
     for (const [file, entry] of Object.entries(FINAOPS_AHEAD)) {
-      const lib = readSource(`src/components/${file}`).split("\n").map((l) => l.trim());
+      const lib = atRelease(`src/components/${file}`).split("\n").map((l) => l.trim());
       for (const line of entry.libraryOnly) expect(lib, `${file}: ${line}`).toContain(line);
       for (const line of entry.appOnly) expect(lib, `${file}: ${line}`).not.toContain(line);
     }
@@ -167,8 +180,17 @@ it("the L2 import commit is in history (a shallow clone: git fetch --unshallow)"
   expect(L2, "no commit titled 'L2: import the kit' - the extraction proof cannot run").toMatch(/^[0-9a-f]{40}$/);
 });
 
-describe.skipIf(!L2)("end to end", () => {
+describe.skipIf(!L2 || !RELEASE_1_0)("end to end", () => {
   const T = { timeout: 60_000 };
+  // The tool as it ran for 1.0.0, from an export of the release (its LIB is the export's root).
+  let run: typeof import("../tools/diff-against-app.mjs").run;
+  beforeAll(async () => {
+    const lib = path.join(SANDBOX, "ops-ui-1.0.0");
+    mkdirSync(lib, { recursive: true });
+    execFileSync("sh", ["-c", `git -C "${ROOT}" archive ${RELEASE_1_0} | tar -x -C "${lib}"`]);
+    symlinkSync(path.join(ROOT, "node_modules"), path.join(lib, "node_modules"), "dir");
+    ({ run } = await import(pathToFileURL(path.join(lib, "tools/diff-against-app.mjs")).href));
+  }, 60_000);
 
   it("the library is proven against the kit it was imported from", T, () => {
     const dir = path.join(SANDBOX, "fina-ops");
