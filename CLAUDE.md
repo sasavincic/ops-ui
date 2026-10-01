@@ -462,7 +462,7 @@ name changes its CSS with a docs commit: `@source not` them (spec §8.4).
   browser tests for all three. Version map settled: **1.5.0 = AppFrame** (styling programme
   §4.2 / §8, restyle plan §10.2). Known flake added: the 375-touch `year-input--picker*` shots
   share `date-input--calendar*`'s (a byte of corner anti-aliasing on the field under the sheet's
-  backdrop, ~1 run in 6): re-run. A hovered bordered button's corners flake the same way
+  backdrop, ~1 run in 6): re-run (fixed for both by the tools fixes below). A hovered bordered button's corners flake the same way
   (`button--matrix@hover-secondary`), so the RowMenu trigger story opens a ghost trigger.
 - **Tools fixes** (2026-10-01, branch `claude/tools-fixes`, from the F/W app runs;
   no `src/` or `styles/` change). `tools/app-shots.mjs`: the G3 dump reads each
@@ -473,10 +473,12 @@ name changes its CSS with a docs commit: `@source not` them (spec §8.4).
   reused through `storageState`; `visual.loginTimeout` / `--login-timeout`,
   default 60 s; `--expect` keeps a `#000` in a value (a comment is `#` + space).
   `tools/release.mjs` rewrites the `OPS_UI_VERSION` line of `api-surface.d.txt`
-  in the release commit (three files now) and never counts that line. The shots
+  in the release commit (three files now) and never counts that line
+  (`--compatible OPS_UI_VERSION` is accepted and ignored). The shots
   repaint the page once (real frames) after a story's `open` click: the
-  375-touch `date-input--calendar*` shots flaked ~8% (the field under the sheet
-  repainted or not after losing focus); 6 baselines rebaselined to the repainted
-  state, 120/120 green with `--repeat-each=20`. Docs: spec §3.3, §4.2, §8.4
+  375-touch `date-input--calendar*` and `year-input--picker*` shots flaked ~8-17%
+  (the field under the sheet repainted or not after losing focus); their 12
+  baselines rebaselined to the repainted state, 240/240 green with
+  `--repeat-each=20` (all 3 brands); every other `open` story unchanged. Docs: spec §3.3, §4.2, §8.4
   (the apps' root docs), §11.4 (servers, sign-ins, the dump), §12.2 F5 / §12.3
   W1, W6.
