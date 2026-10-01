@@ -361,3 +361,89 @@ idea  →   │ change + story + screenshots → release X.Y.Z │
 - Welding procedures as a record (out of Settings).
 - Palette: dark steel-blue sidebar (§7.3).
 - Logo line: the pipe elbow (§7.1).
+
+---
+
+### 4.4 Library 1.2.0 as specified
+
+**Status: SPECIFIED 2026-10-01** (measured, then built as 1.2.0). This section replaces the §4.1
+table for what 1.2.0 ships: §4.1 was the plan, this is the measured API. `Money` / `DateText`
+stay app code (they format by locale), `RecordListToolbar` / `SummaryLine` move to a later
+release, `ExternalButtonLink` already shipped in 1.0.0.
+
+**How it was measured.** Both apps read through git only (`git archive origin/main src`:
+Workforce Ops `626b9db`, FinaOps `7e0d2f5`), every `.tsx` outside `src/components/ui` and
+`src/vendor`, every literal `className="…"` / `className={"…"}` with the element it sits on.
+A class string is compared as a **set** (order ignored). Counts are *exact* (the whole class
+set is the recipe: the call becomes the primitive with no `className`) and *+className* (the
+recipe plus other classes that stay in `className`, e.g. `mt-1`). Survey scripts:
+`/tmp/claude-0/ops-ui-scratch/s12/{survey,primitives}.mjs` (scratch, not shipped).
+
+**The rule every variant obeys: adopting a primitive is a 0-changed-pixel codemod.** A variant
+renders exactly the classes of the recipe it replaces (the same set; the order may differ), so
+`<p className="text-detail text-ink-muted">` and `<Text as="p" size="detail" tone="muted">` are
+the same element with the same classes. Every prop is optional and adds its classes; an absent
+prop adds nothing (no defaults that emit a class, except `Cluster`'s, named below). Extra
+classes go through `className`, merged by the kit's `cn` (tailwind-merge with the kit's font
+sizes), so a codemod moves a class into a prop only when no other class in the same
+`className` belongs to the same tailwind-merge group. Tests (`tests/primitives.test.tsx`)
+render every variant with `renderToStaticMarkup` and require its class set to equal the
+recipe's.
+
+All five new components are **server-safe** (no directive, no hook, no kit config; `TextLink`
+imports `next/link`, a client component a server component may render).
+
+| Component (file) | Prop → exact classes | Replaces, exact (+className), Workforce Ops / FinaOps |
+|---|---|---|
+| `Text` (`components/text.tsx`) | `as`: `span` (default) \| `p` \| `div` \| `li` \| `dt` \| `dd` · `size`: `body` → `text-sm`, `detail` → `text-detail`, `micro` → `text-micro` · `tone`: `ink` → `text-ink`, `secondary` → `text-ink-secondary`, `muted` → `text-ink-muted`, `warning` → `text-warning`, `danger` → `text-danger`, `success` → `text-success` · `weight`: `normal` → `font-normal`, `medium` → `font-medium`, `semibold` → `font-semibold` · `mono` → `font-mono` · `block` → `block` · `truncate` → `truncate` | 726 (+293) / 224 (+92) class sets made only of these (one size, one tone, one weight at most, a size or a tone present). Top: `text-detail text-ink-muted` 127 / 47, `text-detail text-ink-secondary` 104 / 45, `text-sm text-ink-secondary` 84 / 14, `text-ink-muted` 81 / 29, `text-sm text-ink-muted` 54 / –, `block text-detail text-ink-muted` 27 / 6, `font-medium text-ink` 27 / 10, `text-sm text-ink` 25 / –, `font-medium text-detail text-ink` 15 / 4, `font-medium text-sm text-ink` 15 / – |
+| `Heading` (`components/heading.tsx`) | `level` (required): `title` → `text-lg font-semibold tracking-tight text-ink` (default element `h1`), `section` → `text-sm font-semibold text-ink` (`h2`), `subsection` → `text-xs font-medium text-ink-secondary` (`h3`) · `as`: `h1`–`h4` overrides the element | `title` 5 / 5 (the sign-in pages), `section` 12 (+2) / 13, `subsection` 14 / 0 |
+| `Stack` (`components/stack.tsx`) | always `flex flex-col` · `gap`: `0.5 1 1.5 2 2.5 3 4 5 6` → `gap-0.5` … `gap-6` · `as`: `div` (default) \| `span` \| `section` \| `ul` \| `ol` \| `li` \| `form` \| `fieldset` | 121 (+109) / 38 (+28) on div/span/p/li; plus section/ul/form/fieldset/header 64 / 30. Top: `gap-4` 38 / 9, `gap-2` 22 / 11, `gap-3` 16 / 8, `gap-0.5` 12 / 1, `gap-6` 10 / 3, `gap-1.5` 9 / –, `gap-1` 6 / 6 |
+| `Cluster` (`components/cluster.tsx`) | always `flex` · `wrap` (default `true`) → `flex-wrap` · `align` (default `center`) → `items-center`; `start` → `items-start`, `baseline` → `items-baseline`, `end` → `items-end`, `stretch` → nothing (flex's own default) · `justify`: `between` → `justify-between`, `end` → `justify-end`, `center` → `justify-center` (none = start) · `gap` as Stack · `as`: `div` (default) \| `span` \| `p` \| `li` \| `ul` \| `nav` | wrapping 77 (+94) / 38 (+18), not wrapping 89 (+67) / 35 (+30). Top: `flex flex-wrap items-center gap-2` 20 / 17, `flex items-center gap-2` 22 / 7, `flex gap-2 justify-end` 14 / 3, `flex justify-end` 12 / 11, `flex flex-wrap items-center justify-between gap-2` 11 / 3, `flex flex-wrap justify-end gap-1` 10 / –, `flex flex-wrap items-center justify-end gap-2` 7 / 3, `flex flex-wrap gap-1.5` – / 5 |
+| `TextLink` (`components/text-link.tsx`) | `variant` (required): `quiet` → `underline underline-offset-2 hover:text-ink`, `underline` → `underline underline-offset-2`, `primary` → `text-primary hover:underline`, `plain` → `hover:underline`, `strong` → `font-medium text-ink hover:underline` (= `RowLink`'s classes, for a link outside a table) · `size` as `Text` · `href`: an internal path renders `next/link`'s `Link`; a scheme (`https:`, `mailto:`, `tel:`) or `//` renders a plain `<a>`; nothing is added (no `target`, no `rel`: the caller passes them) | `quiet` 8 (+12) / –, `underline` 7 (+14) / –, `primary` 1 (+4) / 19 (+3), `plain` 1 (+38) / 8 (+13), `strong` 8 / – |
+| `TH` / `TD` (`components/table.tsx`, additive) | `hideBelow`: `sm` → `hidden sm:table-cell`, `md` → `hidden md:table-cell`, `lg` → `hidden lg:table-cell` · `alignRight` → `text-right` (on `TH` it takes the place of the base `text-left`, exactly as `className="text-right"` does through `cn` today) · `numeric` (`TD` only) → `text-right font-mono` | `TH` 108 (+10) / 76 (+3), `TD` 57 (+83) / 17 (+42). Top: `TH hidden sm:table-cell` 46 / 9, `TH hidden md:table-cell` 25 / 12, `TD hidden sm:table-cell` 21 / 1, `TH text-right` 15 / 23, `TH hidden sm:table-cell text-right` 12 / 14, `TD hidden md:table-cell` 12 / 2, `TD text-right` 11 / 7, `TD font-mono hidden sm:table-cell text-right` 6 / – |
+
+Readings where the plan was open:
+- **`size` names.** `body` / `detail` / `micro` (the plan's words; `body` = `text-sm`, the
+  DESIGN.md "body and data" step). `text-xs` (badges, column heads) is not a `Text` size: its
+  one repeated recipe is a heading, `Heading level="subsection"`.
+- **`Heading` levels** follow what is repeated, not the plan's page / section / card: the page
+  title is `PageHeader`'s and is never typed by hand; the repeated `text-lg` title is the
+  sign-in card's (`title`), and the uppercase label is `Kicker` (1.0).
+- **Table alignment is `alignRight`, not `align`.** React types `<td align>` / `<th align>` as
+  the HTML attribute (`"left" | "center" | "right" | …`); redefining it would narrow an existing
+  type (a major). `alignRight` and `hideBelow` and `numeric` are new optional props: an unchanged
+  call renders exactly as in 1.1 (tested), so the `TH` / `TD` declaration lines change
+  compatibly (`--compatible TH --compatible TD`).
+- **Not in 1.2.0** (fewer than three uses, or not one recipe): `gap-x-*` / `gap-y-*` pairs,
+  `tabular-nums`, `whitespace-nowrap`, `xl:table-cell`, `text-base` / `text-xl` titles, link
+  colours other than primary.
+
+**Guards, the library side of §5 (1.2.0).** The sync script (`sync/sync-ops-ui.mjs`, shipped to
+every app as `scripts/sync-ops-ui.mjs`) gains pure exports and one flag; nothing existing
+changes:
+
+- `readStyleAllowlist(appRoot, file = "style-allowlist.json")` → `{ arbitrary, colours, styles,
+  rawControls }`, each a list of `{ value, reason }` (a missing file = all empty; an entry
+  without a non-empty `reason` is refused). `arbitrary` values are utility tokens
+  (`max-h-[calc(100dvh-2.5rem)]`, matched with or without variant prefixes); the other three are
+  repo-relative paths (a file, or a folder prefix ending in `/`).
+- `styleFindings(source, file, options)` → findings `{ kind, file, line, text }` for one `.tsx`
+  source: `colour` (a hex, `rgb()`, `rgba()`, `hsl()`, `hsla()`, `oklch()`, `oklab()` literal
+  outside comments), `arbitrary` (a `x-[…]` utility not on the allow-list), `style` (a
+  `style={{` whose line carries no `runtime:` comment and whose object is not CSS variables
+  only), `raw-control` (`<button`, `<select`, `<input`, `<table` outside the allowed folders:
+  `src/components/ui/`, `src/vendor/` and `rawControls`).
+- `classRecipes(source)` → the literal className strings of a source, each normalised to its
+  sorted class set.
+- `styleReport(appRoot, { src = "src", exclude = ["src/vendor/"], allowlist, top = 20 })` →
+  `{ files, findings, counts, recipes }` over `src/**/*.tsx`; `formatStyleReport(report)` → the
+  printed text.
+- `node scripts/sync-ops-ui.mjs --style-report [--top N]` prints it and exits 0: it informs, it
+  does not fail. The failing part is the app's own `tests/style-guards.test.ts` (template in
+  README.md → "Style guards"): it calls `styleReport` and expects no finding, with the day-one
+  violations listed in `style-allowlist.json`, which shrinks with each sweep commit (§5).
+- Rule 5 of §5 (a special's stylesheet listed in `extensions`) is already the sync's
+  `checkAppStyles`.
+
+**Codemods for Phase D** (recipe → primitive; each 0 changed pixels; run per area, G2 checks):
+see the 1.2.0 CHANGELOG section and README.md → "Adopting the primitives".
