@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -24,8 +24,10 @@ import { ROOT, readSource } from "./source-files";
 // tools/diff-against-app.mjs (spec §12.1 L6): the extraction proof. The unit tests pin each
 // normalization to what the spec calls mechanical; the end-to-end tests run the tool against an
 // app tree rebuilt from the library's own L2 import commit (the FinaOps kit byte for byte and the
-// Workforce Ops modules), so the proof is exercised without an app checkout - and a planted change
-// must fail it.
+// Workforce Ops modules) with the 2026-10-01 re-import laid over it (FinaOps 2eef5a4, kept raw in
+// tests/fixtures/reimport-finaops-2eef5a4: button, date-input, dialog, floating-place,
+// sheet-motion; spec §12.4 option 1), so the proof is exercised without an app checkout - and a
+// planted change must fail it.
 
 const EN = stringLeaves(readSource("src/config/strings.ts"), "strings.ts", "EN_STRINGS");
 
@@ -123,6 +125,14 @@ afterAll(() => rmSync(SANDBOX, { recursive: true, force: true }));
 const L2 = execFileSync("git", ["-C", ROOT, "log", "--format=%H", "--grep=^L2: import the kit"], { encoding: "utf8" }).trim().split("\n")[0];
 const atL2 = (p: string) => execFileSync("git", ["-C", ROOT, "show", `${L2}:${p}`], { encoding: "utf8" });
 
+const REIMPORT_DIR = path.join(ROOT, "tests/fixtures/reimport-finaops-2eef5a4");
+const listFiles = (dir: string, rel = ""): string[] =>
+  readdirSync(path.join(dir, rel), { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? listFiles(dir, path.join(rel, e.name)) : [path.join(rel, e.name).replace(/\.txt$/, "")],
+  );
+/** App paths the 2026-10-01 re-import replaced (FinaOps 2eef5a4). */
+const REIMPORTED = new Set(listFiles(REIMPORT_DIR));
+
 /** An app tree as the kit was imported: FinaOps' kit files and the modules at their app paths. */
 function appFromL2(dir: string, name: "fina-ops" | "workforce-ops") {
   const put = (p: string, text: string) => {
@@ -132,7 +142,7 @@ function appFromL2(dir: string, name: "fina-ops" | "workforce-ops") {
   put("package.json", JSON.stringify({ name }));
   const files = execFileSync("git", ["-C", ROOT, "ls-tree", "--name-only", `${L2}:src/components`], { encoding: "utf8" }).split("\n").filter(Boolean);
   for (const f of files) put(`src/components/ui/${f}`, atL2(`src/components/${f}`));
-  for (const m of WHOLE_MODULES) put(m.app, atL2(`src/${m.lib}`));
+  for (const m of WHOLE_MODULES) if (!REIMPORTED.has(m.app)) put(m.app, atL2(`src/${m.lib}`));
   for (const m of EXCERPT_MODULES) {
     const app = typeof m.app === "string" ? m.app : m.app[name === "fina-ops" ? "finaops" : "workforce"];
     // The excerpt files open with their provenance line; the app module never had it.
@@ -144,6 +154,7 @@ function appFromL2(dir: string, name: "fina-ops" | "workforce-ops") {
     if (b) common[a] = { ...(common[a] as object), [b]: v };
     else common[a] = v;
   }
+  for (const p of REIMPORTED) put(p, readFileSync(path.join(REIMPORT_DIR, `${p}.txt`), "utf8"));
   put("src/i18n/dictionaries/en/common.ts", `export const common = ${JSON.stringify(common, null, 2)};\n`);
   return {
     edit: (p: string, fn: (s: string) => string) => put(p, fn(readFileSync(path.join(dir, p), "utf8"))),
@@ -167,42 +178,13 @@ describe.skipIf(!L2)("end to end", () => {
     expect(res.ok).toBe(true);
   });
 
-  it("FinaOps' kit moving after the 1.0 source commit is named drift, never passed silently (spec §12.4)", T, () => {
-    // b775fb6 (FinaOps, 2026-09-30 20:47): AdminIconButton's deactivate / reactivate glyphs.
-    const b775fb6 = (s: string) =>
-      s
-        .replace('icon?: "edit" | "delete" | "unlock" | "permissions" | "key";', 'icon?: "edit" | "delete" | "unlock" | "permissions" | "key" | "deactivate" | "reactivate";')
-        .replace(
-          '    key: "M10 9a3.5 3.5 0 1 0-3-3L1.5 11.5v3h3v-2h2v-2z",\n',
-          '    key: "M10 9a3.5 3.5 0 1 0-3-3L1.5 11.5v3h3v-2h2v-2z",\n' +
-            "    // An account that can't sign in: the circle crossed out.\n" +
-            '    deactivate: "M14.5 8a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0M3.4 3.4l9.2 9.2",\n' +
-            '    reactivate: "M2 6h7a4 4 0 0 1 0 8H6M5 3 2 6l3 3",\n',
-        );
-    const dir = path.join(SANDBOX, "fina-ops-ahead");
-    const app = appFromL2(dir, "fina-ops");
-    app.edit("src/components/ui/button.tsx", b775fb6);
+  it("a FinaOps kit change after the 1.0 source is drift, never passed silently (spec §12.4)", T, () => {
+    // Undo half of b775fb6 (AdminIconButton's reactivate glyph): the library still has it.
+    const dir = path.join(SANDBOX, "fina-ops-drift");
+    appFromL2(dir, "fina-ops").edit("src/components/ui/button.tsx", (s) => s.replace(/ *reactivate: [^\n]*\n/, ""));
     const res = run({ app: dir });
-    const text = res.lines.join("\n");
-    expect(res.ok).toBe(false);
-    expect(text).toMatch(/ 5 {2}button\.tsx +FinaOps ahead \(spec §12\.4 L6 review, RE-IMPORT PENDING\)/);
-    expect(text).toMatch(/FAIL FinaOps ahead/);
-    expect(text).not.toMatch(/not at this ref/);
-    expect(res.lines.at(-1)).toMatch(/^Verdict: EXTRACTION PROVEN against FinaOps \(29 components identical .*\), but FinaOps is ahead of the 1\.0 source in button\.tsx: .*re-import them before L7b\.$/);
-
-    // Half of the change, or the change plus one more line, is not the named drift.
-    const partial = path.join(SANDBOX, "fina-ops-ahead-partial");
-    appFromL2(partial, "fina-ops").edit("src/components/ui/button.tsx", (s) => b775fb6(s).replace(/ *reactivate: [^\n]*\n/, ""));
-    const partialRes = run({ app: partial });
-    expect(partialRes.lines.join("\n")).toMatch(/ 5 {2}button\.tsx +UNEXPLAINED/);
-    expect(partialRes.lines.at(-1)).toMatch(/^Verdict: NOT PROVEN against FinaOps/);
-
-    // The 1.0 source itself: proven, with the named drift listed as not at this ref.
-    const source = path.join(SANDBOX, "fina-ops-at-l2");
-    appFromL2(source, "fina-ops");
-    const base = run({ app: source });
-    expect(base.ok).toBe(true);
-    expect(base.lines.join("\n")).toMatch(/FinaOps ahead of the 1\.0 source, but not at this ref \(spec §12\.4\): the proof holds for this ref only\n {2}button\.tsx: b775fb6/);
+    expect(res.lines.join("\n")).toMatch(/ 5 {2}button\.tsx +UNEXPLAINED/);
+    expect(res.lines.at(-1)).toMatch(/^Verdict: NOT PROVEN against FinaOps/);
   });
 
   it("a planted change fails the proof and names the line", T, () => {

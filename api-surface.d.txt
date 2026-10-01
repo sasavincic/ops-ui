@@ -67,6 +67,9 @@ type ButtonLinkProps = React.ComponentProps<typeof Link> & VariantProps<typeof b
     returnNavigation?: boolean;
 };
 export declare function ButtonLink({ className, variant, size, readOnlySafe, icon, children, returnNavigation, ...props }: ButtonLinkProps): import("react").JSX.Element | null;
+export declare function ExternalButtonLink({ className, variant, size, icon, children, ...props }: React.ComponentProps<"a"> & VariantProps<typeof buttonVariants> & {
+    icon?: ActionIconName;
+}): import("react").JSX.Element;
 export declare function FileLink({ href, children, size, className, disabled, target, rel, ...props }: Omit<React.ComponentProps<"a">, "href"> & {
     href?: string;
     size?: "sm" | "md";
@@ -74,7 +77,7 @@ export declare function FileLink({ href, children, size, className, disabled, ta
 }): import("react").JSX.Element;
 export declare function AdminIconButton({ label, icon, className, ...props }: Omit<React.ComponentProps<"button">, "children"> & {
     label: string;
-    icon?: "edit" | "delete" | "unlock" | "permissions" | "key";
+    icon?: "edit" | "delete" | "unlock" | "permissions" | "key" | "deactivate" | "reactivate";
 }): import("react").JSX.Element | null;
 export {};
 
@@ -623,11 +626,24 @@ export declare function localTodayIso(now?: Date): string;
 export declare function formatDate(iso: string): string;
 export declare function shiftDay(iso: string, delta: number): string;
 
+// src/lib/floating-place.d.ts
+export declare function floatingTop(field: {
+    top: number;
+    bottom: number;
+}, panelHeight: number, viewportHeight: number, gap?: number, margin?: number): {
+    top: number;
+    maxHeight: number | null;
+};
+
 // src/lib/fmt.d.ts
 export declare function fmt(template: string, vars: Record<string, string | number>): string;
 
 // src/lib/months.d.ts
 export declare function shiftMonth(month: string, delta: number): string;
+
+// src/lib/sheet-motion.d.ts
+export declare const PHONE_SHEET_QUERY = "(max-width: 639px)";
+export declare function riseSheet(el: HTMLElement): void;
 
 // src/lib/text.d.ts
 export declare function normalizeSearchText(value: string): string;

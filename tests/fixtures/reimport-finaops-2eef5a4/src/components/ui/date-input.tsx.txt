@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { useReadOnlyScope } from "../config/read-only";
-import { controlClasses } from "./field";
+import { useReadOnlyScope } from "@/components/permissions-provider";
+import { controlClasses } from "@/components/ui/field";
 import {
   isIsoDate,
   localTodayIso,
@@ -12,14 +12,14 @@ import {
   shiftDayByMonths,
   shiftMonth,
   withinRange,
-} from "../lib/date-input";
-import { formatDate, shiftDay } from "../lib/dates";
-import { useOpsUi } from "../config/provider";
-import { fmt } from "../lib/fmt";
-import { useDismissable } from "../lib/use-dismissable";
-import { cn } from "../lib/cn";
-import { floatingTop } from "../lib/floating-place";
-import { riseSheet } from "../lib/sheet-motion";
+} from "@/domain/date-input";
+import { formatDate, shiftDay } from "@/domain/dates";
+import { useDict } from "@/i18n/client";
+import { fmt } from "@/i18n/locales";
+import { floatingTop } from "@/lib/floating-place";
+import { riseSheet } from "@/lib/sheet-motion";
+import { useDismissable } from "@/lib/use-dismissable";
+import { cn } from "@/lib/utils";
 
 /**
  * The house date input (2026-09-28, Saša: "we shouldn't rely on the browser
@@ -91,8 +91,8 @@ export function DateInput({
   readOnlySafe?: boolean;
   "aria-label"?: string;
 }) {
-  const { strings } = useOpsUi();
-  const dp = strings.datePicker;
+  const t = useDict();
+  const dp = t.common.datePicker;
   const locked = useReadOnlyScope() && !readOnlySafe;
   const off = disabled || locked;
   const coarse = useSyncExternalStore(subscribeCoarse, coarseNow, () => false);

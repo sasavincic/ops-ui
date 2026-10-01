@@ -193,29 +193,7 @@ export const LIBRARY_CHANGES = {
  * decision once there is one; until then the run fails (exit 1), because releasing 1.0.0 as it
  * is would foreclose the recommended option (align FinaOps, re-import before L7b).
  */
-export const WFO_AHEAD = {
-  "button.tsx": {
-    ref: "spec §12.4 L6",
-    what: "ce53be0: ExternalButtonLink, a button-styled plain <a> for tel:/sms:/mailto:/WhatsApp/Viber links",
-    removed: 21,
-    added: 0,
-    decided: null,
-  },
-  "date-input.tsx": {
-    ref: "spec §12.4 L6",
-    what: "f364bd5 + ae37fb7 + ff90dde: the calendar stays whole on screen on phones (lib/floating-place.ts) and opens as a bottom sheet on touch screens (lib/sheet-motion.ts)",
-    removed: 57,
-    added: 15,
-    decided: null,
-  },
-  "dialog.tsx": {
-    ref: "spec §12.4 L6",
-    what: "ff90dde: below sm every Dialog is a bottom sheet that rises in (lib/sheet-motion.ts)",
-    removed: 9,
-    added: 1,
-    decided: null,
-  },
-};
+export const WFO_AHEAD = {};
 
 /**
  * FinaOps kit changes made after the 1.0 source commit (80828fc, the L2 import) that the library
@@ -230,20 +208,7 @@ export const WFO_AHEAD = {
  * so the library re-imports the file from FinaOps' post-merge main before L7b (§12.4 option 1's
  * re-import) and this entry is deleted in the same commit.
  */
-export const FINAOPS_AHEAD = {
-  "button.tsx": {
-    ref: "spec §12.4 L6 review",
-    what: "b775fb6 (Sign-in hardening, on origin/claude/trusting-keller-r5bi2t): AdminIconButton gains the deactivate / reactivate glyphs, used by settings/user-active-button.tsx",
-    appOnly: [
-      'icon?: "edit" | "delete" | "unlock" | "permissions" | "key" | "deactivate" | "reactivate";',
-      "// An account that can't sign in: the circle crossed out.",
-      'deactivate: "M14.5 8a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0M3.4 3.4l9.2 9.2",',
-      'reactivate: "M2 6h7a4 4 0 0 1 0 8H6M5 3 2 6l3 3",',
-    ],
-    libraryOnly: ['icon?: "edit" | "delete" | "unlock" | "permissions" | "key";'],
-    decided: null,
-  },
-};
+export const FINAOPS_AHEAD = {};
 
 // ---------------------------------------------------------------------------------------------
 // Reading trees
@@ -694,6 +659,8 @@ export const WHOLE_MODULES = [
   { lib: "navigation/nav-trail.tsx", app: "src/components/shell/nav-trail.tsx" },
   { lib: "lib/date-input.ts", app: "src/domain/date-input.ts" },
   { lib: "lib/use-dismissable.ts", app: "src/lib/use-dismissable.ts" },
+  { lib: "lib/floating-place.ts", app: "src/lib/floating-place.ts" },
+  { lib: "lib/sheet-motion.ts", app: "src/lib/sheet-motion.ts" },
 ];
 
 /** Excerpts: every top-level declaration of the library module, compared with the app's namesake. */
