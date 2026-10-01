@@ -260,7 +260,8 @@ export default async function KitPage({ params }: { params: Promise<{ story?: st
     "routes": ["/", "/operations", "/operations?tab=flightboard", "/workers", "/workers/<fixture-id>", "…", "/dev/kit"],
     "readonlyRoutes": ["/workers/<fixture-id>", "/worksites/<fixture-id>?tab=work"],
     "redirects": { "/": "/operations" },
-    "mask": ["[data-wall-clock]"]
+    "mask": ["[data-wall-clock]"],
+    "loginTimeout": 60000
   }
 }
 ```
@@ -270,6 +271,7 @@ The example shows WFO's values.
 - **The capture users.** `login` is the fixture **editor**, never an owner: both apps force two-step sign-in on owners (FinaOps b775fb6: `requireSession` sends an owner without it to `/two-factor/setup`; the suite plan's item 14 does the same in WFO), so an owner session would capture the setup page, or not sign in at all, on every route of main and branch alike, and G2 would compare nothing. `readonlyLogin` is the fixture read-only user. Owner-only screens are G4's (by hand). The capture tool completes no second step.
 - **`redirects`** maps a route to the URL it is expected to land on (a path, with its query). Capture fails any other route whose final URL differs from the one requested, so a gate page (`/login`, `/two-factor…`, `/password`, `/read-only`) or any other redirect can never pass as a shot (§11.4).
 - **`/dev/kit`** in `routes` stands for the story index plus one route per story (`/dev/kit/<storyId>`, §3.2, §11.4).
+- **`loginTimeout`** (optional, milliseconds, default 60000): how long a sign-in may take to leave the login page. A dev server compiles the landing route on its first request; the 10 s of L7a was too short there. `capture --login-timeout <ms>` overrides it for one run.
 - **Route ids** are literal ids from the local fixture database: WFO `scripts/dev-fixtures.ts`, FinaOps `pnpm db:fixtures`. They are re-listed when the fixtures are rebuilt.
 - **`source`:** resolves to `/home/user/ops-ui` from both repo roots. For PrefabOps (`apps/web`) it is `../../../ops-ui`.
 
@@ -314,7 +316,7 @@ A declaration line that changed in a provably compatible way (for example, a wid
    
    **It refuses when the requested bump is below the required level.** A higher bump is allowed.
 5. `CHANGELOG.md` must have `## X.Y.Z` with dated sections. A major must have `Visible:` (every pixel change, per component) and `Upgrade steps:` (exact commands and edits per app). A `Reviewed:` line names a component whose interaction-only styles changed and says what a hand review found (step 4).
-6. Writes `package.json` `"version"` and `src/version.ts`, then commits exactly those two files as **`release: vX.Y.Z`**.
+6. Writes `package.json` `"version"`, `src/version.ts` and the `OPS_UI_VERSION` line of `api-surface.d.txt`, then commits exactly those three files as **`release: vX.Y.Z`** (the surface line since the tools fixes of 2026-10-01; before them the release left the surface stale, and the next release needed `--compatible OPS_UI_VERSION`).
 7. Creates branch **`release/vX.Y.Z`** at that commit and pushes `main` and the branch.
    - If the proxy refuses the branch push, it prints a warning and continues, because the commit message marker alone is enough for the sync.
    - It never pushes tags: the session proxy rejects tag refs, as the document-service v0.4.0 tag showed.
@@ -323,7 +325,7 @@ The first release (1.0.0) has no P, so step 4 is skipped. Everything else runs.
 
 **As built (L7a, `tools/release.mjs`, tested in `tests/release.test.ts`).** Where the steps above leave a reading open:
 - **Order.** The cheap checks (steps 1, 3, 4, 5) run before the gates (step 2), and every refusal of a step is printed before the script exits, so a refusal never waits for a gallery build.
-- **`--compatible <name>` writes nothing.** The release commit is exactly two files and the tree must be clean, so the reason is written by hand, before the release, as a `Compatible: <name> - <why an unchanged call site renders the same>` line of the section; the flag authorizes it (a missing line, or a name that matches no removed or changed declaration, is refused) and the release commit's body records it. A removed or changed line of `api-surface.d.txt` belongs to the top-level declaration around it (parsed with the TypeScript parser); tsc's empty `export {};` marker is not API.
+- **`--compatible <name>` writes nothing.** The release commit is exactly three files (package.json, src/version.ts, api-surface.d.txt) and the tree must be clean, so the reason is written by hand, before the release, as a `Compatible: <name> - <why an unchanged call site renders the same>` line of the section; the flag authorizes it (a missing line, or a name that matches no removed or changed declaration, is refused) and the release commit's body records it. A removed or changed line of `api-surface.d.txt` belongs to the top-level declaration around it (parsed with the TypeScript parser); tsc's empty `export {};` marker is not API, and neither is the `export declare const OPS_UI_VERSION = "…";` line, which every release rewrites (it never counts towards a level, so `--compatible OPS_UI_VERSION` is never needed).
 - **Also a major, from §4.1's table:** a removed token or a changed token value in `styles/tokens.css` (a new token is a minor), and any change of a `peerDependencies` range.
 - **A pure rebaseline** may also touch `gallery/fonts/**` (the fonts the gallery ships beside Geist, CLAUDE.md), besides the baselines and `gallery/playwright.config.ts`.
 - **`Reviewed:`** is required at every level (§4.1 asks it of a patch or minor, step 4 of any release). A line names a file's component by its file name or its PascalCase name as a whole word (`row-menu` or `RowMenu`).
@@ -752,6 +754,18 @@ These are today's rules, word for word. They leave the apps' globals.css files w
 
 **What Tailwind scans.** `@source "../vendor/ops-ui"` scans the kit's code (and so does automatic detection: the folder is not ignored). The four `@source not` lines keep out everything else the adoption puts into the app tree: `DESIGN.md`, `TOKENS.md` and `CHANGELOG.md` in the vendor folder, the sync script with its declarations under `scripts/`, and the two files at the app root, `ops-ui.config.json` (§3.3) and `ops-ui.lock.json` (§5.3), which automatic detection reads like any other root JSON. Tailwind emits a class or a theme variable for any name it finds in a scanned file, and those files name classes and tokens (TOKENS.md names `--color-sick-subtle`, which WFO declares and never uses; the CHANGELOG names `bg-primary/10`; the script names `--color-tool`; WFO's config lists all three extensions, so the config alone emits `--color-sick-subtle`; the lock names every vendored path). Without the exclusions a docs-only patch, or any edit of the config, would change an app's CSS and its G3 token dump. The library's `app-scan` test builds an app from this template, `ship.json`, the §3.3 config and a lock, and requires the same CSS whatever those files say. `styles/*.css` need no line: Tailwind never scans CSS files for candidates.
 
+**The app's own root docs change the CSS too** (found in the app runs of 2026-10-01). Automatic detection scans every file of the app tree that git does not ignore, the app's own `CLAUDE.md`, `DESIGN.md` and `AGENTS.md` at its root included. Spelling a class or a token name there that no code uses (a `bg-sick-subtle`, a `--color-sidebar-hover`, a `shadow-lg` in a sentence about the kit) makes Tailwind emit it: a docs-only commit then changes the app's CSS, adds a name to its G3 token dump (which now fails on any newly declared name, §11.4) and can even change pixels. Apps do one of two things, and say which in their CLAUDE.md:
+- keep the docs out of the scan, three more lines beside the four above (paths relative to `src/app/globals.css`):
+  ```css
+  @source not "../../CLAUDE.md";
+  @source not "../../DESIGN.md";
+  @source not "../../AGENTS.md";
+  ```
+  (any other root document that talks about classes, such as `PRODUCT.md`, likewise); or
+- never write a literal class or token name in those files (describe it: "the sick tint", "the sidebar hover token").
+
+The first is the robust one: the docs are edited by every session, and nobody re-runs G3 for a docs commit.
+
 **WFO `brand.css`.** The values are copied verbatim from today's globals.css, so the token dump matches as text:
 
 ```css
@@ -1047,14 +1061,15 @@ export function AppSwitcher(p: {
 
 ```
 cd /home/user/ops-ui
-node tools/app-shots.mjs capture --app ../fina-ops --label main [--config <file>]    # on the app's main, dev server running
-node tools/app-shots.mjs capture --app ../fina-ops --label branch [--config <file>]  # on the branch
+node tools/app-shots.mjs capture --app ../fina-ops --label main [--config <file>] [--login-timeout <ms>]    # on the app's main, its server running
+node tools/app-shots.mjs capture --app ../fina-ops --label branch [--config <file>] [--login-timeout <ms>]  # on the branch
 node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file: pages allowed to differ, new routes, new tokens>]
 ```
 
 **`capture`:**
 - Reads `visual` and `extensions` from `--config <file>`, default the app's own `ops-ui.config.json`. The option exists because `main` has no config until the swap merges (F2/W3 add it on a branch, F5/W6 merge it) and a checkout of `main` removes a branch's copy: from F0/W0 until that merge every capture, main and branch, passes the scratch config those steps write (§12.2, §12.3), so both sides shoot the same routes, users and widths. A missing config file, or one without `visual`, is an error (exit 2), never an empty capture.
-- Logs in with the env-provided fixture credentials (local database only): `login` is the fixture **editor**, `readonlyLogin` the read-only user (never an owner, whom both apps send to a two-step setup or challenge page, §3.3). The `readonlyRoutes` are captured as the read-only user. After each login capture checks that it left `login.path` and landed on no gate page, and fails otherwise ("login did not complete").
+- Logs in with the env-provided fixture credentials (local database only): `login` is the fixture **editor**, `readonlyLogin` the read-only user (never an owner, whom both apps send to a two-step setup or challenge page, §3.3). The `readonlyRoutes` are captured as the read-only user. After each login capture checks that it left `login.path` within the login timeout (`visual.loginTimeout`, `--login-timeout`, default 60 s) and landed on no gate page, and fails otherwise ("login did not complete").
+- **Signs in once per user per capture** (tools fixes, 2026-10-01). Both apps allow five e-mail sign-ins a minute per client IP, and a capture used to sign in once per project and user (up to six: 1440, 375, 375-touch × editor, read-only), so the sixth was refused with 429 unless the `rate_limit` table was emptied in a loop during the capture (what the F and W runs of 2026-10-01 did). Each user now signs in once in a context of its own, and every project's context starts from that session (Playwright `storageState`: cookies and local storage).
 - **Every route must land where it was asked to.** After the load state, capture compares the page's final URL (path and query) with the route requested; a different one fails the capture, naming both, unless `visual.redirects` maps that route to exactly the URL it landed on. So a redirect to `/login`, `/two-factor…`, `/password`, `/read-only` or any other route can never be shot in the route's place, which on main and branch alike would compare two identical gate pages and pass G2 on nothing. `/dev/kit/<storyId>` routes are checked the same way (a story the build lacks renders its "unknown story" line, which is not a redirect, and fails on the missing `[data-story][data-ready]`).
 - Takes a full-page PNG per route × width, plus 375 with `hasTouch`/`isMobile` for the coarse-pointer rules.
 - **`/dev/kit` expands to one route per story.** Capture loads the index, reads its `a[data-story-id]` links (§3.2) and shoots every `/dev/kit/<storyId>` as its own route, the way the gallery shoots stories: it waits for `[data-story="<storyId>"][data-ready]`, pauses the clock, clicks the link's `data-story-open` selector when there is one (an open calendar, list, menu or picker needs its CSS too), then shoots. The ids come from the build being captured, so main and branch each list what they vendor. The index page is captured too (it is a plain list).
@@ -1062,8 +1077,13 @@ node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file: 
 - Masks the `mask` selectors, sets reduced motion and hides the caret.
 - Writes to `$TMPDIR/ops-ui-shots/<app>/<label>/`.
 
-**The token dump** is written beside the PNGs as `tokens.json`, once per width. For each name in the contract, plus `config.extensions`, plus every `--color-*`, `--text-*`, `--radius-*`, `--font-*` and `--ops-*` declared in `document.styleSheets`, it records **whether the name is declared** (in some rule of `document.styleSheets`) and its value:
-- **Colour tokens** are read through a probe element (`color: var(--x)`, then the computed `color`). So a serialization difference is not a false alarm, while a real value difference is.
+**Which server a capture runs against** (as the F and W runs of 2026-10-01 did it). Capture shoots whatever `visual.baseUrl` serves, and two kinds of route need two servers:
+- **App pages on a production build** (`pnpm build && pnpm start` on the app's port, local fixture database). A dev server's pages are not stable enough to compare byte for byte across two checkouts: routes compile on first request, the dev tools and HMR inject into the page, and a timing-dependent first render can differ between runs. One capture per side with the full route list, minus `/dev/kit`.
+- **`/dev/kit` and its story routes on a dev server** (`pnpm dev`), because the route refuses production (`notFound()`, §3.2). A second capture per side with a scratch config whose `routes` are `/dev/kit` (plus one ordinary page, so the token dump has an editor route) and its own label pair (`kit-main` / `kit-branch`), compared on its own.
+- Before each capture, stop the other server on that port (both use `visual.baseUrl`), wait until `/login` answers 200, and keep the first request's compile in mind (`loginTimeout`, §3.3). With one sign-in per user per capture, no `rate_limit` clearing is needed any more.
+
+**The token dump** is written beside the PNGs as `tokens.json`, once per width. For each name in the contract, plus `config.extensions`, plus every other custom property declared in `document.styleSheets` except Tailwind's per-utility internals (`--tw-*`), it records **whether the name is declared** (in some rule of `document.styleSheets`) and its value. (L7a dumped only the `--color-*`, `--text-*`, `--radius-*`, `--font-*` and `--ops-*` families besides the contract, so a newly declared name outside them, a `--shadow-*` or `--tracking-*` that a stray class in a scanned file made Tailwind emit, never reached G3.)
+- **Colour tokens** are read through a probe element (`color: var(--x)`, then the computed `color`). So a serialization difference is not a false alarm, while a real value difference is. **One fresh probe per name, with `transition: none`** (tools fixes, 2026-10-01): L7a reused one probe, and the capture runs with reduced motion, where `base.css` gives every element `transition-duration: 0.01ms` while `transition-property` stays `all`; each new `color` then started a transition and the colour read at once was the previous one, so every `--color-*` read as the first colour probed and G3 could not see a colour change at all. Captures taken before the fix compare only names, not colour values.
 - **Other tokens** are read as the trimmed `getComputedStyle(documentElement)` value.
 - An undeclared name has no value: its colour probe would only read the inherited colour, and `getComputedStyle` gives `""`. It is recorded as undeclared, never compared as a value.
 
@@ -1183,7 +1203,7 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
   - Gates: G1, G2 zero.
 - **F5 Swap.**
   1. Delete the 35 local kit files and run `--write-wrappers` (it creates 35 wrappers). Hand-write the `record-tab` binding.
-  2. Turn the §7 app modules into re-exports: `lib/utils` (`cn`), `lib/use-dismissable`, `lib/navigation-history`, `shell/nav-trail`, `domain/nav-trail`, `domain/dates` (two functions), `domain/date-input`, `domain/months` (`shiftMonth`) and `i18n/locales` (`fmt`).
+  2. Turn the §7 app modules into re-exports: `lib/utils` (`cn`), `lib/use-dismissable`, `lib/navigation-history`, `shell/nav-trail`, `domain/nav-trail`, `domain/dates` (two functions), `domain/date-input`, `domain/months` (`shiftMonth`) and `i18n/locales` (`fmt`). **Delete** `lib/floating-place.ts` and `lib/sheet-motion.ts` (they arrived with option 1 of §12.4 "Found while proving 1.0" and only the kit's `date-input` and `dialog` import them, which now come from the vendor folder; an app import of either moves to `@/vendor/ops-ui/lib/…`), with the app's own `tests/lib/floating-place.test.ts` (the library owns it).
   3. Point the domain type imports (`status-meta`, `search`) at `@/vendor/ops-ui/types`.
   4. `tests/ops-ui/text-parity.test.ts` compares `domain/names.foldText` with `normalizeSearchText` over a corpus: đ/Đ, ß, č/š/ž/ć, diacritics, punctuation, `QT-…` numbers, "d.o.o.", "GmbH" and mixed case.
      - If they match, `domain/search` re-exports `matchesAllWords`.
@@ -1207,7 +1227,8 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
   - Run `app-shots capture --app ../workforce-ops --config <scratch config> --label main`.
 - **W1 Align the local kit with the 1.0 source.**
   - Take FinaOps' `segmented.tsx` (overflow), `tag.tsx` (`title`) and `confirm-dialog.tsx` (dead variable).
-  - **Expected:** a Segmented that is wider than its row at 375 now scrolls inside itself. Check `/operations` (horizon, Board/Grid, group-by) and the flightboard group-by. Everything else is zero.
+  - **Expected:** a Segmented that is wider than its row at 375 now scrolls inside itself. Check `/operations` (horizon, Board/Grid, group-by) and the flightboard group-by.
+  - **Expected, also (seen in the W1 run of 2026-10-01):** `overflow-x-auto` makes every Segmented its own scroll container, which Chromium paints separately, so **every page with a Segmented differs at every width** by up to 7 per RGB channel inside the control (its text and edges), not only where it overflows; and the new layer can switch the antialiasing of the page's other text (seen on `/invoicing?tab=instructions` at 1440: about 10,000 pixels, all text). List those pages as `page` entries in `--expect` and check the diff images: only text and Segmented edges may change, no position or size. Everything else is zero.
   - Gates: G1, G2 (expected), G4 segmented. Merge.
 - **W2 Action-icon API.**
   - `action-icon.tsx` becomes FinaOps' version.
@@ -1233,6 +1254,7 @@ FinaOps goes first because its kit *is* the 1.0 source and it has no production 
 - **W6 Swap**, as F5, with these differences:
   - Only the 33 shared kit files are deleted before `--write-wrappers` (which creates 35 wrappers, including `search-form` and `url-select`). `validity-cell.tsx` stays (`config.local`).
   - `domain/hours-periods` re-exports `shiftMonth`, and `domain/compliance`'s type import moves to vendor types.
+  - As in F5 step 2, `lib/floating-place.ts` and `lib/sheet-motion.ts` are deleted (with `tests/lib/floating-place.test.ts`).
   - `tests/ui/toast.test.tsx` and `tests/ui/file-link.test.tsx` are deleted, because the library owns them now.
   - No text-parity test: WFO is the source of `lib/text`.
   - `/dev/kit` as in F5 (WFO's `RouteActionIconScope` switches ActionIcon off on `/dev`; `StoryHost` turns it back on for the stories).

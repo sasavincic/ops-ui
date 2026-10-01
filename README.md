@@ -145,7 +145,10 @@ pnpm release X.Y.Z [--compatible <name>]… [--trailer <line>]… [--dry-run]  #
 ```
 
 The per-app visual check (gates G2 and G3, spec §11.4) runs from this checkout too, against an app's
-running dev server and its local fixture database (the apps carry no Playwright):
+running server and its local fixture database (the apps carry no Playwright): app pages against a
+production build (`pnpm build && pnpm start`), `/dev/kit` and its story routes in a second capture
+pair against `pnpm dev` (the route refuses production). Each user signs in once per capture; a slow
+first sign-in gets `visual.loginTimeout` or `--login-timeout <ms>` (default 60 s):
 
 ```bash
 OPS_UI_SHOTS_USER=… OPS_UI_SHOTS_PASSWORD=… OPS_UI_SHOTS_RO_USER=… OPS_UI_SHOTS_RO_PASSWORD=… \
@@ -156,7 +159,10 @@ node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file>]
 
 Captures land in `$TMPDIR/ops-ui-shots/<app>/<label>/` (PNGs per width and 375-touch, `tokens.json`,
 `manifest.json`); `compare` writes red-overlay diffs beside them. The `--expect` syntax (new routes,
-pages allowed to differ, new tokens) is in the spec, §11.4.
+pages allowed to differ, new tokens) is in the spec, §11.4. The token dump holds every custom property
+the page declares except Tailwind's `--tw-*`, so a class or token name spelled in the app's root
+`CLAUDE.md`, `DESIGN.md` or `AGENTS.md` (which Tailwind scans) shows up as a new token: keep those
+files out with `@source not` (spec §8.4).
 
 Requires Node ≥ 20 and pnpm. The gallery (`gallery/`) is a small Next 16 +
 Tailwind v4 app: `/<brand>` lists the stories, `/<brand>/<story>` renders one,

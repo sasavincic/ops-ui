@@ -137,8 +137,9 @@ declarations, shipped beside it as `scripts/sync-ops-ui.d.mts` so an app with
 3. Requires `## X.Y.Z — YYYY-MM-DD` in `CHANGELOG.md` (dated: date it in its own
    commit before the release); a major needs `Visible:` and `Upgrade steps:`.
 4. Runs `pnpm typecheck && pnpm lint && pnpm test && pnpm shots`.
-5. Writes the version into `package.json` and `src/version.ts` and commits
-   exactly those two files as **`release: vX.Y.Z`** (body: the level, the
+5. Writes the version into `package.json`, `src/version.ts` and the
+   `OPS_UI_VERSION` line of `api-surface.d.txt` (that line never counts towards
+   a level) and commits exactly those three files as **`release: vX.Y.Z`** (body: the level, the
    `--compatible` names, then each `--trailer` line, e.g. the session's
    `Co-Authored-By:`). The committer is git's: run it as
    `GIT_AUTHOR_NAME="Saša Vinčić" GIT_AUTHOR_EMAIL=77722684+sasavincic@users.noreply.github.com GIT_COMMITTER_NAME="Saša Vinčić" GIT_COMMITTER_EMAIL=77722684+sasavincic@users.noreply.github.com pnpm release …`.
@@ -169,12 +170,19 @@ or scratch exports.
 
 **The visual check** (`tools/app-shots.mjs`, spec §11.4, tested in
 `tests/app-shots.test.ts` on synthetic captures and against a local server):
-`node tools/app-shots.mjs capture --app ../fina-ops --label main [--config <file>]`
-(the app's dev server running; credentials in the env variables its config
-names: `OPS_UI_SHOTS_USER` / `_PASSWORD`, `OPS_UI_SHOTS_RO_USER` / `_PASSWORD`),
-the same with `--label branch` on the branch, then
+`node tools/app-shots.mjs capture --app ../fina-ops --label main [--config <file>] [--login-timeout <ms>]`
+(credentials in the env variables its config names: `OPS_UI_SHOTS_USER` /
+`_PASSWORD`, `OPS_UI_SHOTS_RO_USER` / `_PASSWORD`), the same with `--label branch`
+on the branch, then
 `node tools/app-shots.mjs compare --app ../fina-ops main branch [--expect <file>]`.
-Captures go to `$TMPDIR/ops-ui-shots/<app>/<label>/`.
+Captures go to `$TMPDIR/ops-ui-shots/<app>/<label>/`. **Servers** (spec §11.4
+"Which server"): app pages against a production build (`pnpm build && pnpm
+start`), `/dev/kit` and its stories in a second capture pair against `pnpm dev`
+(the route refuses production). Each user signs in once per capture (the apps
+allow five sign-ins a minute); the login timeout defaults to 60 s
+(`visual.loginTimeout`). G3 dumps every declared custom property but `--tw-*`, so
+an app whose root `CLAUDE.md` / `DESIGN.md` / `AGENTS.md` spell a class or token
+name changes its CSS with a docs commit: `@source not` them (spec §8.4).
 
 ## Build state (update when a step lands)
 
@@ -407,9 +415,9 @@ Captures go to `$TMPDIR/ops-ui-shots/<app>/<label>/`.
   `tools/diff-against-app.mjs` is the 1.0 proof and reads the library from its
   checkout, so `tests/diff-against-app.test.ts` pins its tables and end-to-end
   runs to the `release: v1.0.0` commit (the tool runs from an export of it).
-  Known tooling gap: the release commit writes `src/version.ts` but not
-  `api-surface.d.txt`, so after each release the surface is stale (regenerate in
-  the next commit) and the next release needs `--compatible OPS_UI_VERSION`.
+  Known tooling gap (closed by the tools fixes below): the release commit wrote
+  `src/version.ts` but not `api-surface.d.txt`, so after each release the surface
+  was stale and the next release needed `--compatible OPS_UI_VERSION`.
 - **1.2.0** (2026-10-01, styling programme spec §4.4 + the library side of §5): the
   primitives `Text`, `Heading`, `Stack`, `Cluster`, `TextLink` (server-safe, `lib/gap.ts`) and
   the additive `TH` / `TD` props `hideBelow` / `alignRight` / `numeric` (not `align`: React
@@ -456,3 +464,19 @@ Captures go to `$TMPDIR/ops-ui-shots/<app>/<label>/`.
   share `date-input--calendar*`'s (a byte of corner anti-aliasing on the field under the sheet's
   backdrop, ~1 run in 6): re-run. A hovered bordered button's corners flake the same way
   (`button--matrix@hover-secondary`), so the RowMenu trigger story opens a ghost trigger.
+- **Tools fixes** (2026-10-01, branch `claude/tools-fixes`, from the F/W app runs;
+  no `src/` or `styles/` change). `tools/app-shots.mjs`: the G3 dump reads each
+  `--color-*` through a fresh probe with `transition: none` (one reused probe read
+  every colour as the first one under reduced motion, so G3 never saw a colour
+  value) and dumps every declared custom property but `--tw-*` (a newly declared
+  name outside the old families never failed); one sign-in per user per capture,
+  reused through `storageState`; `visual.loginTimeout` / `--login-timeout`,
+  default 60 s; `--expect` keeps a `#000` in a value (a comment is `#` + space).
+  `tools/release.mjs` rewrites the `OPS_UI_VERSION` line of `api-surface.d.txt`
+  in the release commit (three files now) and never counts that line. The shots
+  repaint the page once (real frames) after a story's `open` click: the
+  375-touch `date-input--calendar*` shots flaked ~8% (the field under the sheet
+  repainted or not after losing focus); 6 baselines rebaselined to the repainted
+  state, 120/120 green with `--repeat-each=20`. Docs: spec §3.3, §4.2, §8.4
+  (the apps' root docs), §11.4 (servers, sign-ins, the dump), §12.2 F5 / §12.3
+  W1, W6.
