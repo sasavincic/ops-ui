@@ -1505,4 +1505,4 @@ export type ToastAction = {
 };
 
 // src/version.d.ts
-export declare const OPS_UI_VERSION = "1.5.0";
+export declare const OPS_UI_VERSION = "1.6.0";
