@@ -85,13 +85,16 @@ describe("the shot comparison is exact", () => {
     { name: "surface → surface-raised", file: "1440/workforce/table--rows.png", from: token("--brand-surface"), to: token("--brand-surface-raised") },
     { name: "border lightness 0.9 → 0.89", file: "1440/workforce/table--rows.png", from: token("--brand-border"), to: pixel("oklch(0.89 0.006 250)") },
   ];
+  // Decoding, repainting and comparing whole-page PNGs takes seconds on a loaded machine (load 30 on
+  // 4 cores timed out at vitest's 5 s): a timeout, never a looser comparison.
+  const PNG_WORK = 60_000;
   it.each(steps)("a baseline repainted $name is refused", ({ file, from, to }) => {
     const { count, buffer } = repaint(file, from, to);
     expect(count, "the baseline holds pixels of the token").toBeGreaterThan(20);
     const result = compare(buffer, baseline(file), SHOT_COMPARISON);
     expect(result?.errorMessage).toMatch(/pixels .* are different/);
     expect(exactDiff(buffer, baseline(file)).changed).toBe(count);
-  });
+  }, PNG_WORK);
 
   it.each(["1440/workforce/button--matrix.png", "375/finaops/dialog--form.png"])(
     "%s with every glyph and corner edge lightened: Playwright's comparator lets it through, exactDiff refuses it",
@@ -106,6 +109,7 @@ describe("the shot comparison is exact", () => {
       expect(exact.sizeMismatch).toBeNull();
       expect(exact.diff).not.toBeNull();
     },
+    PNG_WORK,
   );
 
   it("a size change is refused", () => {
