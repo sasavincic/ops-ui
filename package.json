@@ -1,6 +1,6 @@
 {
   "name": "@latro/ops-ui",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "The shared UI kit of Workforce Ops, FinaOps and PrefabOps. Never published: apps vendor a released copy with scripts/sync-ops-ui.mjs.",
   "license": "UNLICENSED",
