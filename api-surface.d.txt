@@ -313,7 +313,12 @@ type ReadOnlyProps = {
 type SizeProps = {
     size?: ControlSize | number;
 };
-export declare function Input({ className, readOnlySafe, size, ...props }: Omit<React.ComponentProps<"input">, "size"> & ReadOnlyProps & SizeProps): import("react").JSX.Element;
+type AdornmentProps = {
+    prefix?: React.ReactNode;
+    suffix?: React.ReactNode;
+    wrapperClassName?: string;
+};
+export declare function Input({ className, readOnlySafe, size, prefix, suffix, wrapperClassName, ...props }: Omit<React.ComponentProps<"input">, "size" | "prefix"> & ReadOnlyProps & SizeProps & AdornmentProps): import("react").JSX.Element;
 export declare function Select({ className, readOnlySafe, size, ...props }: Omit<React.ComponentProps<"select">, "size"> & ReadOnlyProps & SizeProps): import("react").JSX.Element;
 export declare function Checkbox({ label, className, readOnlySafe, ...props }: React.ComponentProps<"input"> & {
     label: string;
@@ -442,9 +447,23 @@ export type RowMenuItem = {
     danger?: boolean;
     disabled?: boolean;
 };
-export declare function RowMenu({ label, items, className, }: {
-    label: string;
+export type RowMenuSection = {
+    key: string;
+    heading?: string;
     items: RowMenuItem[];
+};
+export type RowMenuTrigger = {
+    label: string;
+    icon?: ActionIconName;
+    variant?: "secondary" | "ghost" | "primary";
+    size?: "sm" | "md" | "lg";
+    disabled?: boolean;
+};
+export declare function RowMenu({ label, items, sections, trigger, className, }: {
+    label: string;
+    items?: RowMenuItem[];
+    sections?: RowMenuSection[];
+    trigger?: RowMenuTrigger;
     className?: string;
 }): import("react").JSX.Element | null;
 
@@ -709,6 +728,32 @@ export declare function ValidityCell({ date, today, noExpiry, warnDays, label, c
     className?: string;
 }): import("react").JSX.Element;
 
+// src/components/year-input.d.ts
+import { type ControlSize } from "../lib/touch";
+export type YearInputChange = {
+    target: {
+        value: string;
+        name?: string;
+    };
+};
+export declare function YearInput({ id, name, value, defaultValue, onChange, min, max, disabled, required, placeholder, className, readOnlySafe, "aria-label": ariaLabel, "aria-describedby": ariaDescribedBy, size, }: {
+    id?: string;
+    name?: string;
+    value?: string;
+    defaultValue?: string;
+    onChange?: (event: YearInputChange) => void;
+    min?: number;
+    max?: number;
+    disabled?: boolean;
+    required?: boolean;
+    placeholder?: string;
+    className?: string;
+    readOnlySafe?: boolean;
+    "aria-label"?: string;
+    "aria-describedby"?: string;
+    size?: ControlSize;
+}): import("react").JSX.Element;
+
 // src/config/provider.d.ts
 import { type OpsUiStrings } from "./strings";
 export type OpsUiConfig = {
@@ -776,9 +821,14 @@ export type OpsUiStrings = {
         unknown: string;
         noExpiry: string;
     };
+    yearPicker?: {
+        placeholder: string;
+        openPicker: string;
+        thisYear: string;
+    };
 };
 export declare const EN_STRINGS: OpsUiStrings;
-export declare const EN_OPTIONAL_STRINGS: Required<Pick<OpsUiStrings, "tabs" | "appSwitcher" | "validity">>;
+export declare const EN_OPTIONAL_STRINGS: Required<Pick<OpsUiStrings, "tabs" | "appSwitcher" | "validity" | "yearPicker">>;
 
 // src/config/tabs-nav.d.ts
 export declare function TabsNav({ className, children }: {
@@ -882,6 +932,15 @@ export type ValidityOptions = {
 };
 export declare function daysBetween(fromIso: string, toIso: string): number;
 export declare function validityState(date: string | null, today: string, { noExpiry, warnDays }?: ValidityOptions): ValidityState;
+
+// src/lib/year-input.d.ts
+export declare function isYearString(value: string): boolean;
+export declare function parseTypedYear(text: string, todayYear: number): number | null;
+export declare function maskTypedYear(text: string): string;
+export declare function yearWithin(year: number, min?: number | null, max?: number | null): boolean;
+export declare function yearPageStart(year: number): number;
+export declare function anchorYear(value: number | null, todayYear: number, min?: number | null, max?: number | null): number;
+export declare function yearKeyTarget(key: string, focused: number, shift?: boolean): number | null;
 
 // src/navigation/history.d.ts
 import { type NavTrailState } from "./trail";
@@ -1121,6 +1180,10 @@ import type { Story } from "./index";
 export declare const stories: Story[];
 
 // src/stories/validity-cell.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/year-input.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
 

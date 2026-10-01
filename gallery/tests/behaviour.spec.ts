@@ -1,11 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { EN_STRINGS } from "../../src/config/strings";
+import { EN_OPTIONAL_STRINGS, EN_STRINGS } from "../../src/config/strings";
 import { STORY_GROUPS, storyId } from "../../src/stories";
 
 // Behaviour the screenshots cannot prove (spec §11.1 "behaviour", §12.0 G4 by hand, automated
 // here): the Dialog and Sheet discard prompts, toast lifetimes, the toast hooks and Field messages
 // (localized, re-raised, taken away on unmount), DateInput typing and calendar,
-// Combobox matching and keyboard, RowMenu placement, the AppSwitcher menu, MonthNav, Segmented at 375 and the
+// Combobox matching and keyboard, RowMenu placement (trigger and sections since 1.4.0), Input adornments and
+// YearInput (1.4.0), the AppSwitcher menu, MonthNav, Segmented at 375 and the
 // read-only default-deny. One brand is enough: behaviour does not depend on colour.
 
 const FIXED_NOW = new Date("2026-09-30T10:00:00");
@@ -363,6 +364,204 @@ test.describe("desktop behaviour", () => {
     await expect(menu).toBeHidden();
   });
 
+  test("RowMenu (1.4.0): a labelled trigger opens headed sections; a pick closes it; it stays on screen at the left edge", async ({ page }) => {
+    await open(page, "row-menu--label-trigger-and-sections");
+    const trigger = page.getByRole("button", { name: "AI tools" });
+    await expect(trigger).toHaveAttribute("title", "AI extraction tools");
+    await expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+    await trigger.click();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    // The ungrouped item first, then two named groups.
+    await expect(menu.getByRole("menuitem").first()).toHaveText("Reset to AI draft");
+    const bulk = menu.getByRole("group", { name: "Bulk actions" });
+    await expect(menu.getByRole("group", { name: "Current page" }).getByRole("menuitem")).toHaveText(["Extract page"]);
+    await expect(bulk.getByRole("menuitem")).toHaveText(["Extract un-reviewed (3)", "Re-extract all"]);
+    await expect(bulk.getByRole("menuitem", { name: "Re-extract all" })).toBeDisabled();
+    // The trigger sits at the content's left edge: the menu lines up with its left edge, below it.
+    const [b, m] = [await trigger.boundingBox(), await menu.boundingBox()];
+    expect(m!.x).toBeGreaterThanOrEqual(8);
+    expect(Math.abs(m!.x - b!.x)).toBeLessThanOrEqual(1);
+    expect(m!.y).toBeGreaterThanOrEqual(b!.y + b!.height);
+    await menu.getByRole("menuitem", { name: "Extract page" }).click();
+    await expect(menu).toBeHidden();
+    await expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await trigger.click();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toBeHidden();
+    await trigger.click();
+    await page.mouse.click(1000, 600);
+    await expect(page.getByRole("menu")).toBeHidden();
+  });
+
+  test("RowMenu (1.4.0): sections open upward on the last row and follow the button when the page scrolls", async ({ page }) => {
+    await open(page, "row-menu--sections-open-upward-on-the-last-row");
+    const button = page.getByRole("button", { name: "Review actions" });
+    await button.click();
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    let [b, m] = [await button.boundingBox(), await menu.boundingBox()];
+    expect(m!.y + m!.height).toBeLessThanOrEqual(b!.y);
+    // Right edges lined up (the ⋯ is at the right of its row).
+    expect(Math.abs(m!.x + m!.width - (b!.x + b!.width))).toBeLessThanOrEqual(1);
+    await expect(menu.getByRole("group")).toHaveCount(3);
+    await expect(menu.getByRole("menuitem", { name: "Delete" })).toBeVisible();
+    // Follow-scroll: make the page scroll, scroll it, the menu moves with its button.
+    await page.evaluate(() => {
+      const spacer = document.createElement("div");
+      spacer.style.height = "1000px";
+      document.body.append(spacer);
+      window.scrollTo(0, 200);
+    });
+    await expect.poll(async () => (await button.boundingBox())!.y).toBeLessThan(b!.y);
+    [b, m] = [await button.boundingBox(), await menu.boundingBox()];
+    expect(Math.abs(m!.x + m!.width - (b!.x + b!.width))).toBeLessThanOrEqual(1);
+    expect(m!.y + m!.height).toBeLessThanOrEqual(b!.y);
+    await expect(menu).toBeVisible();
+  });
+
+  test("Input (1.4.0): the text keeps clear of a measured adornment, which is the field's description and passes clicks through", async ({ page }) => {
+    await open(page, "field--adornments");
+    for (const [label, side] of [
+      ["Wall thickness", "suffix"],
+      ["Design pressure", "suffix"],
+      ["Hourly rate", "prefix"],
+      ["Hourly rate", "suffix"],
+      ["Transport cost, large", "prefix"],
+      ["Narrow, in a grid cell", "suffix"],
+    ] as const) {
+      const input = page.getByLabel(label, { exact: true });
+      const { padding, adornment, inputBox, box } = await input.evaluate((el: HTMLInputElement, which) => {
+        const span = el.parentElement!.querySelector<HTMLElement>(`[data-ops-adornment="${which}"]`)!;
+        const style = getComputedStyle(el);
+        return {
+          padding: parseFloat(which === "prefix" ? style.paddingLeft : style.paddingRight),
+          adornment: span.getBoundingClientRect().width,
+          inputBox: el.getBoundingClientRect().toJSON(),
+          box: span.getBoundingClientRect().toJSON(),
+        };
+      }, side);
+      // 12px from the edge, the adornment's measured width, 6px to the text.
+      expect(Math.abs(padding - (12 + adornment + 6)), `${label} ${side}`).toBeLessThanOrEqual(1);
+      // Inside the field, vertically centred.
+      expect(box.left).toBeGreaterThanOrEqual(inputBox.left);
+      expect(box.right).toBeLessThanOrEqual(inputBox.right);
+      expect(Math.abs(box.top + box.height / 2 - (inputBox.top + inputBox.height / 2))).toBeLessThanOrEqual(1);
+    }
+    const mm = page.getByLabel("Wall thickness", { exact: true });
+    await expect(mm).toHaveAccessibleDescription(/mm/);
+    await expect(mm).toHaveValue("4.5");
+    await expect(page.getByLabel("Hourly rate", { exact: true })).toHaveAccessibleDescription(/€.*\/h/);
+    // A click on the unit lands in the field (the input under it takes the press, which is why
+    // Playwright's own click on the span would refuse: it clicks at the span's centre instead).
+    const unit = (await page.locator('[data-ops-adornment="suffix"]', { hasText: "°C" }).boundingBox())!;
+    await page.mouse.click(unit.x + unit.width / 2, unit.y + unit.height / 2);
+    await expect(page.getByLabel("Design temperature", { exact: true })).toBeFocused();
+    await page.keyboard.type("80");
+    await expect(page.getByLabel("Design temperature", { exact: true })).toHaveValue("80");
+  });
+
+  test("YearInput: typing four digits, two read as a year, unreadable text reverts, limits, the posted year", async ({ page }) => {
+    await open(page, "year-input--states");
+    const empty = page.getByLabel("Empty", { exact: true });
+    await empty.pressSequentially("2019x");
+    await expect(empty).toHaveValue("2019");
+    await empty.fill("85");
+    await empty.blur();
+    await expect(empty).toHaveValue("1985");
+    await empty.fill("202");
+    await empty.blur();
+    await expect(empty).toHaveValue("1985");
+    await empty.fill("");
+    await empty.blur();
+    await expect(empty).toHaveValue("");
+
+    const late = page.getByLabel("After its maximum");
+    await expect(late).toHaveAttribute("aria-invalid", "true");
+    expect(await late.evaluate((el: HTMLInputElement) => el.validationMessage)).toBe(EN_STRINGS.datePicker.latest.replace("{date}", "2027"));
+    await late.fill("2026");
+    await expect(late).not.toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByLabel("In a read-only scope")).toBeDisabled();
+    await expect(page.getByLabel("Disabled", { exact: true })).toBeDisabled();
+
+    const field = page.getByLabel("Uncontrolled, posting its year");
+    const posted = page.locator('input[type="hidden"][name="manufactureYear"]');
+    await expect(posted).toHaveValue("2024");
+    await field.fill("2018");
+    await expect(posted).toHaveValue("2018");
+    await field.click();
+    const picker = page.getByRole("dialog", { name: EN_OPTIONAL_STRINGS.yearPicker.openPicker });
+    await picker.getByRole("button", { name: "2021", exact: true }).click();
+    await expect(picker).toBeHidden();
+    await expect(field).toHaveValue("2021");
+    await expect(posted).toHaveValue("2021");
+    await field.click();
+    await picker.getByRole("button", { name: EN_STRINGS.datePicker.clear }).click();
+    await expect(field).toHaveValue("");
+    await expect(posted).toHaveValue("");
+  });
+
+  test("YearInput: the picker pages, walks with the keyboard, This year and Clear, Escape", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await open(page, "year-input--picker");
+    const input = page.getByLabel("Year of manufacture");
+    await input.click();
+    const picker = page.getByRole("dialog", { name: EN_OPTIONAL_STRINGS.yearPicker.openPicker });
+    await expect(picker).toBeVisible();
+    await expect(picker).toContainText("2016 – 2027");
+    await expect(picker.getByRole("button", { name: "2024", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(picker.getByRole("button", { name: "2026", exact: true })).toHaveAttribute("aria-current", "date");
+    await picker.getByRole("button", { name: EN_STRINGS.datePicker.previousYears }).click();
+    await expect(picker).toContainText("2004 – 2015");
+    await picker.getByRole("button", { name: "2009", exact: true }).click();
+    await expect(picker).toBeHidden();
+    await expect(input).toHaveValue("2009");
+
+    // Keyboard: ↓ opens on the year, arrows walk a year or a row, PageDown a page, Enter picks.
+    const focusedYear = () => page.evaluate(() => document.activeElement?.getAttribute("data-year") ?? null);
+    await input.press("ArrowDown");
+    await expect.poll(focusedYear).toBe("2009");
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(focusedYear).toBe("2010");
+    await page.keyboard.press("ArrowDown");
+    await expect.poll(focusedYear).toBe("2013");
+    await page.keyboard.press("PageDown");
+    await expect.poll(focusedYear).toBe("2025");
+    await expect(picker).toContainText("2016 – 2027");
+    await page.keyboard.press("End");
+    await expect.poll(focusedYear).toBe("2027");
+    await page.keyboard.press("Enter");
+    await expect(input).toHaveValue("2027");
+    await expect(input).toBeFocused();
+
+    await input.click();
+    await picker.getByRole("button", { name: EN_OPTIONAL_STRINGS.yearPicker.thisYear }).click();
+    await expect(input).toHaveValue("2026");
+    await input.click();
+    await picker.getByRole("button", { name: EN_STRINGS.datePicker.clear }).click();
+    await expect(input).toHaveValue("");
+    await input.click();
+    await page.keyboard.press("Escape");
+    await expect(picker).toBeHidden();
+    // Enter in the open field settles instead of submitting; the picker button toggles it.
+    await page.getByRole("button", { name: EN_OPTIONAL_STRINGS.yearPicker.openPicker }).click();
+    await expect(picker).toBeVisible();
+    await page.mouse.click(1200, 800);
+    await expect(picker).toBeHidden();
+  });
+
+  test("YearInput: years outside min/max cannot be picked", async ({ page }) => {
+    await open(page, "year-input--picker-with-limits");
+    await page.getByLabel("Year of manufacture").click();
+    const picker = page.getByRole("dialog", { name: EN_OPTIONAL_STRINGS.yearPicker.openPicker });
+    await expect(picker.getByRole("button", { name: "2018", exact: true })).toBeDisabled();
+    await expect(picker.getByRole("button", { name: "2019", exact: true })).toBeEnabled();
+    await expect(picker.getByRole("button", { name: "2027", exact: true })).toBeEnabled();
+    await picker.getByRole("button", { name: EN_STRINGS.datePicker.nextYears }).click();
+    await expect(picker.getByRole("button", { name: "2028", exact: true })).toBeDisabled();
+  });
+
   test("AppSwitcher: the menu lists the apps with a URL, the current one without a link; keyboard, Tab, Escape and an outside press close it", async ({ page }) => {
     await open(page, "app-switcher--closed");
     const trigger = page.getByRole("button", { name: "Switch app: Workforce Ops" });
@@ -463,6 +662,40 @@ test.describe("phone behaviour", () => {
     // A pixel shot cannot see an attribute: on a phone the field asks for no keyboard, since a
     // tap opens the calendar; a fine pointer types digits.
     await expect(page.getByLabel("Empty", { exact: true })).toHaveAttribute("inputmode", info.project.name === "375-touch" ? "none" : "numeric");
+  });
+
+  test("YearInput: a coarse pointer gets the picker as a bottom sheet, never the keyboard", async ({ page }, info) => {
+    await open(page, "year-input--picker");
+    const input = page.getByLabel("Year of manufacture");
+    const touch = info.project.name === "375-touch";
+    await expect(input).toHaveAttribute("inputmode", touch ? "none" : "numeric");
+    if (touch) await input.tap();
+    else await input.click();
+    const picker = page.getByRole("dialog", { name: EN_OPTIONAL_STRINGS.yearPicker.openPicker });
+    await expect(picker.first()).toBeVisible();
+    const sheet = page.locator("dialog[open]");
+    if (!touch) {
+      await expect(sheet).toHaveCount(0); // a fine pointer gets the floating panel
+      return;
+    }
+    // A modal <dialog> in the top layer, docked to the bottom edge, full width.
+    await expect(sheet).toHaveCount(1);
+    expect(await sheet.evaluate((el: HTMLDialogElement) => el.matches(":modal"))).toBe(true);
+    const box = (await sheet.boundingBox())!;
+    expect(Math.round(box.y + box.height)).toBe(812);
+    expect(Math.round(box.width)).toBe(375);
+    await sheet.getByRole("button", { name: "2021", exact: true }).tap();
+    await expect(sheet).toHaveCount(0);
+    await expect(input).toHaveValue("2021");
+    // A tap on the dimmed rest closes it without a pick; Clear empties the field.
+    await input.tap();
+    await expect(sheet).toHaveCount(1);
+    await page.touchscreen.tap(187, 40);
+    await expect(sheet).toHaveCount(0);
+    await expect(input).toHaveValue("2021");
+    await input.tap();
+    await sheet.getByRole("button", { name: EN_STRINGS.datePicker.clear }).tap();
+    await expect(input).toHaveValue("");
   });
 
   test("Segmented wider than its row scrolls inside itself; the page never scrolls sideways", async ({ page }) => {

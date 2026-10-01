@@ -181,7 +181,13 @@ workspace's footer is a kit `FormActions`), and its own stylesheet obeys rule 5.
 Each lands with a story and shots; adopting it in an app is a **0-changed-pixel** codemod
 (the component renders exactly the classes it replaces).
 
-### 4.2 The shared shell (1.3.0)
+### 4.2 The shared shell (1.5.0)
+
+*Version map (settled 2026-10-01):* 1.1.0 = AppSwitcher + ValidityCell; 1.2.0 = the primitives
+(§4.1, §4.4); 1.3.0 = PrefabOps restyle M1 + M2 (scoped preflight, stacking variables, touch
+floor, `size="lg"`, `IconButton`, two glyphs); 1.4.0 = restyle M3 (`Input` prefix / suffix,
+`YearInput`, `RowMenu` trigger + sections); **1.5.0 = `AppFrame`**, the release this section
+describes. The restyle minors came first because PrefabOps' areas need them; nothing here changed.
 
 `AppFrame` with slots, extracted from the two near-identical shells: `Sidebar` (brand slot,
 **three nav registers** — workspaces, records, tools — each with its icon, ⌥-digit chords, the
@@ -298,7 +304,7 @@ checked by eye at 1440 / 375 / 375-touch.
 |---|---|---|
 | **A. Library 1.0** | Align FinaOps' kit with WFO's three newer files (option 1: bottom-sheet dialogs on phones, touch calendar, `ExternalButtonLink`); re-import into the library; re-accept the 375 baselines that change; re-run the extraction proof; release **1.0.0** | FinaOps phone dialogs become bottom sheets (as WFO already is) |
 | **B. Apps on 1.0** | FinaOps F0–F7 then Workforce Ops W0–W8 (library spec §12.2–12.3): vendor the kit, one-line wrappers, `brand.css` | none |
-| **C. Library 1.1–1.3** | 1.1 AppSwitcher + ValidityCell; 1.2 primitives (§4.1) + guards template; 1.3 AppFrame (§4.2); each adopted by both apps with a codemod + allow-lists (§5) | the app switcher in the logo; nothing else |
+| **C. Library 1.1–1.5** | 1.1 AppSwitcher + ValidityCell; 1.2 primitives (§4.1) + guards template; 1.3 + 1.4 the PrefabOps restyle minors M1–M3 (restyle plan §10.2; additive, nothing to adopt in WFO / FinaOps); 1.5 AppFrame (§4.2); each adopted by both apps with a codemod + allow-lists (§5) | the app switcher in the logo; nothing else |
 | **D. Sweep** | Both apps: shrink the allow-lists area by area (raw controls → kit, recipes → primitives, arbitrary values → tokens) | none |
 | **E. PrefabOps** | R0 (local env), P0 (Next 16), P1–P3 (tokens renamed, Tailwind + kit, notifications), then **P4.1 = new frame with records/workspaces/tools nav, logo and palette**, P4.2–P4.8 area by area, then the three workspaces, P5 delete legacy CSS | the whole new look, area by area |
 | **F. Docs** | `DESIGN.md` (library) gains the layer rules and the decision ladder; each app's CLAUDE.md points to it | — |

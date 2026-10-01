@@ -1,8 +1,8 @@
 // The words the kit itself says (spec §6.1): exactly the `common.*` keys the
 // two apps' kits read today, 17 top-level strings plus 16 for the date
-// picker, and since 1.1 three optional groups with English defaults (EN_OPTIONAL_STRINGS):
-// tabs, appSwitcher, validity. An app feeds its own dictionary through OpsUiProvider; outside a
-// provider (a root-layout Toaster, a login page) the kit speaks EN_STRINGS.
+// picker, and since 1.1 optional groups with English defaults (EN_OPTIONAL_STRINGS):
+// tabs, appSwitcher, validity (1.1) and yearPicker (1.4). An app feeds its own
+// dictionary through OpsUiProvider; outside a provider (a root-layout Toaster, a login page) the kit speaks EN_STRINGS.
 // Per-call label props (closeLabel, openLabel, pendingLabel, clearLabel)
 // still win over these.
 
@@ -65,6 +65,18 @@ export type OpsUiStrings = {
     unknown: string;
     noExpiry: string;
   };
+  /**
+   * 1.4, optional: YearInput's own words (it reuses datePicker.previousYears / nextYears / clear /
+   * earliest / latest). Default EN_OPTIONAL_STRINGS.yearPicker.
+   */
+  yearPicker?: {
+    /** The empty field's placeholder ("YYYY"). */
+    placeholder: string;
+    /** The picker button's and the picker's accessible name ("Choose year"). */
+    openPicker: string;
+    /** The footer button that picks the current year ("This year"). */
+    thisYear: string;
+  };
 };
 
 /** Today's Workforce Ops en `common` values (FinaOps' en values are identical). */
@@ -107,13 +119,13 @@ export const EN_STRINGS: OpsUiStrings = {
 };
 
 /**
- * The English defaults of the optional strings (1.1). EN_STRINGS stays exactly the apps' `common`
+ * The English defaults of the optional strings (1.1; yearPicker 1.4). EN_STRINGS stays exactly the apps' `common`
  * words of 1.0; a component reads `strings.x ?? EN_OPTIONAL_STRINGS.x`, so an app that passes no
  * value renders what it rendered before. The validity words are Workforce Ops' English
  * (`workers.compliance.expiredAgo` / `expiresIn`, `compliance.desk.unknown`,
  * `statuses.expiry.no_expiry`).
  */
-export const EN_OPTIONAL_STRINGS: Required<Pick<OpsUiStrings, "tabs" | "appSwitcher" | "validity">> = {
+export const EN_OPTIONAL_STRINGS: Required<Pick<OpsUiStrings, "tabs" | "appSwitcher" | "validity" | "yearPicker">> = {
   tabs: "Tabs",
   appSwitcher: { label: "Switch app", current: "Current app" },
   validity: {
@@ -122,4 +134,5 @@ export const EN_OPTIONAL_STRINGS: Required<Pick<OpsUiStrings, "tabs" | "appSwitc
     unknown: "Validity unknown",
     noExpiry: "No expiry",
   },
+  yearPicker: { placeholder: "YYYY", openPicker: "Choose year", thisYear: "This year" },
 };

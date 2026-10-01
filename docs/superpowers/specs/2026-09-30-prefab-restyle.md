@@ -1015,12 +1015,12 @@ A gap becomes a **library component** when it is a primitive whose interaction, 
 
 ### 10.2 Library minors, batched
 
-Each minor is additive, with **0 changed pixels on every existing gallery baseline**, and needs no action from WFO or FinaOps: they sync whenever they like. The real version numbers (2026-10-01): 1.1.0 was the AppSwitcher / ValidityCell release and 1.2.0 the primitives release of the styling programme, so M1 and M2 shipped together as **1.3.0** and M3 is next.
+Each minor is additive, with **0 changed pixels on every existing gallery baseline**, and needs no action from WFO or FinaOps: they sync whenever they like. The real version numbers (2026-10-01): 1.1.0 was the AppSwitcher / ValidityCell release and 1.2.0 the primitives release of the styling programme, so M1 and M2 shipped together as **1.3.0** and M3 as **1.4.0**. The shared shell (`AppFrame`, styling programme §4.2) is **1.5.0**: PrefabOps' P4.1 frame is Prefab-owned (§7.1), and taking `AppFrame` later is a step of its own, not part of M1–M3.
 
 | Minor | Content | Needed before |
 |---|---|---|
 | **M1 + M2 = 1.3.0** (released 2026-10-01) | M1: `styles/preflight-scoped.css` (G19); stacking variables `--ops-z-toast` / `-calendar` / `-menu` / `-sheet`, defaults 60 / 50 / 40 / 40 (G18). M2: `[data-ops-touch]` coarse floor + `size="lg"` on Button and the input family (G2); `IconButton` in `components/button.tsx` (G4); `ActionIcon` `sparkle`, `mail` (G17). G3 needed nothing: every Dialog is a bottom sheet below `sm` since 1.0.0, so there is no `presentation` prop. | P2 (sync), P3 (stacking), P4.1 |
-| **M3 = 1.4.0** | `Input` prefix / suffix (G10); `YearInput` (G13); `RowMenu` `trigger` + `sections` (G8) | P4.4a |
+| **M3 = 1.4.0** (released 2026-10-01) | `Input` `prefix` / `suffix` + `wrapperClassName` (G10: the adornment is the field's description, the text keeps clear of its measured width); `YearInput` (G13: four digits or two, posts `"YYYY"` under `name`, min / max as numbers, the twelve-year page, a bottom sheet on touch; words `strings.yearPicker`); `RowMenu` `trigger` (`{ label, icon?, variant?, size?, disabled? }`) + `sections` (`{ key, heading?, items }[]`, `items` optional) (G8) | P4.4a |
 
 **PrefabOps and library 2.0.** PrefabOps takes 2.0 (the batched visible fixes) whenever it lands. Because every hand-built Cancel inside a Dialog already carries `data-ops-dismiss` (§9.2) and PrefabOps uses no `MonthNav`, its 2.0 upgrade steps are expected to be empty.
 

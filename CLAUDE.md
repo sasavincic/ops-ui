@@ -437,6 +437,22 @@ Captures go to `$TMPDIR/ops-ui-shots/<app>/<label>/`.
   and the input family (`Input` / `Select` take `"md" | "lg" | number`, a number stays the HTML
   attribute), `IconButton` in `button.tsx`, ActionIcon `sparkle` / `mail`. G3 needed nothing
   (bottom-sheet dialogs since 1.0). 6 new stories (78), new baselines only;
-  `tests/touch-and-stacking.test.tsx`, `tests/preflight-scoped.test.ts`. Next: M3 = 1.4.0 (Input
-  prefix / suffix, YearInput, RowMenu trigger + sections). Note: the styling programme's §4.2
-  still calls the AppFrame release "1.3.0"; it is now 1.4.0 or later.
+  `tests/touch-and-stacking.test.tsx`, `tests/preflight-scoped.test.ts`.
+- **1.4.0** (2026-10-01, the PrefabOps restyle plan's M3, §10.2): `Input` `prefix` / `suffix` +
+  `wrapperClassName` (G10; an adorned input gets a `relative block w-full` wrapper, the adornment
+  spans are aria-hidden and joined to the input's `aria-describedby`, the text keeps clear of
+  each by its measured width via inline padding — 12 + width + 6px, a 0.6em-per-character
+  estimate before the first measurement; no adornment = the 1.3.0 markup, no wrapper);
+  `components/year-input.tsx` `YearInput` + `lib/year-input.ts` (G13; DateInput's structure:
+  hidden input under `name`, `onChange({ target: { value } })`, min / max numbers, the twelve-year
+  page, floating panel or touch bottom sheet, keyboard walk; optional `strings.yearPicker`, the
+  rest reused from `datePicker`); `RowMenu` `trigger` + `sections` (G8; `items` optional, the ⋯
+  branch is the 1.3.0 markup, a menu with no room left of the button's right edge aligns to its
+  left edge). `tests/m3.test.tsx` renders the 1.3.0 release's own `field.tsx` / `row-menu.tsx` /
+  `search-input.tsx` (exported from git into a sandbox) beside the current ones and requires
+  identical markup for every call without the new props. 6 new stories (84), new baselines only;
+  browser tests for all three. Version map settled: **1.5.0 = AppFrame** (styling programme
+  §4.2 / §8, restyle plan §10.2). Known flake added: the 375-touch `year-input--picker*` shots
+  share `date-input--calendar*`'s (a byte of corner anti-aliasing on the field under the sheet's
+  backdrop, ~1 run in 6): re-run. A hovered bordered button's corners flake the same way
+  (`button--matrix@hover-secondary`), so the RowMenu trigger story opens a ghost trigger.

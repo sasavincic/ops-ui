@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { ActionIcon, type ActionIconName } from "./action-icon";
 import { Button } from "./button";
 import { useDismissable } from "../lib/use-dismissable";
@@ -21,6 +21,14 @@ import { TOUCH_FLOOR } from "../lib/touch";
  * which clipped an absolutely positioned menu on the last row. It opens
  * below the button, or above when the viewport has no room below, and
  * follows its button while the page scrolls.
+ *
+ * 1.4.0 (PrefabOps restyle plan G8): an optional `trigger` replaces the ⋯
+ * with a labelled button (a toolbar's "AI tools ▾"), and optional
+ * `sections` add headed groups after the ungrouped `items`, each set off
+ * by a hairline. Placement, flip-up, follow-scroll and every way of
+ * closing are the same for all three shapes; a menu with no room left of
+ * its button's right edge lines up with the button's left edge instead.
+ * Without either prop the menu renders exactly the 1.3 markup.
  */
 export type RowMenuItem = {
   key: string;
@@ -32,20 +40,50 @@ export type RowMenuItem = {
   disabled?: boolean;
 };
 
+/** A group of a RowMenu (1.4.0): an optional heading, set off from what precedes it by a hairline. */
+export type RowMenuSection = {
+  key: string;
+  /** A short heading over the group ("Current page", "Bulk actions"). */
+  heading?: string;
+  items: RowMenuItem[];
+};
+
+/** A labelled trigger in place of the ⋯ (1.4.0). */
+export type RowMenuTrigger = {
+  /** The visible label and the button's accessible name; progress may ride it ("Extracting 2/5…"). */
+  label: string;
+  icon?: ActionIconName;
+  /** Default "secondary". */
+  variant?: "secondary" | "ghost" | "primary";
+  /** Default "sm", the ⋯'s size. */
+  size?: "sm" | "md" | "lg";
+  disabled?: boolean;
+};
+
+type Place = { top: number; right: number; left?: undefined } | { top: number; left: number; right?: undefined };
+
 export function RowMenu({
   label,
-  items,
+  items = [],
+  sections = [],
+  trigger,
   className,
 }: {
-  /** The accessible name of the ⋯ button ("Row actions"). */
+  /** The accessible name of the ⋯ button ("Row actions"); with a `trigger`, the trigger's title. */
   label: string;
-  items: RowMenuItem[];
+  /** The ungrouped items, first. */
+  items?: RowMenuItem[];
+  /** Groups after the items, each with an optional heading (1.4.0). */
+  sections?: RowMenuSection[];
+  /** A labelled button instead of the ⋯ (1.4.0). */
+  trigger?: RowMenuTrigger;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [place, setPlace] = useState<{ top: number; right: number } | null>(null);
+  const [place, setPlace] = useState<Place | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLUListElement>(null);
+  const headingId = useId();
   useDismissable(open, wrapRef, () => setOpen(false));
 
   // Measure before paint so the menu never flashes in the wrong place, and
@@ -65,7 +103,14 @@ export function RowMenu({
         below + height > window.innerHeight - 8 && rect.top - gap - height >= 8
           ? rect.top - gap - height
           : below;
-      setPlace({ top, right: Math.max(8, window.innerWidth - rect.right) });
+      const right = Math.max(8, window.innerWidth - rect.right);
+      // A menu that would leave the screen on the left (a labelled trigger
+      // near the left edge) lines up with the button's left edge instead.
+      if (window.innerWidth - right - menu.offsetWidth < 8) {
+        setPlace({ top, left: Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8)) });
+      } else {
+        setPlace({ top, right });
+      }
     };
     place();
     window.addEventListener("scroll", place, true);
@@ -76,7 +121,42 @@ export function RowMenu({
     };
   }, [open]);
 
-  if (items.length === 0) return null;
+  const groups = sections.filter((section) => section.items.length > 0);
+  if (items.length === 0 && groups.length === 0) return null;
+
+  const renderItem = (item: RowMenuItem) => (
+    <li key={item.key} role="none">
+      {item.href ? (
+        <Link
+          role="menuitem"
+          href={item.href}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-ink hover:bg-surface"
+          onClick={() => setOpen(false)}
+        >
+          <ActionIcon name={item.icon} />
+          {item.label}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          role="menuitem"
+          disabled={item.disabled}
+          className={cn(
+            "flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm hover:bg-surface disabled:opacity-50",
+            item.danger ? "text-danger hover:bg-danger/10" : "text-ink"
+          )}
+          onClick={() => {
+            setOpen(false);
+            item.onClick?.();
+          }}
+        >
+          <ActionIcon name={item.icon} />
+          {item.label}
+        </button>
+      )}
+    </li>
+  );
+
   return (
     <div
       ref={wrapRef}
@@ -85,64 +165,75 @@ export function RowMenu({
         if (e.key === "Escape") setOpen(false);
       }}
     >
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        aria-label={label}
-        title={label}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => {
-          setPlace(null);
-          setOpen((v) => !v);
-        }}
-        // The trigger is icon-only: under the touch floor it is 44 x 44 (Button brings the height).
-        className={cn("px-2", TOUCH_FLOOR.width)}
-      >
-        {/* The dots ARE the button — always drawn, even where decorative
-            action icons are off (Settings, workspaces rendered it empty). */}
-        <ActionIcon name="more" always />
-      </Button>
+      {trigger ? (
+        <Button
+          type="button"
+          variant={trigger.variant ?? "secondary"}
+          size={trigger.size ?? "sm"}
+          icon={trigger.icon}
+          title={label}
+          disabled={trigger.disabled}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          onClick={() => {
+            setPlace(null);
+            setOpen((v) => !v);
+          }}
+        >
+          {trigger.label}
+          <svg aria-hidden="true" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-70">
+            <path d="m4 6 4 4 4-4" />
+          </svg>
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label={label}
+          title={label}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          onClick={() => {
+            setPlace(null);
+            setOpen((v) => !v);
+          }}
+          // The trigger is icon-only: under the touch floor it is 44 x 44 (Button brings the height).
+          className={cn("px-2", TOUCH_FLOOR.width)}
+        >
+          {/* The dots ARE the button — always drawn, even where decorative
+              action icons are off (Settings, workspaces rendered it empty). */}
+          <ActionIcon name="more" always />
+        </Button>
+      )}
       {open && (
         <ul
           ref={menuRef}
           role="menu"
-          style={place ? { top: place.top, right: place.right } : { visibility: "hidden" }}
+          style={place ? (place.left === undefined ? { top: place.top, right: place.right } : { top: place.top, left: place.left }) : { visibility: "hidden" }}
           className="fixed z-[var(--ops-z-menu,40)] w-52 max-w-[calc(100vw-2rem)] rounded-control border border-border bg-bg py-1 shadow-lg"
         >
-          {items.map((item) => (
-            <li key={item.key} role="none">
-              {item.href ? (
-                <Link
-                  role="menuitem"
-                  href={item.href}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-ink hover:bg-surface"
-                  onClick={() => setOpen(false)}
-                >
-                  <ActionIcon name={item.icon} />
-                  {item.label}
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  role="menuitem"
-                  disabled={item.disabled}
-                  className={cn(
-                    "flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm hover:bg-surface disabled:opacity-50",
-                    item.danger ? "text-danger hover:bg-danger/10" : "text-ink"
+          {items.map(renderItem)}
+          {groups.map((section, index) => {
+            const id = section.heading ? `${headingId}-${section.key}` : undefined;
+            return (
+              <li key={section.key} role="none" className={cn((index > 0 || items.length > 0) && "mt-1 border-t border-border pt-1")}>
+                <ul role="group" aria-labelledby={id}>
+                  {section.heading && (
+                    <li
+                      id={id}
+                      role="presentation"
+                      className="px-3 pt-1 pb-0.5 text-micro font-medium tracking-wide text-ink-muted uppercase"
+                    >
+                      {section.heading}
+                    </li>
                   )}
-                  onClick={() => {
-                    setOpen(false);
-                    item.onClick?.();
-                  }}
-                >
-                  <ActionIcon name={item.icon} />
-                  {item.label}
-                </button>
-              )}
-            </li>
-          ))}
+                  {section.items.map(renderItem)}
+                </ul>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

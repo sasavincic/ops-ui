@@ -85,7 +85,7 @@ describe("client-directive", () => {
 
   it("the other component files are client modules", () => {
     const components = SOURCES.filter((f) => f.startsWith("src/components/"));
-    expect(components).toHaveLength(42);
+    expect(components).toHaveLength(43); // 1.4.0: year-input
     const clients = components.filter((f) => !SERVER_SAFE.includes(f) && !SERVER_SAFE_LATER.includes(f));
     expect(clients.filter((f) => !hasUseClient(readSource(f)))).toEqual([]);
   });

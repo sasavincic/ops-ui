@@ -134,12 +134,45 @@ function Large() {
   );
 }
 
+/** 1.4.0: Input prefix / suffix (units and currency). */
+function Adornments() {
+  return (
+    <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+      <Field label="Wall thickness" htmlFor="a-mm" hint="Nominal, before corrosion allowance">
+        <Input id="a-mm" inputMode="decimal" defaultValue="4.5" suffix="mm" />
+      </Field>
+      <Field label="Design pressure" htmlFor="a-bar">
+        <Input id="a-bar" inputMode="decimal" defaultValue="16" suffix="bar" className="text-right" />
+      </Field>
+      <Field label="Design temperature" htmlFor="a-c">
+        <Input id="a-c" inputMode="decimal" placeholder="120" suffix="°C" />
+      </Field>
+      <Field label="Hourly rate" htmlFor="a-eur">
+        <Input id="a-eur" inputMode="decimal" defaultValue="46.80" prefix="€" suffix="/h" />
+      </Field>
+      <Field label="Weight" htmlFor="a-kg" error="Enter a weight above 0.">
+        <Input id="a-kg" inputMode="decimal" defaultValue="0" suffix="kg" aria-invalid />
+      </Field>
+      <Field label="Surcharge" htmlFor="a-pct">
+        <Input id="a-pct" inputMode="decimal" defaultValue="25" suffix="%" disabled />
+      </Field>
+      <Field label="Transport cost, large" htmlFor="a-lg">
+        <Input id="a-lg" size="lg" inputMode="decimal" defaultValue="380.00" prefix="€" />
+      </Field>
+      <Field label="Narrow, in a grid cell" htmlFor="a-narrow">
+        <Input id="a-narrow" inputMode="decimal" defaultValue="219.1" suffix="mm" wrapperClassName="w-32" className="h-8 text-right" />
+      </Field>
+    </div>
+  );
+}
+
 export const stories: Story[] = [
   { name: "States", render: () => <States /> },
   { name: "Controls", render: () => <Controls /> },
   { name: "Check tiles", render: () => <Tiles /> },
   { name: "Switch", render: () => <Switches /> },
   { name: "Large", render: () => <Large /> },
+  { name: "Adornments", render: () => <Adornments /> },
   {
     name: "In a read-only scope",
     render: () => (

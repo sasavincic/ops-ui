@@ -208,6 +208,21 @@ opens the calendar without the keyboard; on a desktop ↓ enters it and arrows /
 / Home / End walk the days. Code that writes the hidden input from outside dispatches an `input`
 event on it.
 
+**A year is the kit `YearInput`** (1.4.0): DateInput's sibling, built the same way. It takes four
+digits (two are read as DateInput reads a two-digit year; unreadable text returns to the last good
+year), hands back the four-digit string (hidden input under `name`, `onChange({ target: { value }
+})`), and its picker is the page of twelve years DateInput's calendar shows when its title steps
+up to years: earlier / later pages, years outside min/max cannot be picked, This year and Clear
+below. On touch it is a bottom sheet and never the keyboard; on a desktop ↓ enters it, arrows walk
+a year or a row, PageUp / PageDown a page, Home / End the page's ends.
+
+**A unit belongs to the field, not the label** (1.4.0): `Input` takes `prefix` / `suffix` for the
+unit or currency of a typed number (mm, bar, °C, kg, €, %). It is muted text inside the field, the
+pointer passes through it, and it is the field's description, never part of the value, so the
+label stays the quantity ("Wall thickness", not "Wall thickness (mm)"). Amounts and measurements
+align right (`className="text-right"`) where they line up in a column; a narrow field sizes its
+wrapper with `wrapperClassName`.
+
 **Which select.** The native `Select` is for a short closed vocabulary whose words say
 everything: a status, a type. A pick from **records** is the kit `Combobox`: a record knows more
 than its name, and the row shows it (the `Monogram` chip, a right-aligned `meta` such as a rate
@@ -245,7 +260,7 @@ content (a card header's or `RecordTab`'s create, table row actions, sheet inter
 is "how deep in the page is this?"; a whole action row is one size. A third size, `lg` (h-12,
 16px, 1.3.0), is for a surface built for gloved hands and a phone at arm's length (PrefabOps'
 workshop portal): there EVERY control is `lg`, Button and the input family (`Input`, `Select`,
-`Combobox`, `DateInput`) alike, at every width. It is a surface's size, never a way to make one
+`Combobox`, `DateInput`, `YearInput`) alike, at every width. It is a surface's size, never a way to make one
 button louder.
 
 An icon-only control is `IconButton` (1.3.0): square at `sm` / `md` / `lg`, ghost unless the
@@ -335,13 +350,16 @@ shown. **Every visual device means exactly one thing in every app**: the inset s
 Columns go identity → state → dates → money → actions. Below `sm` the secondary columns fold
 into the name cell instead of scrolling sideways; wide content scrolls inside its own container,
 never the page. Row menus (`RowMenu`) float at their button and open upward when there is no room
-below. Empty tables use `EmptyState`.
+below. The same menu with a labelled `trigger` (1.4.0) folds a toolbar's related actions ("AI
+tools ▾"); its `sections` group items under short headings, set off by a hairline. A menu holds
+actions only, never a filter (filters are selects in the filter bar). Empty tables use
+`EmptyState`.
 
 ## Read-only
 
 A session that may not write never sees a control it cannot use. The kit's read-only scope
 (`ReadOnlyScope`, rendered by each app's own permission scope) is default-deny: inside it
-`Button`, `ButtonLink` and `AdminIconButton` render nothing, and `Field` controls and `DateInput`
+`Button`, `ButtonLink` and `AdminIconButton` render nothing, and `Field` controls, `DateInput` and `YearInput`
 come up disabled, unless marked `readOnlySafe` (a control that only narrows what is shown). A
 nested scope may re-open a subtree.
 
@@ -357,7 +375,7 @@ controls grow (`pointer-coarse:`), and text inputs are 16px below `lg` (no focus
 **The touch floor** (1.3.0, opt-in): an app that puts `data-ops-touch` on an ancestor (PrefabOps:
 `<html data-ops-touch>`) gets, on a screen that cannot hover and has a coarse pointer
 (`(hover: none) and (pointer: coarse)`), every kit control at least 44px tall (`Button` and its
-links, `IconButton`, `Input`, `Select`, `Combobox`, `DateInput`, `Segmented`'s options, the
+links, `IconButton`, `Input`, `Select`, `Combobox`, `DateInput`, `YearInput` (1.4.0), `Segmented`'s options, the
 `RowMenu` trigger; icon-only ones 44px wide too) and every text input at 16px, at every width.
 Without the attribute nothing changes. The classes are `TOUCH_FLOOR` in `lib/touch.ts`.
 

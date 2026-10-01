@@ -764,7 +764,7 @@ describe("sync helpers", () => {
     expect(kitDependents(graph, "dialog")).toEqual(["confirm-dialog"]);
     expect(kitDependents(graph, "button")).toEqual(["confirm-dialog", "dialog", "record-tab", "row-menu"]);
     expect(kitDependents(graph, "date-input")).toEqual([]);
-    expect(kitDependents(graph, "field")).toEqual(["combobox", "date-input", "search-form", "search-input", "url-select"]);
+    expect(kitDependents(graph, "field")).toEqual(["combobox", "date-input", "search-form", "search-input", "url-select", "year-input"]);
     const synthetic = kitImportGraph(
       new Map([
         ["a", 'import { B } from "./b";\nimport type { C } from "./c";\n'],

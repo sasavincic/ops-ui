@@ -1,5 +1,6 @@
 "use client";
 
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { useReadOnlyScope } from "../config/read-only";
 import { useOpsUi } from "../config/provider";
 import { cn } from "../lib/cn";
@@ -110,21 +111,114 @@ function useLocked(readOnlySafe?: boolean): boolean {
   return useReadOnlyScope() && !readOnlySafe;
 }
 
+/**
+ * Input adornments (1.4.0; PrefabOps restyle plan G10): a unit or currency drawn inside the field,
+ * before (`prefix`, "€") or after (`suffix`, "mm", "bar", "°C", "kg", "%") the typed value. The
+ * adornment is not part of the value: it is muted text the pointer passes through to the input,
+ * hidden from the accessibility tree and joined to the input's `aria-describedby` instead, so a
+ * screen reader reads "Wall thickness, edit text, 4.5, mm". `className` still styles the input box
+ * (widths, `h-8`, `text-right`); `wrapperClassName` lays out the wrapper the adornments need. The
+ * text keeps clear of an adornment by its measured width. Without either prop the Input renders
+ * exactly the 1.3 markup (no wrapper).
+ */
+type AdornmentProps = {
+  /** Drawn inside the field before the value ("€"). Part of the description, not the value. */
+  prefix?: React.ReactNode;
+  /** Drawn inside the field after the value ("mm", "bar", "°C", "kg", "%"). */
+  suffix?: React.ReactNode;
+  /** Layout classes for the wrapper an adorned input gets (width etc.); ignored without one. */
+  wrapperClassName?: string;
+};
+
+/** The gap between an adornment and the field's edge (px-3) and between it and the text. */
+const ADORNMENT_EDGE = 12;
+const ADORNMENT_GAP = 6;
+
+function useAdornmentWidth(ref: React.RefObject<HTMLSpanElement | null>, present: boolean): number | null {
+  const [width, setWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!present || !el) return;
+    const measure = () => setWidth(el.offsetWidth);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref, present]);
+  return width;
+}
+
+/** Before the first measurement (the server render): about 0.6em per character. */
+function adornmentPadding(width: number | null, node: React.ReactNode): string {
+  if (width !== null) return `${ADORNMENT_EDGE + width + ADORNMENT_GAP}px`;
+  const chars = typeof node === "string" || typeof node === "number" ? String(node).length : 2;
+  return `calc(${ADORNMENT_EDGE + ADORNMENT_GAP}px + ${(chars * 0.6).toFixed(1)}em)`;
+}
+
 export function Input({
   className,
   readOnlySafe,
   size,
+  prefix,
+  suffix,
+  wrapperClassName,
   ...props
-}: Omit<React.ComponentProps<"input">, "size"> & ReadOnlyProps & SizeProps) {
+}: Omit<React.ComponentProps<"input">, "size" | "prefix"> & ReadOnlyProps & SizeProps & AdornmentProps) {
   const locked = useLocked(readOnlySafe);
   const sized = controlSize(size);
+  const hasPrefix = prefix !== undefined && prefix !== null && prefix !== false && prefix !== "";
+  const hasSuffix = suffix !== undefined && suffix !== null && suffix !== false && suffix !== "";
+  const prefixRef = useRef<HTMLSpanElement>(null);
+  const suffixRef = useRef<HTMLSpanElement>(null);
+  const prefixWidth = useAdornmentWidth(prefixRef, hasPrefix);
+  const suffixWidth = useAdornmentWidth(suffixRef, hasSuffix);
+  const baseId = useId();
+  if (!hasPrefix && !hasSuffix) {
+    return (
+      <input
+        className={cn(controlClasses, CONTROL_SIZE_CLASS[sized.size], TOUCH_FLOOR.height, TOUCH_FLOOR.text, className)}
+        size={sized.htmlSize}
+        {...props}
+        disabled={props.disabled || locked}
+      />
+    );
+  }
+  const prefixId = `${baseId}-prefix`;
+  const suffixId = `${baseId}-suffix`;
+  const describedBy = [props["aria-describedby"], hasPrefix && prefixId, hasSuffix && suffixId]
+    .filter(Boolean)
+    .join(" ");
+  const adornmentClass = cn(
+    "pointer-events-none absolute inset-y-0 flex items-center whitespace-nowrap text-ink-muted select-none",
+    sized.size === "lg" ? "text-base" : "text-base lg:text-sm",
+    TOUCH_FLOOR.text
+  );
   return (
-    <input
-      className={cn(controlClasses, CONTROL_SIZE_CLASS[sized.size], TOUCH_FLOOR.height, TOUCH_FLOOR.text, className)}
-      size={sized.htmlSize}
-      {...props}
-      disabled={props.disabled || locked}
-    />
+    <span className={cn("relative block w-full", wrapperClassName)}>
+      <input
+        className={cn(controlClasses, CONTROL_SIZE_CLASS[sized.size], TOUCH_FLOOR.height, TOUCH_FLOOR.text, className)}
+        size={sized.htmlSize}
+        {...props}
+        style={{
+          ...props.style,
+          ...(hasPrefix ? { paddingLeft: adornmentPadding(prefixWidth, prefix) } : null),
+          ...(hasSuffix ? { paddingRight: adornmentPadding(suffixWidth, suffix) } : null),
+        }}
+        aria-describedby={describedBy}
+        disabled={props.disabled || locked}
+      />
+      {hasPrefix && (
+        <span ref={prefixRef} id={prefixId} aria-hidden="true" data-ops-adornment="prefix" className={cn(adornmentClass, "left-3")}>
+          {prefix}
+        </span>
+      )}
+      {hasSuffix && (
+        <span ref={suffixRef} id={suffixId} aria-hidden="true" data-ops-adornment="suffix" className={cn(adornmentClass, "right-3")}>
+          {suffix}
+        </span>
+      )}
+    </span>
   );
 }
 

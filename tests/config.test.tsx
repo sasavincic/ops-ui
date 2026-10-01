@@ -53,8 +53,8 @@ const DATE_PICKER_KEYS = [
   "latest",
 ] as const satisfies readonly (keyof OpsUiStrings["datePicker"])[];
 type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-/** The optional groups 1.1 added (spec §6.1), each with an English default. */
-const OPTIONAL_KEYS = ["tabs", "appSwitcher", "validity"] as const satisfies readonly (keyof OpsUiStrings)[];
+/** The optional groups 1.1 added (spec §6.1) and yearPicker (1.4), each with an English default. */
+const OPTIONAL_KEYS = ["tabs", "appSwitcher", "validity", "yearPicker"] as const satisfies readonly (keyof OpsUiStrings)[];
 const topKeysAreAll: Exact<(typeof TOP_KEYS)[number], Exclude<keyof OpsUiStrings, "datePicker" | (typeof OPTIONAL_KEYS)[number]>> = true;
 type OptionalKeys = { [K in keyof OpsUiStrings]-?: undefined extends OpsUiStrings[K] ? K : never }[keyof OpsUiStrings];
 const optionalKeysAreAll: Exact<(typeof OPTIONAL_KEYS)[number], OptionalKeys> = true;
@@ -69,7 +69,7 @@ describe("config/strings (spec §6.1)", () => {
     expect(Object.keys(EN_STRINGS.datePicker).sort()).toEqual([...DATE_PICKER_KEYS].sort());
   });
 
-  it("1.1's optional strings: exactly tabs, appSwitcher, validity, each with an English default outside EN_STRINGS", () => {
+  it("the optional strings: exactly tabs, appSwitcher, validity (1.1) and yearPicker (1.4), each with an English default outside EN_STRINGS", () => {
     expect(optionalKeysAreAll).toBe(true);
     // EN_STRINGS stays the apps' 1.0 `common` words; the defaults live beside it.
     for (const key of OPTIONAL_KEYS) expect(key in EN_STRINGS, key).toBe(false);
@@ -80,6 +80,8 @@ describe("config/strings (spec §6.1)", () => {
       // Workforce Ops' en words (workers.compliance.expiredAgo / expiresIn, compliance.desk.unknown,
       // statuses.expiry.no_expiry).
       validity: { expiredAgo: "expired {days} d ago", expiresIn: "in {days} d", unknown: "Validity unknown", noExpiry: "No expiry" },
+      // YearInput's own words; it reuses datePicker.previousYears / nextYears / clear / earliest / latest.
+      yearPicker: { placeholder: "YYYY", openPicker: "Choose year", thisYear: "This year" },
     });
   });
 
@@ -124,6 +126,7 @@ describe("config/strings (spec §6.1)", () => {
       "toast",
       "app-switcher",
       "validity-cell",
+      "year-input",
     ]) {
       for (const m of read(`src/components/${file}.tsx`).matchAll(/\bstrings\.([a-zA-Z]+)/g)) used.add(m[1]);
     }
