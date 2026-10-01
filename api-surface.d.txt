@@ -826,9 +826,25 @@ export type OpsUiStrings = {
         openPicker: string;
         thisYear: string;
     };
+    shell?: {
+        search: string;
+        records: string;
+        tools: string;
+        openMenu: string;
+        closeMenu: string;
+        signOut: string;
+        pullToSearch: string;
+        releaseToSearch: string;
+        closeSearch: string;
+        searchPlaceholder: string;
+        searchEmptyHint: string;
+        searchNoResults: string;
+        searchNavigate: string;
+        searchCreate: string;
+    };
 };
 export declare const EN_STRINGS: OpsUiStrings;
-export declare const EN_OPTIONAL_STRINGS: Required<Pick<OpsUiStrings, "tabs" | "appSwitcher" | "validity" | "yearPicker">>;
+export declare const EN_OPTIONAL_STRINGS: Required<Pick<OpsUiStrings, "tabs" | "appSwitcher" | "validity" | "yearPicker" | "shell">>;
 
 // src/config/tabs-nav.d.ts
 export declare function TabsNav({ className, children }: {
@@ -899,8 +915,39 @@ export declare const GAP_CLASS: {
 };
 export type Gap = keyof typeof GAP_CLASS;
 
+// src/lib/keyboard.d.ts
+export declare function isTypingTarget(target: EventTarget | null): boolean;
+export type ShortcutKey = Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey" | "target">;
+export declare function isPageSearchShortcut(e: ShortcutKey): boolean;
+export declare function workspaceShortcutIndex(e: ShortcutKey & {
+    code?: string;
+}, count: number): number | null;
+export declare function isChordModifierKey(key: string): boolean;
+export declare function chordLabel(n: number, isMac: boolean): string;
+export declare function isApplePlatform(platform: string): boolean;
+export declare function searchChordKeys(isMac: boolean): readonly string[];
+export declare const PAGE_SEARCH_SELECTOR = "input[type=\"search\"]:not([disabled])";
+export declare function focusPageSearch(root?: ParentNode): boolean;
+
 // src/lib/months.d.ts
 export declare function shiftMonth(month: string, delta: number): string;
+
+// src/lib/pointer-intent.d.ts
+export type PointerSpot = {
+    x: number;
+    y: number;
+};
+export declare function pointerMoved(last: PointerSpot | null, now: PointerSpot): boolean;
+
+// src/lib/pull-to-search.d.ts
+export declare const PULL_TRIGGER_TRAVEL = 150;
+export declare const PULL_START_SLOP = 10;
+export declare const PULL_MAX_OFFSET = 120;
+export declare function pullOffset(travel: number): number;
+export declare function pullProgress(travel: number): number;
+export declare function isPullArmed(travel: number): boolean;
+export type PullIntent = "undecided" | "pull" | "not_a_pull";
+export declare function pullIntent(dx: number, dy: number): PullIntent;
 
 // src/lib/sheet-motion.d.ts
 export declare const PHONE_SHEET_QUERY = "(max-width: 639px)";
@@ -979,7 +1026,154 @@ export declare function startTrail(url: string): NavTrailState;
 export declare function navigateTrail(state: NavTrailState, url: string, mode: "push" | "replace"): NavTrailState;
 export declare function backTarget(state: NavTrailState | null, path: string, fallback: string): BackDestination;
 
+// src/shell/app-frame.d.ts
+import { type CommandPaletteProps, type PaletteLink } from "./command-palette";
+import { type ShellChromeProps } from "./sidebar";
+export type ContentWidth = "5xl" | "6xl";
+export type AppFrameProps<I> = ShellChromeProps & {
+    initialIsMac?: boolean;
+    palette?: Omit<CommandPaletteProps<I>, "navigate"> & {
+        navigate?: readonly PaletteLink[];
+    };
+    contentWidth?: ContentWidth;
+    floatingLauncher?: boolean;
+    afterMain?: React.ReactNode;
+    navTrail?: boolean;
+    defaultDrawerOpen?: boolean;
+    children: React.ReactNode;
+};
+export declare function paletteNavigate(nav: ShellChromeProps["nav"]): PaletteLink[];
+export declare function AppFrame<I>({ initialIsMac, palette, contentWidth, floatingLauncher, afterMain, navTrail, defaultDrawerOpen, children, ...chrome }: AppFrameProps<I>): import("react").JSX.Element;
+
+// src/shell/command-palette.d.ts
+import type { StateMarkSpec } from "../types";
+export declare const OPEN_SEARCH_EVENT = "ops-ui:open-search";
+export declare function openCommandPalette(): void;
+export type PaletteEntry = {
+    key: string;
+    href: string;
+    title: string;
+    subtitle?: string | null;
+    status?: (StateMarkSpec & {
+        label: string;
+    }) | null;
+};
+export type PaletteSection = {
+    header: string;
+    entries: readonly PaletteEntry[];
+};
+export type PaletteLink = {
+    href: string;
+    label: string;
+};
+export type PaletteTrailing = {
+    header: string;
+    label: (query: string) => string;
+    icon: React.ReactNode;
+    href?: (query: string) => string;
+    onSelect?: (query: string) => void;
+};
+export type CommandPaletteProps<I> = {
+    loadIndex: () => Promise<I>;
+    search: (query: string, index: I) => readonly PaletteSection[];
+    navigate: readonly PaletteLink[];
+    create?: readonly PaletteLink[];
+    trailing?: PaletteTrailing;
+    defaultOpen?: boolean;
+    defaultQuery?: string;
+};
+export declare function CommandPalette<I>({ loadIndex, search, navigate, create, trailing, defaultOpen, defaultQuery, }: CommandPaletteProps<I>): import("react").JSX.Element | null;
+export declare function ChatGlyph(): import("react").JSX.Element;
+export declare function ListGlyph(): import("react").JSX.Element;
+
+// src/shell/mobile-top-bar.d.ts
+import { type ShellChromeProps } from "./sidebar";
+export declare function MobileTopBar({ defaultDrawerOpen, ...chrome }: ShellChromeProps & {
+    defaultDrawerOpen?: boolean;
+}): import("react").JSX.Element;
+export declare function NavDrawer({ nav, user, onSignOut, isActive, pathname, onClose, }: Pick<ShellChromeProps, "nav" | "user" | "onSignOut" | "isActive"> & {
+    pathname: string;
+    onClose: () => void;
+}): import("react").JSX.Element;
+
+// src/shell/nav-icon.d.ts
+import type { ReactNode } from "react";
+export declare const NAV_ICON_NAMES: readonly ["board", "shield-check", "receipt", "paper-plane", "truck", "person-plus", "document", "tray-check", "invoice", "calendar-check", "report", "bars", "bulb"];
+export type NavIconName = (typeof NAV_ICON_NAMES)[number];
+export declare function NavIcon({ name, children }: {
+    name?: NavIconName;
+    children?: ReactNode;
+}): import("react").JSX.Element;
+
+// src/shell/nav.d.ts
+import type { ReactNode } from "react";
+import type { NavIconName } from "./nav-icon";
+export type NavRegister = "record" | "workspace" | "tool";
+export type ShellNavItem = {
+    href: string;
+    label: string;
+    icon?: NavIconName | Exclude<ReactNode, string | number | bigint>;
+    register?: NavRegister;
+};
+export type ShellNav = {
+    workspaces: readonly ShellNavItem[];
+    records: readonly ShellNavItem[];
+    tools?: readonly ShellNavItem[];
+    footer?: readonly ShellNavItem[];
+};
+export type NavActiveMatch = (href: string, pathname: string) => boolean;
+export declare const startsWithMatch: NavActiveMatch;
+export declare function navLinkClasses(active: boolean, register?: NavRegister): string;
+
+// src/shell/pull-to-search.d.ts
+export declare function PullToSearch(): import("react").JSX.Element;
+
+// src/shell/sidebar.d.ts
+import type { OpsApp, OpsAppId } from "../lib/apps";
+import { type NavActiveMatch, type NavRegister, type ShellNav, type ShellNavItem } from "./nav";
+export type ShellUser = {
+    name: string;
+    email: string;
+};
+export type ShellChromeProps = {
+    mark: React.ReactNode;
+    app?: OpsAppId;
+    apps?: readonly OpsApp[];
+    nav: ShellNav;
+    user?: ShellUser;
+    onSignOut?: () => void | Promise<void>;
+    isActive?: NavActiveMatch;
+};
+export declare function ShellMark({ mark, app, apps }: Pick<ShellChromeProps, "mark" | "app" | "apps">): import("react").JSX.Element;
+export declare function NavItemIcon({ icon }: {
+    icon: ShellNavItem["icon"];
+}): import("react").JSX.Element | null;
+export declare function NavGroupHeading({ children }: {
+    children: React.ReactNode;
+}): import("react").JSX.Element;
+export declare function NavDivider(): import("react").JSX.Element;
+export declare function itemRegister(item: ShellNavItem, group: NavRegister): NavRegister;
+export declare function useWorkspaceChords(initialIsMac: boolean, workspaces: readonly {
+    href: string;
+}[]): {
+    held: boolean;
+    isMac: boolean;
+};
+export declare function Sidebar({ mark, app, apps, nav, user, onSignOut, isActive, initialIsMac, }: ShellChromeProps & {
+    initialIsMac?: boolean;
+}): import("react").JSX.Element;
+
+// src/shell/sign-out-button.d.ts
+export declare function SignOutButton({ onSignOut, className }: {
+    onSignOut: () => void | Promise<void>;
+    className?: string;
+}): import("react").JSX.Element;
+
 // src/stories/action-icon.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/app-frame.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
 

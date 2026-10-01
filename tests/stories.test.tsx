@@ -16,9 +16,10 @@ const COMPONENTS = readdirSync(path.join(ROOT, "src/components"))
 const ALL = STORY_GROUPS.flatMap((group) => group.stories.map((story) => ({ group, story, id: storyId(group.component, story.name) })));
 
 describe("stories", () => {
-  it("one group per component file, in file order, each with at least one story", () => {
+  it("one group per component file, in file order, then the shell's frame, each with at least one story", () => {
     expect(COMPONENTS).toHaveLength(43); // 1.4.0: year-input
-    expect(STORY_GROUPS.map((g) => g.component)).toEqual(COMPONENTS);
+    // 1.5.0: src/shell/ has one story group, app-frame, covering the frame and its parts.
+    expect(STORY_GROUPS.map((g) => g.component)).toEqual([...COMPONENTS, "app-frame"]);
     for (const group of STORY_GROUPS) expect(group.stories.length, group.component).toBeGreaterThan(0);
   });
 

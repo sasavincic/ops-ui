@@ -1,0 +1,22 @@
+"use client";
+
+import { AppSwitcher } from "@/components/ui/app-switcher";
+
+/**
+ * The app's mark — the ochre dot and the wordmark — and the button of the
+ * suite's app switcher (@latro/ops-ui 1.1, library spec §10): it opens a
+ * menu of the group's apps, each a plain link to its own sign-in.
+ */
+export function AppMark() {
+  return (
+    <AppSwitcher
+      current="workforce"
+      mark={
+        <span className="flex items-center gap-2.5">
+          <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-accent" />
+          <span className="text-sm font-semibold tracking-tight text-sidebar-fg-active">Workforce Ops</span>
+        </span>
+      }
+    />
+  );
+}

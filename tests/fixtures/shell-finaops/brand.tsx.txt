@@ -1,0 +1,38 @@
+"use client";
+
+import { AppSwitcher } from "@/components/ui/app-switcher";
+import { useDict } from "@/i18n/client";
+import { cn } from "@/lib/utils";
+
+/**
+ * The FinaOps mark: the group's ochre dot (the Workforce Ops mark) resting
+ * on a thin ledger line — the balance. Same family, told apart at a glance
+ * in the next browser tab.
+ */
+export function BrandMark({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden width="16" height="12" viewBox="0 0 16 12" className={cn("shrink-0", className)}>
+      <circle cx="8" cy="5" r="3.25" className="fill-accent" />
+      <path d="M1 10.5h14" className="stroke-sidebar-fg" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * The mark and the app's name, as the app switcher's trigger (ops-ui 1.1):
+ * pressing it lists the suite's apps. Sidebar and phone top bar alike.
+ */
+export function BrandSwitcher() {
+  const t = useDict();
+  return (
+    <AppSwitcher
+      current="finaops"
+      mark={
+        <span className="flex items-center gap-2.5">
+          <BrandMark />
+          <span className="text-sm font-semibold tracking-tight text-sidebar-fg-active">{t.shell.appName}</span>
+        </span>
+      }
+    />
+  );
+}

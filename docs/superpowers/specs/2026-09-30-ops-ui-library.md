@@ -120,6 +120,7 @@ Vendoring needs no token, no registry and no network at build time. A release is
 - Publishing to any registry, or any runtime dependency on the library repo.
 - Shared auth, SSO or shared cookies. Phase 3 of the suite spec stays deferred.
 - Sharing shells, navigation, screens or business rules. The sidebar, command palette, pull-to-search, `RecordListToolbar`, pickers (country, employer), role/user settings components and `unsaved-exit-guard` stay app code. Each may join later through its own spec line and minor release.
+  - **Changed in 1.5.0 (styling programme §4.2, deliberately):** the shell joined the library as `AppFrame` (§10.1): the sidebar, the phone top bar and drawer, the command palette frame, pull-to-search and the nav glyphs. What stays app code is the part that knows the app: the session and user, the read-permission filter (the nav arrives filtered), the dictionary, the search index and its ranking, the sign-out call and the brand mark. Screens, business rules, `RecordListToolbar`, the pickers, the settings components and `unsaved-exit-guard` remain non-goals.
 - Dark mode in the library (§13.3).
 - Visual redesign. The library freezes today's look; every visible change goes through the semver gate.
 - A barrel `index.ts`. It would mix server-safe and `"use client"` modules.
@@ -155,6 +156,8 @@ ops-ui/
     navigation/trail.ts        (was domain/nav-trail.ts)
     navigation/history.ts      (was lib/navigation-history.ts)
     navigation/nav-trail.tsx   NavTrail, useReturnNavigation            ("use client")
+    shell/                1.5.0 (§10.1): app-frame.tsx (AppFrame), sidebar.tsx, mobile-top-bar.tsx (MobileTopBar, NavDrawer), command-palette.tsx, pull-to-search.tsx, sign-out-button.tsx, nav.ts, nav-icon.tsx; not under components/, so no wrappers
+    lib/keyboard.ts lib/pull-to-search.ts lib/pointer-intent.ts   1.5.0, moved whole from the apps (identical in both)
     components/           the 35 kit files of §9
     stories/              <component>.stories.tsx + index.ts (registry) + story-host.tsx (StoryHost, StoryToaster), shipped so apps render them in /dev/kit
   styles/
@@ -953,6 +956,32 @@ export function AppSwitcher(p: {
   - FinaOps: the sidebar mark;
   - PrefabOps: the logo at its shell step.
 - **Strings.** Both strings are optional with English defaults. The apps add `common.appSwitcher.{label,current}` in en/sl/sr (WFO) and en/sl (FinaOps), and `pickKitStrings` passes them.
+
+### 10.1 The shell: `AppFrame` (library 1.5.0)
+
+Extracted from Workforce Ops' and FinaOps' `components/shell/*` and `(app)/layout.tsx` (styling programme §4.2). `src/shell/`, all `"use client"` except `nav.ts` and `nav-icon.tsx`:
+
+```ts
+type NavRegister = "record" | "workspace" | "tool";
+type ShellNavItem = { href: string; label: string; icon?: NavIconName | ReactNode; register?: NavRegister };
+type ShellNav = { workspaces: ShellNavItem[]; records: ShellNavItem[]; tools?: ShellNavItem[]; footer?: ShellNavItem[] };
+type ShellChromeProps = { mark: ReactNode; app?: OpsAppId; apps?: OpsApp[]; nav: ShellNav;
+  user?: { name: string; email: string }; onSignOut?: () => void | Promise<void>; isActive?: (href, pathname) => boolean };
+function AppFrame<I>(p: ShellChromeProps & {
+  initialIsMac?: boolean; palette?: CommandPaletteProps<I> (navigate optional); contentWidth?: "5xl" | "6xl";
+  floatingLauncher?: boolean; afterMain?: ReactNode; navTrail?: boolean; defaultDrawerOpen?: boolean; children: ReactNode;
+}): JSX.Element;
+function CommandPalette<I>(p: { loadIndex(): Promise<I>; search(query, index: I): PaletteSection[];
+  navigate: PaletteLink[]; create?: PaletteLink[]; trailing?: PaletteTrailing; defaultOpen?: boolean; defaultQuery?: string }): JSX.Element | null;
+```
+
+- **The nav arrives filtered.** The read-permission filter is app code (no `canSee` prop): each app passes the arrays its session may open, in nav order (workspaces = ⌥-digit order). `tools` absent = no tools group; present and empty = the heading only (Workforce Ops today).
+- **The mark is a slot** (programme §4.3): `mark` is the app's BrandMark + name; with `app` it becomes the `AppSwitcher` trigger, in the sidebar and the top bar.
+- **Words:** optional `strings.shell` (14 words, English defaults in `EN_OPTIONAL_STRINGS.shell`, outside `EN_STRINGS`); every label the app's own (`ShellNavItem.label`, palette headers, the trailing row's label).
+- **Glyphs:** `NavIcon` with 13 named glyphs (both apps' sets, named by what they draw), or the app's paths as children.
+- **Search:** the app supplies the index loader (a server action), its ranking mapped to `PaletteSection[]`, the create shortcuts (filtered by what it may create) and the optional trailing row (`href` or `onSelect`); the library owns the overlay, keyboard, the pointer-moved selection rule, the phone sheet and visual-viewport sizing, `openCommandPalette()` (event `ops-ui:open-search`).
+- **Proof** (`tests/shell-markup.test.tsx`, `tests/shell-behaviour.test.tsx`): the raw app files (`tests/fixtures/shell-wfo`, `shell-finaops`) and the library fed the same nav, words and mark render identical markup on the server (whole frame on three pages, sidebar with Mac chords, open drawer, open palette idle and typed) and identical DOM after every step of the same interactions in happy-dom; the only difference allowed is `INTENTIONAL_DIFFERENCES` (Workforce Ops' mark row gains `items-center`, 0 pixels).
+- **Adoption** (each app's own session, after the sync): CHANGELOG `## 1.5.0` → Upgrade steps.
 
 ---
 

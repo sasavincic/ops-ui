@@ -1,0 +1,64 @@
+// Single source of the app navigation — used by the desktop sidebar and
+// the mobile drawer. Labels come from the user's dictionary
+// (t.shell[key]). Workspaces are daily-use boards, visually set apart
+// (icons + accent active/hover, divider before Records).
+import type { PermissionArea } from "@/domain/permissions";
+
+/**
+ * What a nav entry needs to be readable (spec 2026-09-30-read-permissions):
+ * every `all` area, and at least one `any` area (a workspace whose tabs are
+ * separate areas opens while one of them does). The page is the guard — the
+ * nav only stops offering a page that would answer "No access".
+ */
+type ReadNeed = { all?: readonly PermissionArea[]; any?: readonly PermissionArea[] };
+
+export function navItemReadable(
+  item: { read?: ReadNeed },
+  canRead: (area: PermissionArea) => boolean
+): boolean {
+  const need = item.read;
+  if (!need) return true;
+  return (need.all ?? []).every(canRead) && (!need.any || need.any.some(canRead));
+}
+
+export const WORKSPACE_NAV = [
+  { href: "/operations", key: "operations", icon: "operations", read: { all: ["workers", "worksites.work"] } },
+  { href: "/compliance", key: "compliance", icon: "compliance", read: { all: ["workers.compliance"] } },
+  {
+    href: "/invoicing",
+    key: "invoicing",
+    icon: "invoicing",
+    read: { any: ["worksites.hours", "invoicing", "subcontractors.invoices", "companies.intercompany"] },
+  },
+  { href: "/outreach", key: "outreach", icon: "outreach", read: { all: ["outreach"] } },
+  { href: "/logistics", key: "logistics", icon: "logistics", read: { any: ["accommodations.stays", "vehicles.trips"] } },
+  // Last (⌥6) so the existing chords keep their numbers (2026-09-25).
+  { href: "/recruiting", key: "recruiting", icon: "recruiting", read: { any: ["workers.recruiting", "workers.pay"] } },
+] as const satisfies readonly ({ href: string; key: string; read?: ReadNeed } & Record<string, unknown>)[];
+
+export type NavIconName =
+  | (typeof WORKSPACE_NAV)[number]["icon"]
+  | (typeof TOOLS_NAV)[number]["icon"];
+
+// Ordered by how often the office opens them. Group companies last (Saša,
+// 2026-08-28): the two legal entities are set up once and then left alone.
+export const NAV = [
+  { href: "/clients", key: "clients", read: { all: ["clients"] } },
+  { href: "/workers", key: "workers", read: { all: ["workers"] } },
+  { href: "/worksites", key: "worksites", read: { all: ["worksites"] } },
+  { href: "/subcontractors", key: "subcontractors", read: { all: ["subcontractors"] } },
+  { href: "/accommodations", key: "accommodations", read: { all: ["accommodations"] } },
+  { href: "/vehicles", key: "vehicles", read: { all: ["vehicles"] } },
+  { href: "/companies", key: "companies", read: { all: ["companies"] } },
+] as const satisfies readonly ({ href: string; key: string; read?: ReadNeed } & Record<string, unknown>)[];
+
+// Tools serve the office rather than describing the business (spec
+// 2026-08-28): they own no business truth, they reduce manual work. Their own
+// group below Records, so nobody looks for a record among them.
+export const TOOLS_NAV = [
+  { href: "/tools/documents", key: "toolsDocuments", icon: "documents", read: { all: ["documents"] } },
+] as const satisfies readonly ({ href: string; key: string; read?: ReadNeed } & Record<string, unknown>)[];
+
+// Settings = personal account (language, password) for everyone; user
+// management appears below it for admins only.
+export const SECONDARY_NAV = [{ href: "/settings", key: "settings" }] as const;

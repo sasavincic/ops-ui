@@ -482,3 +482,21 @@ name changes its CSS with a docs commit: `@source not` them (spec §8.4).
   `--repeat-each=20` (all 3 brands); every other `open` story unchanged. Docs: spec §3.3, §4.2, §8.4
   (the apps' root docs), §11.4 (servers, sign-ins, the dump), §12.2 F5 / §12.3
   W1, W6.
+- **1.5.0** (2026-10-01, styling programme §4.2 / library spec §10.1, which also records the §2
+  non-goal change): the shared shell in `src/shell/` (not `components/`, so no wrappers): `AppFrame`,
+  `Sidebar`, `MobileTopBar` + `NavDrawer`, `CommandPalette` (generic over the app's index; app
+  supplies `loadIndex`, `search`, `create`, the optional `trailing` row), `PullToSearch`,
+  `SignOutButton`, `NavIcon` (13 named glyphs) and `nav.ts` (`ShellNav`, `navLinkClasses`); the nav
+  arrays arrive already filtered (no `canSee`); optional `strings.shell` (14 words);
+  `lib/keyboard.ts`, `lib/pull-to-search.ts`, `lib/pointer-intent.ts` moved whole from the apps.
+  Proof: `tests/fixtures/shell-wfo` (workforce-ops 96b4c7a) / `shell-finaops` (fina-ops 6182202)
+  are the raw app files; `tests/shell-fixtures.tsx` sandboxes them (imports rewritten, declared
+  state rewrites to start a drawer / palette open) and builds the library props per app
+  (`libraryProps` = the adoption recipe); `tests/shell-markup.test.tsx` (server) and
+  `tests/shell-behaviour.test.tsx` (happy-dom, new devDependency; `vitest.config.mts` lets Vite read
+  the OS temp folder) require identical markup / DOM after every step; one intentional difference
+  (`INTENTIONAL_DIFFERENCES`: WFO's mark row gains `items-center`, 0 pixels). The gallery declares
+  `--color-tool` (an app extension, not a library token). 6 stories (90), 54 new baselines only;
+  browser tests for the palette, chords, drawer and pull-to-search. The palette stories open on
+  mount and click their own field (`open`) so the shot repaints once (without it the 375 palette
+  text flaked between two antialiasing modes).

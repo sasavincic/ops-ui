@@ -1,0 +1,79 @@
+import { RouteActionIconScope } from "@/components/shell/action-icon-route-scope";
+import { MobileTopBar } from "@/components/shell/mobile-top-bar";
+import { NavTrail } from "@/components/shell/nav-trail";
+import { PullToSearch } from "@/components/shell/pull-to-search";
+import { Sidebar } from "@/components/shell/sidebar";
+import { CommandPalette } from "@/components/shell/command-palette";
+import { AssistantLauncher } from "@/components/assistant/assistant-launcher";
+import { headers } from "next/headers";
+import { Suspense } from "react";
+import { PermissionsProvider } from "@/components/permissions-provider";
+import { VocabularyProvider } from "@/components/vocabulary-provider";
+import { getLocale, getT } from "@/i18n";
+import { I18nProvider } from "@/i18n/client";
+import { readableAreas, requireSession, writableAreas } from "@/lib/session";
+import { listActiveProfessionNames } from "@/queries/professions";
+import { isApplePlatform } from "@/lib/keyboard";
+
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  // Temp passwords are single-use: requireSession sends a session that
+  // still carries one to /password, here and in every page, query, action
+  // and route (audit W-M4) — the layout is not the boundary.
+  const session = await requireSession();
+  // getT carries the DB profession-label overlay — the client dict too.
+  const [dict, locale] = await Promise.all([getT(), getLocale()]);
+  const professionVocabulary = await listActiveProfessionNames();
+  // What the UI may OFFER this session (2026-08-28). Not a boundary — the
+  // actions still check — but it is what keeps a read-only account from
+  // clicking its way into an error page.
+  const grants = await writableAreas();
+  // And what it may read — the navigation hides a closed record (spec
+  // 2026-09-30-read-permissions). The pages themselves are the guard.
+  const readable = await readableAreas();
+  const initialIsMac = isApplePlatform((await headers()).get("user-agent") ?? "");
+
+  return (
+    <I18nProvider dict={dict} locale={locale}>
+      <PermissionsProvider areas={grants.areas} readable={readable} adminTools={grants.adminTools}>
+      <VocabularyProvider professions={professionVocabulary}>
+      <div className="flex min-h-dvh flex-col lg:flex-row">
+        <Sidebar userName={session.user.name} userEmail={session.user.email} initialIsMac={initialIsMac} />
+        <MobileTopBar
+          userName={session.user.name}
+          userEmail={session.user.email}
+        />
+        <main className="relative min-w-0 flex-1">
+          {/* Phones: dragging the page down from its top opens the search —
+              the content carries [data-pull-content] so the gesture can
+              move it, and the pill below rides in the gap it opens. */}
+          <PullToSearch />
+          {/* Pages that render a [data-page-full-width] marker (the
+              Operations dispatch desk) escape the reading-width cap — the
+              spec wants the board full-width; everything else stays 5xl. */}
+          {/* pb-24 below sm: clearance for the assistant launcher, which
+              otherwise floats exactly over the BottomActions primary button
+              and the last rows of lists on phones. */}
+          {/* Phones get a tighter rhythm (gap-4): a list page stacks header,
+              actions, toolbar and summary before its first row, and at
+              gap-6 that first row started halfway down a 375px screen. */}
+          <div data-pull-content className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-5 pb-24 sm:gap-6 sm:px-8 sm:py-8 has-[[data-page-full-width]]:max-w-none">
+            <RouteActionIconScope>{children}</RouteActionIconScope>
+          </div>
+        </main>
+        <AssistantLauncher />
+        <CommandPalette />
+        {/* Records where you came from, so back links can return there
+            (useSearchParams needs the Suspense boundary). */}
+        <Suspense fallback={null}>
+          <NavTrail />
+        </Suspense>
+      </div>
+      </VocabularyProvider>
+      </PermissionsProvider>
+    </I18nProvider>
+  );
+}

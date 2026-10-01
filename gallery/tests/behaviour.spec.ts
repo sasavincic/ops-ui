@@ -6,8 +6,8 @@ import { STORY_GROUPS, storyId } from "../../src/stories";
 // here): the Dialog and Sheet discard prompts, toast lifetimes, the toast hooks and Field messages
 // (localized, re-raised, taken away on unmount), DateInput typing and calendar,
 // Combobox matching and keyboard, RowMenu placement (trigger and sections since 1.4.0), Input adornments and
-// YearInput (1.4.0), the AppSwitcher menu, MonthNav, Segmented at 375 and the
-// read-only default-deny. One brand is enough: behaviour does not depend on colour.
+// YearInput (1.4.0), the AppSwitcher menu, MonthNav, Segmented at 375, the
+// read-only default-deny and the shell (1.5.0: palette, chords, drawer, pull-to-search). One brand is enough: behaviour does not depend on colour.
 
 const FIXED_NOW = new Date("2026-09-30T10:00:00");
 
@@ -652,6 +652,62 @@ test.describe("desktop behaviour", () => {
   });
 });
 
+test.describe("shell behaviour (1.5.0)", () => {
+  test.beforeEach(async ({ page }, info) => {
+    test.skip(info.project.name !== "1440", "desktop behaviour runs once, at 1440");
+    await page.clock.setFixedTime(FIXED_NOW);
+  });
+
+  test("AppFrame: ⌘K and the Search button open the palette; typing ranks; arrows move; Escape closes", async ({ page }) => {
+    await open(page, "app-frame--closed");
+    const palette = page.getByRole("dialog", { name: "Search" });
+    await expect(palette).toHaveCount(0);
+    await page.keyboard.press("Control+k");
+    await expect(palette).toBeVisible();
+    const input = palette.getByRole("textbox", { name: "Search" });
+    await expect(input).toBeFocused();
+    // Idle: the Go to and Create new shortcuts.
+    await expect(palette.getByRole("heading", { name: "Go to" })).toBeVisible();
+    await expect(palette.getByRole("button", { name: "New client" })).toBeVisible();
+    await input.fill("an");
+    await expect(palette.getByRole("button", { name: /Ana Novak/ })).toBeVisible();
+    await expect(palette.getByRole("button", { name: "Ask the assistant: “an”" })).toBeVisible();
+    // The first row is selected; ArrowDown moves the selection, never past the last row.
+    const selected = () => palette.locator("[data-row-index].bg-primary-subtle");
+    await expect(selected()).toHaveAttribute("data-row-index", "0");
+    await input.press("ArrowDown");
+    await expect(selected()).toHaveAttribute("data-row-index", "1");
+    // A pointer resting over a row selects nothing; a pointer that moves does.
+    const third = palette.locator('[data-row-index="2"]');
+    const box = (await third.boundingBox())!;
+    await page.mouse.move(box.x + 20, box.y + 5);
+    await page.mouse.move(box.x + 24, box.y + 6);
+    await expect(selected()).toHaveAttribute("data-row-index", "2");
+    await input.press("Escape");
+    await expect(palette).toHaveCount(0);
+    // The sidebar's Search button opens it again, emptied.
+    await page.locator("aside").getByRole("button", { name: /Search/ }).click();
+    await expect(palette).toBeVisible();
+    await expect(palette.getByRole("textbox")).toHaveValue("");
+    // A press on the backdrop closes it.
+    await page.mouse.click(20, 880);
+    await expect(palette).toHaveCount(0);
+  });
+
+  test("AppFrame: holding ⌥ turns the workspace icons into their numbers; ⌥2 opens the second workspace", async ({ page }) => {
+    await open(page, "app-frame--closed");
+    const aside = page.locator("aside");
+    const second = aside.getByRole("link", { name: /Compliance/ });
+    await expect(second).toHaveAttribute("title", "Alt+2");
+    await page.keyboard.down("Alt");
+    await expect(second.locator("span")).toHaveText("2");
+    await page.keyboard.up("Alt");
+    await expect(second.locator("span")).toHaveCount(0);
+    await page.keyboard.press("Alt+Digit2");
+    await expect(page).toHaveURL(/\/compliance$/);
+  });
+});
+
 test.describe("phone behaviour", () => {
   test.beforeEach(({}, info) => {
     test.skip(!info.project.name.startsWith("375"), "phone behaviour runs at 375 and 375-touch");
@@ -704,6 +760,60 @@ test.describe("phone behaviour", () => {
     const { scroll, client } = await control.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
     expect(scroll).toBeGreaterThan(client);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+  });
+
+  test("AppFrame: the menu button opens the drawer and freezes the page; the backdrop closes it", async ({ page }) => {
+    await open(page, "app-frame--closed");
+    const menu = page.getByRole("button", { name: "Open menu" });
+    await menu.click();
+    await expect(page.getByRole("button", { name: "Close menu" }).first()).toHaveAttribute("aria-expanded", "true");
+    const drawer = page.locator("nav.w-64");
+    await expect(drawer.getByRole("link", { name: "Workers" })).toBeVisible();
+    await expect(drawer.getByRole("button", { name: "Sign out" })).toBeVisible();
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+    await page.mouse.click(360, 600);
+    await expect(drawer).toHaveCount(0);
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
+  });
+
+  test("AppFrame: the top bar's magnifier opens the palette full screen", async ({ page }) => {
+    await open(page, "app-frame--closed");
+    await page.locator("header").getByRole("button", { name: "Search" }).click();
+    const sheet = page.getByRole("dialog", { name: "Search" });
+    const box = (await sheet.boundingBox())!;
+    expect([Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height)]).toEqual([0, 0, 375, 812]);
+    await sheet.getByRole("button", { name: "Close search" }).last().click();
+    await expect(sheet).toHaveCount(0);
+  });
+
+  test("PullToSearch: a long pull from the top opens the palette, a short one springs back", async ({ page }, info) => {
+    test.skip(info.project.name !== "375-touch", "a pull is a touch gesture");
+    await open(page, "app-frame--closed");
+    const cdp = await page.context().newCDPSession(page);
+    const at = (y: number) => [{ x: 180, y }];
+    const drag = async (travel: number) => {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: at(200) });
+      for (let y = 200; y <= 200 + travel; y += 10) {
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: at(y) });
+      }
+    };
+    const release = () => cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    const pill = page.getByRole("status");
+    const content = page.locator("[data-pull-content]");
+    const palette = page.getByRole("dialog", { name: "Search" });
+    // A short pull: the content follows with resistance, the pill asks for more, nothing opens.
+    await drag(80);
+    await expect(pill).toHaveText("Pull to search");
+    expect(await content.evaluate((el) => el.style.transform)).toMatch(/^translate3d\(0px, [1-9]/);
+    await release();
+    await expect(palette).toHaveCount(0);
+    await expect.poll(() => content.evaluate((el) => el.style.transform)).toBe("");
+    // A long one arms it ("Release to search") and opens the palette on release.
+    await drag(220);
+    await expect(pill).toHaveText("Release to search");
+    await release();
+    await expect(palette).toBeVisible();
+    await cdp.detach();
   });
 
   test("the page stays inside 375 on every story", async ({ page }) => {

@@ -42,6 +42,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "geist": "^1.7.2",
+    "happy-dom": "^20.14.5",
     "next": "16.2.10",
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",

@@ -1,0 +1,115 @@
+// 1.5.0: moved whole from workforce-ops origin/main (96b4c7a) src/lib/keyboard.ts (identical in fina-ops origin/main).
+
+/**
+ * Page-search shortcut (Saša, 2026-09-05: "as ⌘K opens the general search,
+ * I also want some other command to open the page search or filtering").
+ *
+ * `/` — the GitHub/Gmail idiom — and ⌘⇧F / Ctrl+Shift+F (a chord for
+ * ⌘K muscle memory, and layout-independent where `/` is Shift+7) focus the
+ * page's own search field. A page search is any `input[type="search"]`:
+ * the kit's SearchInput renders exactly that, so a new list gets the
+ * shortcut by using the kit, not by remembering an attribute. With no such
+ * field on the page the keys fall through to the global palette — "search
+ * here, else search everything" is what people expect of `/`.
+ */
+
+/** True when the key press belongs to whatever the user is typing into. */
+export function isTypingTarget(target: EventTarget | null): boolean {
+  // Duck-typed rather than instanceof Element, so the rule is testable
+  // without a DOM and never throws where Element is undefined.
+  const el = target as { tagName?: unknown; isContentEditable?: unknown } | null;
+  if (!el || typeof el.tagName !== "string") return false;
+  const tag = el.tagName.toUpperCase();
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  return el.isContentEditable === true;
+}
+
+export type ShortcutKey = Pick<
+  KeyboardEvent,
+  "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey" | "target"
+>;
+
+/** `/` while not typing, or ⌘⇧F / Ctrl+Shift+F anywhere. */
+export function isPageSearchShortcut(e: ShortcutKey): boolean {
+  if (e.altKey) return false;
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "f")
+    return true;
+  return (
+    e.key === "/" &&
+    !e.metaKey &&
+    !e.ctrlKey &&
+    !e.shiftKey &&
+    !isTypingTarget(e.target)
+  );
+}
+
+/**
+ * Workspace switch (Saša, 2026-09-14: "cmd+1 is work operations, cmd+2 is
+ * hr & compliance and so on… cmd+k stays search"): a modifier + a digit
+ * picks the Nth workspace in nav order. Returns the 0-based index, or null.
+ *
+ * ONE chord: ⌥/Alt + digit. ⌘/Ctrl + digit was what was asked for, but on
+ * macOS every browser keeps ⌘1–9 for tab switching and never delivers the
+ * key to the page (found the day it shipped: the numbers showed, nothing
+ * navigated), so it was dropped rather than kept as a second chord that
+ * only sometimes works (Saša: "keep it only at option"). Read from `code`
+ * (Digit1…) so a layout where a digit sits on a shifted key still counts
+ * (and ⌥+digit on a Mac, whose `key` is "¡™£…"); falls back to `key`
+ * where `code` is absent. Works while typing too — like a tab switch, it
+ * is a shell chord, not a text key.
+ */
+export function workspaceShortcutIndex(
+  e: ShortcutKey & { code?: string },
+  count: number
+): number | null {
+  if (e.shiftKey || e.metaKey || e.ctrlKey || !e.altKey) return null;
+  const match = /^Digit([1-9])$/.exec(e.code ?? "") ?? /^([1-9])$/.exec(e.key);
+  if (!match) return null;
+  const index = Number(match[1]) - 1;
+  return index < count ? index : null;
+}
+
+/** The chord modifier, for the "hold it to see the numbers" hint. */
+export function isChordModifierKey(key: string): boolean {
+  return key === "Alt";
+}
+
+/** How the chord is written on this platform: "⌥1" on a Mac, "Alt+1" elsewhere. */
+export function chordLabel(n: number, isMac: boolean): string {
+  return isMac ? `⌥${n}` : `Alt+${n}`;
+}
+
+/** Works with the request's User-Agent and the browser's platform string. */
+export function isApplePlatform(platform: string): boolean {
+  return /Mac|iPhone|iPad|iPod/i.test(platform);
+}
+
+/**
+ * The search chord as KEYCAPS, one per key, so the hint can draw each key
+ * in its own chip (Saša, 2026-09-21: "⌘K" read as one glyph with no space
+ * between the icons, and Windows never has a ⌘ — it says Ctrl + K there).
+ */
+export function searchChordKeys(isMac: boolean): readonly string[] {
+  return isMac ? ["⌘", "K"] : ["Ctrl", "K"];
+}
+
+export const PAGE_SEARCH_SELECTOR = 'input[type="search"]:not([disabled])';
+
+/**
+ * Focus the first VISIBLE page search field. Returns false when the page
+ * has none, so the caller can fall back to the global palette.
+ */
+export function focusPageSearch(root: ParentNode = document): boolean {
+  const fields = Array.from(
+    root.querySelectorAll<HTMLInputElement>(PAGE_SEARCH_SELECTOR)
+  );
+  // An open <dialog> is its own page: a search inside it wins, and one
+  // behind it must not steal focus through the backdrop.
+  const openDialog = root.querySelector("dialog[open]");
+  const scope = openDialog ? fields.filter((f) => openDialog.contains(f)) : fields;
+  const field = scope.find((f) => f.offsetParent !== null);
+  if (!field) return false;
+  field.focus();
+  field.select();
+  return true;
+}

@@ -1,0 +1,46 @@
+import { headers } from "next/headers";
+import { Suspense } from "react";
+import { ActionIconScope } from "@/components/ui/action-icon";
+import { MobileTopBar } from "@/components/shell/mobile-top-bar";
+import { NavTrail } from "@/components/shell/nav-trail";
+import { PullToSearch } from "@/components/shell/pull-to-search";
+import { Sidebar } from "@/components/shell/sidebar";
+import { CommandPalette } from "@/components/shell/command-palette";
+import { PermissionsProvider } from "@/components/permissions-provider";
+import { getLocale, getT } from "@/i18n";
+import { I18nProvider } from "@/i18n/client";
+import { requireSession, writableAreas } from "@/lib/session";
+import { isApplePlatform } from "@/lib/keyboard";
+
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  // Temp passwords are single-use: requireSession sends them to /password.
+  const session = await requireSession();
+  const [dict, locale, areas] = await Promise.all([getT(), getLocale(), writableAreas()]);
+  const initialIsMac = isApplePlatform((await headers()).get("user-agent") ?? "");
+
+  return (
+    <I18nProvider dict={dict} locale={locale}>
+      <PermissionsProvider areas={areas}>
+        <div className="flex min-h-dvh flex-col lg:flex-row">
+          <Sidebar userName={session.user.name} userEmail={session.user.email} initialIsMac={initialIsMac} />
+          <MobileTopBar userName={session.user.name} userEmail={session.user.email} />
+          <main className="relative min-w-0 flex-1">
+            <PullToSearch />
+            {/* Reports and the review queue are wide: pages that render a
+                [data-page-full-width] marker escape the reading-width cap. */}
+            <div
+              data-pull-content
+              className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 pb-16 sm:gap-6 sm:px-8 sm:py-8 has-[[data-page-full-width]]:max-w-none"
+            >
+              <ActionIconScope>{children}</ActionIconScope>
+            </div>
+          </main>
+          <CommandPalette />
+          <Suspense fallback={null}>
+            <NavTrail />
+          </Suspense>
+        </div>
+      </PermissionsProvider>
+    </I18nProvider>
+  );
+}

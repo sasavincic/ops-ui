@@ -1,0 +1,2 @@
+// NavTrail and useReturnNavigation live in @latro/ops-ui (navigation/nav-trail.tsx).
+export { NavTrail, useReturnNavigation } from "@/vendor/ops-ui/navigation/nav-trail";

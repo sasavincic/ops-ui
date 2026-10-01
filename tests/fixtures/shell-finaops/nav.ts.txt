@@ -1,0 +1,26 @@
+// Single source of the app navigation — the desktop sidebar and the mobile
+// drawer both read it. Labels come from t.shell[key]. Workspaces are the
+// daily boards (ochre register), records the business itself (plain).
+export const WORKSPACE_NAV = [
+  { href: "/review", key: "review", icon: "review" },
+  { href: "/invoicing", key: "invoicing", icon: "invoicing" },
+  { href: "/close", key: "close", icon: "close" },
+  { href: "/reports", key: "reports", icon: "reports" },
+  { href: "/analysis", key: "analysis", icon: "analysis" },
+  { href: "/insights", key: "insights", icon: "insights" },
+] as const;
+
+export type NavIconName = (typeof WORKSPACE_NAV)[number]["icon"];
+
+// Ordered by how often the office opens them; the set-once records last.
+export const NAV = [
+  { href: "/transactions", key: "transactions" },
+  { href: "/statements", key: "statements" },
+  { href: "/counterparties", key: "counterparties" },
+  { href: "/rules", key: "rules" },
+  { href: "/categories", key: "categories" },
+  { href: "/accounts", key: "accounts" },
+  { href: "/companies", key: "companies" },
+] as const;
+
+export const SECONDARY_NAV = [{ href: "/settings", key: "settings" }] as const;

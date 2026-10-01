@@ -197,6 +197,19 @@ The app passes its nav arrays, its brand mark, its strings. Workforce Ops and Fi
 at 0 changed pixels; PrefabOps gets it as its new frame. **This is the single biggest "same
 suite" lever:** one sidebar, one phone bar, one ⌘K for all three.
 
+*As built (1.5.0, 2026-10-01; library spec §10.1):* `src/shell/` (not `components/`, so the sync
+writes no wrappers; apps import `@/vendor/ops-ui/shell/…` from one client component of their own).
+The read-permission filter stays app code: `AppFrame` takes the nav arrays already filtered (no
+`canSee` prop). The sign-out call, the search index, its ranking and the trailing row (Workforce
+Ops' "Ask the assistant", FinaOps' "Search transactions") are props; the words are the optional
+`strings.shell`. With each app's own nav, words and mark the library renders that app's markup
+exactly (server and DOM proofs against the raw app files), one intentional difference: Workforce
+Ops' sidebar mark row gains `items-center` (FinaOps' row; 0 pixels). The tools register's teal
+`--color-tool` stays an app extension (Workforce Ops has it; PrefabOps declares it at P4.1).
+Stories: `app-frame--*` (closed, drawer open, palette open / with results, PrefabOps registers and
+drawer). Not changed by it: the gallery's `prefab` fixture is still the light D3 palette; §7.3's
+dark steel-blue sidebar arrives with PrefabOps' own `brand.css`.
+
 ### 4.3 The brand-mark slot
 
 `AppFrame` takes `mark: ReactNode` and the app-switcher entries carry each app's mark, so the

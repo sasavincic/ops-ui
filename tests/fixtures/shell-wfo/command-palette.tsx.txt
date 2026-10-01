@@ -1,0 +1,477 @@
+"use client";
+
+// Global search palette (spec 2026-08-25-global-search): Spotlight for the
+// app — ⌘K/Ctrl-K anywhere, the Search button atop the sidebar, or the
+// magnifier in the mobile top bar. One lean server read per open (60 s
+// cache), every keystroke filters locally via domain/search. Navigate-only
+// v1 + the "Ask the assistant" handoff row (Saša: search and prompt share
+// one field, browser-style).
+//
+// Deliberately NOT the Dialog kit: its no-Escape/no-backdrop doctrine
+// protects half-filled forms — a palette is ephemeral navigation where
+// Esc/backdrop-close is the correct behavior.
+
+import { useCanWriteFn } from "@/components/permissions-provider";
+import type { PermissionArea } from "@/domain/permissions";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { pointerMoved, type PointerSpot } from "@/lib/pointer-intent";
+import { focusPageSearch, isPageSearchShortcut } from "@/lib/keyboard";
+import { SearchIcon } from "@/components/ui/search-input";
+import { loadSearchIndex } from "@/actions/search";
+import { SECONDARY_NAV } from "@/components/shell/nav";
+import { useReadableNav } from "@/components/shell/use-readable-nav";
+import type { BadgeVariant } from "@/components/ui/badge";
+import { StateMark } from "@/components/ui/state-mark";
+import {
+  normalizeSearchText,
+  rankSearchEntries,
+  type SearchEntry,
+  type SearchKind,
+} from "@/domain/search";
+import { useDict } from "@/i18n/client";
+import { fmt } from "@/i18n/locales";
+import type { Dict } from "@/i18n/dictionaries/types";
+
+export const OPEN_SEARCH_EVENT = "wf:open-search";
+/** The assistant launcher listens for this (detail: { prompt }). */
+export const OPEN_ASSISTANT_EVENT = "wf:open-assistant";
+
+export function openCommandPalette() {
+  window.dispatchEvent(new Event(OPEN_SEARCH_EVENT));
+}
+
+// Module-level cache: rapid re-opens don't refetch; staleness is bounded
+// by the palette open (~navigation freshness, not display data).
+let indexCache: { at: number; entries: SearchEntry[] } | null = null;
+const INDEX_TTL_MS = 60_000;
+
+type Row =
+  | { type: "entry"; entry: SearchEntry }
+  | { type: "link"; href: string; label: string; group: "navigate" | "create" }
+  | { type: "ask"; query: string };
+
+function kindLabel(t: Dict, kind: SearchKind): string {
+  switch (kind) {
+    case "worker":
+      return t.shell.workers;
+    case "client":
+      return t.shell.clients;
+    case "lead":
+      return t.shell.searchLeads;
+    case "candidate":
+      return t.shell.searchCandidates;
+    case "worksite":
+      return t.shell.worksites;
+    case "company":
+      return t.shell.companies;
+    case "subcontractor":
+      return t.shell.subcontractors;
+    case "accommodation":
+      return t.shell.accommodations;
+    case "vehicle":
+      return t.shell.vehicles;
+    case "quote":
+      return t.shell.searchQuotes;
+    case "contract":
+      return t.shell.searchContracts;
+  }
+}
+
+export function CommandPalette() {
+  const t = useDict();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [index, setIndex] = useState<SearchEntry[] | null>(null);
+  const [active, setActive] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  // The mouse selects a row only when it MOVES over it — never because the
+  // list appeared or scrolled under a resting cursor (lib/pointer-intent).
+  const lastPointer = useRef<PointerSpot | null>(null);
+  const hoverRow = (i: number) => (e: React.PointerEvent) => {
+    const now = { x: e.clientX, y: e.clientY };
+    const moved = pointerMoved(lastPointer.current, now);
+    lastPointer.current = now;
+    if (moved) setActive(i);
+  };
+
+  // Summons: ⌘K/Ctrl-K + the shell buttons' custom event. `/` and ⌘⇧F
+  // (2026-09-05) go to the PAGE's search first and land here only when the
+  // page has none — see src/lib/keyboard.ts.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setOpen((v) => !v);
+        return;
+      }
+      if (isPageSearchShortcut(e)) {
+        e.preventDefault();
+        if (!focusPageSearch()) setOpen(true);
+      }
+    };
+    const onOpen = () => setOpen(true);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener(OPEN_SEARCH_EVENT, onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(OPEN_SEARCH_EVENT, onOpen);
+    };
+  }, []);
+
+  // Fresh open: reset, focus, load the index (cached for 60 s).
+  useEffect(() => {
+    if (!open) return;
+    setQuery("");
+    setActive(0);
+    lastPointer.current = null;
+    const cached = indexCache;
+    if (cached && Date.now() - cached.at < INDEX_TTL_MS) {
+      setIndex(cached.entries);
+    } else {
+      setIndex(null);
+      loadSearchIndex().then((entries) => {
+        indexCache = { at: Date.now(), entries };
+        setIndex(entries);
+      });
+    }
+    const focus = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(focus);
+  }, [open]);
+
+  // Navigation closes the palette (row click or external route change).
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  const canWrite = useCanWriteFn();
+  const nav = useReadableNav();
+
+  const shortcuts = useMemo(() => {
+    const navigate: Row[] = [
+      ...nav.workspaces.map((item) => ({
+        type: "link" as const,
+        href: item.href,
+        label: t.shell[item.key],
+        group: "navigate" as const,
+      })),
+      ...nav.records.map((item) => ({
+        type: "link" as const,
+        href: item.href,
+        label: t.shell[item.key],
+        group: "navigate" as const,
+      })),
+      ...SECONDARY_NAV.map((item) => ({
+        type: "link" as const,
+        href: item.href,
+        label: t.shell[item.key],
+        group: "navigate" as const,
+      })),
+    ];
+    // Only what this session may actually create (2026-08-28) — the routes
+    // now refuse, and a shortcut into a refusal is worse than no shortcut.
+    const create: Row[] = (
+      [
+        { href: "/workers/new", label: t.workers.list.newWorker, area: "workers" },
+        { href: "/clients/new", label: t.clients.newClient, area: "clients" },
+        { href: "/worksites/new", label: t.worksites.newWorksite, area: "worksites" },
+        { href: "/companies/new", label: t.companies.newCompany, area: "companies" },
+        {
+          href: "/subcontractors/new",
+          label: t.subcontractors.newSubcontractor,
+          area: "subcontractors",
+        },
+        {
+          href: "/accommodations/new",
+          label: t.accommodations.newAccommodation,
+          area: "accommodations",
+        },
+        { href: "/vehicles/new", label: t.vehicles.newVehicle, area: "vehicles" },
+      ] satisfies { href: string; label: string; area: PermissionArea }[]
+    )
+      .filter((s) => canWrite(s.area))
+      .map((s) => ({
+        type: "link" as const,
+        group: "create" as const,
+        href: s.href,
+        label: s.label,
+      }));
+    return { navigate, create };
+  }, [t, canWrite, nav]);
+
+  // The visible row list: shortcuts when idle; ranked records + matching
+  // shortcuts + the assistant handoff once something is typed.
+  const sections = useMemo((): { header: string; rows: Row[] }[] => {
+    const q = normalizeSearchText(query);
+    if (q === "") {
+      return [
+        { header: t.shell.searchNavigate, rows: shortcuts.navigate },
+        { header: t.shell.searchCreate, rows: shortcuts.create },
+      ];
+    }
+    const out: { header: string; rows: Row[] }[] = [];
+    for (const group of rankSearchEntries(query, index ?? [])) {
+      out.push({
+        header: kindLabel(t, group.kind),
+        rows: group.entries.map((entry) => ({ type: "entry", entry })),
+      });
+    }
+    const matchLink = (row: Row) =>
+      row.type === "link" && normalizeSearchText(row.label).includes(q);
+    const nav = shortcuts.navigate.filter(matchLink);
+    const create = shortcuts.create.filter(matchLink);
+    if (nav.length > 0) out.push({ header: t.shell.searchNavigate, rows: nav });
+    if (create.length > 0)
+      out.push({ header: t.shell.searchCreate, rows: create });
+    out.push({
+      header: t.shell.assistant,
+      rows: [{ type: "ask", query: query.trim() }],
+    });
+    return out;
+  }, [query, index, shortcuts, t]);
+
+  const flatRows = useMemo(() => sections.flatMap((s) => s.rows), [sections]);
+  const clampedActive = Math.min(active, Math.max(0, flatRows.length - 1));
+
+  function select(row: Row) {
+    if (row.type === "ask") {
+      setOpen(false);
+      window.dispatchEvent(
+        new CustomEvent(OPEN_ASSISTANT_EVENT, { detail: { prompt: row.query } })
+      );
+      return;
+    }
+    const href = row.type === "entry" ? row.entry.href : row.href;
+    setOpen(false);
+    router.push(href);
+  }
+
+  function onInputKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((a) => Math.min(a + 1, flatRows.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((a) => Math.max(a - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const row = flatRows[clampedActive];
+      if (row) select(row);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    }
+  }
+
+  // Keep the active row in view while arrowing.
+  useEffect(() => {
+    listRef.current
+      ?.querySelector<HTMLElement>(`[data-row-index="${clampedActive}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [clampedActive]);
+
+  // Phones: the sheet is full-screen and the input autofocuses, so the
+  // on-screen keyboard is up for the whole interaction. iOS overlays the
+  // keyboard without resizing the layout viewport — size the sheet from the
+  // visual viewport so the result list (and the always-last "Ask the
+  // assistant" row) never hides behind the keys. Android is handled by the
+  // root viewport's interactiveWidget: "resizes-content".
+  const sheetRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    document.body.style.overflow = "hidden";
+    const vv = window.visualViewport;
+    const size = () => {
+      const sheet = sheetRef.current;
+      if (!sheet || !vv) return;
+      // Only the full-screen phone variant is height-managed.
+      if (window.matchMedia("(min-width: 40rem)").matches) {
+        sheet.style.height = "";
+        return;
+      }
+      sheet.style.height =
+        vv.height < window.innerHeight - 1 ? `${vv.height}px` : "";
+    };
+    size();
+    vv?.addEventListener("resize", size);
+    return () => {
+      document.body.style.overflow = "";
+      vv?.removeEventListener("resize", size);
+      if (sheetRef.current) sheetRef.current.style.height = "";
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  let rowIndex = -1;
+  return (
+    <div className="fixed inset-0 z-[60]">
+      <button
+        aria-label={t.shell.closeSearch}
+        className="absolute inset-0 bg-ink/40"
+        onClick={() => setOpen(false)}
+      />
+      <div
+        ref={sheetRef}
+        role="dialog"
+        aria-modal
+        aria-label={t.shell.search}
+        className="absolute inset-0 flex flex-col bg-bg sm:inset-x-0 sm:top-[10dvh] sm:bottom-auto sm:mx-auto sm:max-h-[70dvh] sm:w-[min(640px,calc(100%-2rem))] sm:rounded-container sm:border sm:border-border sm:shadow-xl"
+      >
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-3">
+          <SearchIcon />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            placeholder={t.shell.searchPlaceholder}
+            aria-label={t.shell.search}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActive(0);
+            }}
+            onKeyDown={onInputKeyDown}
+            className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-muted lg:text-sm"
+          />
+          <kbd className="hidden rounded-control border border-border px-1.5 py-0.5 text-micro text-ink-muted sm:inline">
+            Esc
+          </kbd>
+          <button
+            type="button"
+            aria-label={t.shell.closeSearch}
+            onClick={() => setOpen(false)}
+            className="rounded-control p-2.5 text-ink-secondary hover:bg-surface hover:text-ink sm:hidden"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div
+          ref={listRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+        >
+          {query.trim() !== "" && index === null && (
+            <p className="px-3 py-2 text-detail text-ink-muted">…</p>
+          )}
+          {query.trim() !== "" &&
+            index !== null &&
+            sections.length === 1 &&
+            sections[0].rows[0]?.type === "ask" && (
+              <p className="px-3 py-2 text-detail text-ink-muted">
+                {t.shell.searchNoResults}
+              </p>
+            )}
+          {sections.map((section) => (
+            <section key={section.header} className="mb-2">
+              <h3 className="px-3 pb-1 pt-2 text-micro font-medium uppercase tracking-wide text-ink-muted">
+                {section.header}
+              </h3>
+              {section.rows.map((row) => {
+                rowIndex += 1;
+                const i = rowIndex;
+                const isActive = i === clampedActive;
+                const rowClass = `flex w-full items-center justify-between gap-3 rounded-control px-3 py-2.5 text-left text-sm lg:py-2 ${
+                  isActive ? "bg-primary-subtle text-ink" : "text-ink hover:bg-surface"
+                }`;
+                if (row.type === "ask") {
+                  return (
+                    <button
+                      key="ask"
+                      type="button"
+                      data-row-index={i}
+                      className={rowClass}
+                      onPointerMove={hoverRow(i)}
+                      onClick={() => select(row)}
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <ChatIcon />
+                        <span className="truncate">
+                          {fmt(t.shell.searchAskAssistant, { query: row.query })}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                }
+                if (row.type === "link") {
+                  return (
+                    <button
+                      key={`${row.group}:${row.href}`}
+                      type="button"
+                      data-row-index={i}
+                      className={rowClass}
+                      onPointerMove={hoverRow(i)}
+                      onClick={() => select(row)}
+                    >
+                      <span className="truncate">{row.label}</span>
+                    </button>
+                  );
+                }
+                const { entry } = row;
+                return (
+                  <button
+                    key={`${entry.kind}:${entry.id}`}
+                    type="button"
+                    data-row-index={i}
+                    className={rowClass}
+                    onPointerMove={hoverRow(i)}
+                    onClick={() => select(row)}
+                  >
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate">{entry.title}</span>
+                      {entry.subtitle && (
+                        <span className="truncate text-detail text-ink-muted">
+                          {entry.subtitle}
+                        </span>
+                      )}
+                    </span>
+                    {entry.statusLabel && entry.statusIcon && (
+                      // Results follow the row rule: outlined, and only
+                      // for the exception (status doctrine 2026-09-25).
+                      <StateMark
+                        icon={entry.statusIcon}
+                        tone={entry.statusVariant as BadgeVariant}
+                      >
+                        {entry.statusLabel}
+                      </StateMark>
+                    )}
+                  </button>
+                );
+              })}
+            </section>
+          ))}
+          {query.trim() === "" && (
+            <p className="px-3 py-2 text-detail text-ink-muted">
+              {t.shell.searchEmptyHint}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// The glyph lives in the kit now (SearchInput carries it too); re-exported
+// so the shell's existing imports keep working.
+export { SearchIcon };
+
+function ChatIcon() {
+  return (
+    <svg
+      aria-hidden
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="shrink-0 text-primary"
+    >
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}

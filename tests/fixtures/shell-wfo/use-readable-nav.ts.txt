@@ -1,0 +1,21 @@
+import { useMemo } from "react";
+import { useCanReadFn } from "@/components/permissions-provider";
+import { NAV, TOOLS_NAV, WORKSPACE_NAV, navItemReadable } from "@/components/shell/nav";
+
+/**
+ * The navigation this session may open (spec 2026-09-30-read-permissions):
+ * a record or workspace set to No access is not offered. The pages are the
+ * guard; this only keeps the sidebar, drawer and palette from pointing at a
+ * "No access" page.
+ */
+export function useReadableNav() {
+  const canRead = useCanReadFn();
+  return useMemo(
+    () => ({
+      workspaces: WORKSPACE_NAV.filter((item) => navItemReadable(item, canRead)),
+      records: NAV.filter((item) => navItemReadable(item, canRead)),
+      tools: TOOLS_NAV.filter((item) => navItemReadable(item, canRead)),
+    }),
+    [canRead]
+  );
+}

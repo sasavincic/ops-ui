@@ -1,0 +1,204 @@
+"use client";
+
+// Pull-to-search (Saša, 2026-09-22: "make the search open with a drag down,
+// refresh-like, like iOS — exaggerated and with a nice animation so it does
+// not look like a bug"). Phones only. Dragging the page down from its very
+// top pulls the content along with resistance and reveals a ring that fills
+// with the pull; once the ring is full it turns solid, the label flips to
+// "Release to search", and letting go opens the global search palette. A
+// short pull springs back and does nothing. The numbers live in
+// src/lib/pull-to-search.ts.
+//
+// The gesture is decided with touch events (not pointer events) because
+// only touchmove can cancel the browser's own overscroll — iOS rubber-banding
+// and Chrome's pull-to-refresh — for the duration of OUR pull.
+
+import { useEffect, useRef, useState } from "react";
+import { openCommandPalette } from "@/components/shell/command-palette";
+import { SearchIcon } from "@/components/ui/search-input";
+import { useDict } from "@/i18n/client";
+import {
+  isPullArmed,
+  pullIntent,
+  pullOffset,
+  pullProgress,
+  type PullIntent,
+} from "@/lib/pull-to-search";
+import { cn } from "@/lib/utils";
+
+/** Phones and tablets in the drawer layout (below lg) with a touch screen. */
+const MOBILE_QUERY = "(max-width: 1023px) and (pointer: coarse)";
+const RING_R = 15;
+const RING_C = 2 * Math.PI * RING_R;
+const SPRING = "transform 360ms cubic-bezier(0.22, 1.2, 0.36, 1)";
+
+export function PullToSearch() {
+  const t = useDict();
+  const indicator = useRef<HTMLDivElement>(null);
+  const ring = useRef<SVGCircleElement>(null);
+  const [armed, setArmed] = useState(false);
+  const [pulling, setPulling] = useState(false);
+
+  useEffect(() => {
+    const content = document.querySelector<HTMLElement>("[data-pull-content]");
+    if (!content) return;
+    const media = window.matchMedia(MOBILE_QUERY);
+
+    let startX = 0;
+    let startY = 0;
+    let intent: PullIntent | "idle" = "idle";
+    let travel = 0;
+    let wasArmed = false;
+
+    const paint = (offset: number, progress: number) => {
+      content.style.transform = offset ? `translate3d(0, ${offset}px, 0)` : "";
+      const el = indicator.current;
+      if (el) {
+        // The pill rides in the gap the content opens; fully visible after
+        // the first ~40px of travel, scaling up as it goes.
+        const visible = Math.min(1, travel / 40);
+        el.style.opacity = String(visible);
+        el.style.transform = `translate3d(-50%, ${offset - 48}px, 0) scale(${0.85 + 0.15 * visible})`;
+      }
+      if (ring.current) {
+        ring.current.style.strokeDashoffset = String(RING_C * (1 - progress));
+      }
+    };
+
+    const settle = () => {
+      content.style.transition = SPRING;
+      content.style.transform = "";
+      const el = indicator.current;
+      if (el) {
+        el.style.transition = "transform 360ms cubic-bezier(0.22, 1.2, 0.36, 1), opacity 200ms ease";
+        el.style.opacity = "0";
+        el.style.transform = "translate3d(-50%, -48px, 0) scale(0.85)";
+      }
+      window.setTimeout(() => {
+        content.style.transition = "";
+        if (el) el.style.transition = "";
+      }, 380);
+    };
+
+    const reset = () => {
+      intent = "idle";
+      travel = 0;
+      wasArmed = false;
+      setArmed(false);
+      setPulling(false);
+    };
+
+    const ignoredTarget = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return true;
+      // Overlays own their touches; form controls too. A scrolled inner
+      // scroller (a sheet body, a wide table) is not "the top of the page".
+      if (target.closest("dialog[open], [role=dialog], input, textarea, select, [contenteditable], [data-pull-ignore]")) return true;
+      let node: Element | null = target;
+      while (node && node !== document.body) {
+        if (node.scrollTop > 0) return true;
+        node = node.parentElement;
+      }
+      return false;
+    };
+
+    const onStart = (e: TouchEvent) => {
+      if (!media.matches || e.touches.length !== 1) return;
+      if (window.scrollY > 0 || ignoredTarget(e.target)) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      intent = "undecided";
+      travel = 0;
+      wasArmed = false;
+    };
+
+    const onMove = (e: TouchEvent) => {
+      if (intent === "idle" || intent === "not_a_pull") return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (intent === "undecided") {
+        intent = pullIntent(dx, dy);
+        if (intent !== "pull") return;
+        setPulling(true);
+        content.style.transition = "";
+        if (indicator.current) indicator.current.style.transition = "";
+      }
+      if (window.scrollY > 0) {
+        // The page scrolled under us (momentum) — not a pull any more.
+        intent = "not_a_pull";
+        paint(0, 0);
+        reset();
+        return;
+      }
+      // Ours now: no rubber-band, no native pull-to-refresh.
+      e.preventDefault();
+      travel = Math.max(0, dy);
+      const nowArmed = isPullArmed(travel);
+      if (nowArmed !== wasArmed) {
+        wasArmed = nowArmed;
+        setArmed(nowArmed);
+        // A tick under the thumb where the platform offers one (Android).
+        if (nowArmed && "vibrate" in navigator) navigator.vibrate?.(8);
+      }
+      paint(pullOffset(travel), pullProgress(travel));
+    };
+
+    const onEnd = () => {
+      if (intent !== "pull") {
+        reset();
+        return;
+      }
+      const open = wasArmed;
+      settle();
+      reset();
+      if (open) openCommandPalette();
+    };
+
+    document.addEventListener("touchstart", onStart, { passive: true });
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onEnd);
+    document.addEventListener("touchcancel", onEnd);
+    return () => {
+      document.removeEventListener("touchstart", onStart);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onEnd);
+      document.removeEventListener("touchcancel", onEnd);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={indicator}
+      aria-hidden={!pulling}
+      role="status"
+      className={cn(
+        "pointer-events-none absolute left-1/2 top-0 z-20 flex h-10 items-center gap-2.5 rounded-full border pl-1.5 pr-4 text-detail font-medium shadow-lg lg:hidden",
+        armed
+          ? "border-primary bg-primary text-white"
+          : "border-border bg-bg text-ink-secondary"
+      )}
+      style={{ opacity: 0, transform: "translate3d(-50%, -48px, 0) scale(0.85)" }}
+    >
+      <span className="relative flex h-7 w-7 items-center justify-center">
+        <svg aria-hidden viewBox="0 0 36 36" className="absolute inset-0 h-7 w-7 -rotate-90">
+          <circle cx="18" cy="18" r={RING_R} fill="none" strokeWidth="2.5" className={armed ? "stroke-white/30" : "stroke-border"} />
+          <circle
+            ref={ring}
+            cx="18"
+            cy="18"
+            r={RING_R}
+            fill="none"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeDasharray={RING_C}
+            strokeDashoffset={RING_C}
+            className={cn("transition-[stroke] duration-150", armed ? "stroke-white" : "stroke-primary")}
+          />
+        </svg>
+        <span className={cn("transition-transform duration-200", armed ? "scale-110" : "scale-100")}>
+          <SearchIcon size={13} />
+        </span>
+      </span>
+      {armed ? t.shell.releaseToSearch : t.shell.pullToSearch}
+    </div>
+  );
+}

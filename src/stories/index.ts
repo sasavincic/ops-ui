@@ -42,6 +42,7 @@ import { stories as toast } from "./toast.stories";
 import { stories as urlSelect } from "./url-select.stories";
 import { stories as validityCell } from "./validity-cell.stories";
 import { stories as yearInput } from "./year-input.stories";
+import { stories as appFrame } from "./app-frame.stories";
 
 /**
  * One rendered state of a component, shot by the gallery (every story x brand x
@@ -105,6 +106,8 @@ export const STORY_GROUPS: readonly StoryGroup[] = [
   { component: "url-select", stories: urlSelect },
   { component: "validity-cell", stories: validityCell },
   { component: "year-input", stories: yearInput },
+  // The shell (1.5.0, src/shell/): one group for the frame and its parts, after the components.
+  { component: "app-frame", stories: appFrame },
 ];
 
 /** URL-safe id of a story: `button--matrix`, `dialog--open-with-error`. */

@@ -1,0 +1,173 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { SECONDARY_NAV } from "@/components/shell/nav";
+import {
+  SearchIcon,
+  openCommandPalette,
+} from "@/components/shell/command-palette";
+import { NavIcon, navLinkClasses } from "@/components/shell/sidebar";
+import { useDict } from "@/i18n/client";
+import { useReadableNav } from "@/components/shell/use-readable-nav";
+import { SignOutButton } from "@/components/shell/sign-out-button";
+import { AppMark } from "@/components/shell/app-mark";
+
+/** Mobile shell: sticky top bar + slide-out navigation drawer. Hidden ≥lg. */
+export function MobileTopBar({
+  userName,
+  userEmail,
+}: {
+  userName: string;
+  userEmail: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const t = useDict();
+  const nav = useReadableNav();
+
+  // Close the drawer whenever navigation happens.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  // Keep the page from scrolling behind the open drawer.
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  return (
+    <>
+      {/* pt env() keeps the bar clear of the notch/status bar once the app
+          runs standalone (viewportFit: "cover"); sticky offsets elsewhere use
+          --mobile-topbar-h from globals.css, which mirrors this height. */}
+      <header className="sticky top-0 z-30 flex items-center justify-between bg-sidebar px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
+        <AppMark />
+        <span className="flex items-center gap-1">
+          <button
+            aria-label={t.shell.search}
+            onClick={openCommandPalette}
+            className="rounded-control p-2.5 text-sidebar-fg-active transition-colors duration-150 hover:bg-sidebar-hover"
+          >
+            <SearchIcon size={18} />
+          </button>
+          <button
+            aria-label={open ? t.shell.closeMenu : t.shell.openMenu}
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+            className="rounded-control p-2.5 text-sidebar-fg-active transition-colors duration-150 hover:bg-sidebar-hover"
+          >
+          <svg
+            aria-hidden
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+          >
+            {open ? (
+              <>
+                <path d="M5 5l10 10" />
+                <path d="M15 5L5 15" />
+              </>
+            ) : (
+              <>
+                <path d="M3 5.5h14" />
+                <path d="M3 10h14" />
+                <path d="M3 14.5h14" />
+              </>
+            )}
+          </svg>
+          </button>
+        </span>
+      </header>
+
+      {open && (
+        // z-40: above content stickies (≤20), sheets (40 — later DOM under
+        // the same z would win, but the drawer only coexists with the page)
+        // and the assistant FAB (30); below the palette (60). See the shell
+        // z-ladder note in DESIGN.md-adjacent audit 2026-08-25.
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <button
+            aria-label={t.shell.closeMenu}
+            className="absolute inset-0 bg-ink/40"
+            onClick={() => setOpen(false)}
+          />
+          <nav className="absolute inset-y-0 left-0 flex w-64 flex-col bg-sidebar pt-[calc(4rem+env(safe-area-inset-top))] shadow-xl">
+            {/* The link list scrolls on short phones; the account block stays
+                pinned below so Sign out is always reachable. */}
+            <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain px-3 pb-2">
+              {nav.workspaces.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={navLinkClasses(pathname.startsWith(item.href), "workspace")}
+                >
+                  <NavIcon name={item.icon} />
+                  {t.shell[item.key]}
+                </Link>
+              ))}
+
+              <div aria-hidden className="mx-3 my-2 border-t border-sidebar-border" />
+
+              <p className="mb-1 px-3 text-micro font-medium uppercase tracking-wider text-sidebar-fg/70">
+                {t.shell.records}
+              </p>
+              {nav.records.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={navLinkClasses(pathname.startsWith(item.href))}
+                >
+                  {t.shell[item.key]}
+                </Link>
+              ))}
+
+              <div aria-hidden className="mx-3 my-2 border-t border-sidebar-border" />
+
+              <p className="mb-1 px-3 text-micro font-medium uppercase tracking-wider text-sidebar-fg/70">
+                {t.shell.tools}
+              </p>
+              {nav.tools.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={navLinkClasses(pathname.startsWith(item.href), "tool")}
+                >
+                  <NavIcon name={item.icon} />
+                  {t.shell[item.key]}
+                </Link>
+              ))}
+
+              <div className="mt-auto mb-2 flex flex-col gap-0.5">
+                {SECONDARY_NAV.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={navLinkClasses(pathname.startsWith(item.href))}
+                  >
+                    {t.shell[item.key]}
+                  </Link>
+                ))}
+              </div>
+            </div>
+            {/* pb env() lifts Sign out clear of the iOS home indicator. */}
+            <div className="border-t border-sidebar-border px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <p className="truncate text-detail font-medium text-sidebar-fg-active">
+                {userName}
+              </p>
+              <p className="truncate text-xs text-sidebar-fg">{userEmail}</p>
+              <SignOutButton className="mt-2 inline-flex min-h-10 items-center" />
+            </div>
+          </nav>
+        </div>
+      )}
+    </>
+  );
+}

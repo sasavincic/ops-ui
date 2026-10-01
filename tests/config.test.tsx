@@ -53,8 +53,8 @@ const DATE_PICKER_KEYS = [
   "latest",
 ] as const satisfies readonly (keyof OpsUiStrings["datePicker"])[];
 type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-/** The optional groups 1.1 added (spec §6.1) and yearPicker (1.4), each with an English default. */
-const OPTIONAL_KEYS = ["tabs", "appSwitcher", "validity", "yearPicker"] as const satisfies readonly (keyof OpsUiStrings)[];
+/** The optional groups 1.1 added (spec §6.1), yearPicker (1.4) and shell (1.5), each with an English default. */
+const OPTIONAL_KEYS = ["tabs", "appSwitcher", "validity", "yearPicker", "shell"] as const satisfies readonly (keyof OpsUiStrings)[];
 const topKeysAreAll: Exact<(typeof TOP_KEYS)[number], Exclude<keyof OpsUiStrings, "datePicker" | (typeof OPTIONAL_KEYS)[number]>> = true;
 type OptionalKeys = { [K in keyof OpsUiStrings]-?: undefined extends OpsUiStrings[K] ? K : never }[keyof OpsUiStrings];
 const optionalKeysAreAll: Exact<(typeof OPTIONAL_KEYS)[number], OptionalKeys> = true;
@@ -69,7 +69,7 @@ describe("config/strings (spec §6.1)", () => {
     expect(Object.keys(EN_STRINGS.datePicker).sort()).toEqual([...DATE_PICKER_KEYS].sort());
   });
 
-  it("the optional strings: exactly tabs, appSwitcher, validity (1.1) and yearPicker (1.4), each with an English default outside EN_STRINGS", () => {
+  it("the optional strings: exactly tabs, appSwitcher, validity (1.1), yearPicker (1.4) and shell (1.5), each with an English default outside EN_STRINGS", () => {
     expect(optionalKeysAreAll).toBe(true);
     // EN_STRINGS stays the apps' 1.0 `common` words; the defaults live beside it.
     for (const key of OPTIONAL_KEYS) expect(key in EN_STRINGS, key).toBe(false);
@@ -82,6 +82,24 @@ describe("config/strings (spec §6.1)", () => {
       validity: { expiredAgo: "expired {days} d ago", expiresIn: "in {days} d", unknown: "Validity unknown", noExpiry: "No expiry" },
       // YearInput's own words; it reuses datePicker.previousYears / nextYears / clear / earliest / latest.
       yearPicker: { placeholder: "YYYY", openPicker: "Choose year", thisYear: "This year" },
+      // The shell's words: both apps' en shell values where they agree (tools, the placeholder
+      // and the empty hint generic; each app passes its own).
+      shell: {
+        search: "Search",
+        records: "Records",
+        tools: "Tools",
+        openMenu: "Open menu",
+        closeMenu: "Close menu",
+        signOut: "Sign out",
+        pullToSearch: "Pull to search",
+        releaseToSearch: "Release to search",
+        closeSearch: "Close search",
+        searchPlaceholder: "Search…",
+        searchEmptyHint: "Type to search.",
+        searchNoResults: "No matches.",
+        searchNavigate: "Go to",
+        searchCreate: "Create new",
+      },
     });
   });
 

@@ -355,6 +355,55 @@ tools ▾"); its `sections` group items under short headings, set off by a hairl
 actions only, never a filter (filters are selects in the filter bar). Empty tables use
 `EmptyState`.
 
+## The shell: one frame for every app (1.5.0)
+
+Every app has the same frame, `AppFrame` (`src/shell/`): one sidebar, one phone bar and drawer,
+one ⌘K. A person who learned one app's chrome has learned the others'. The app passes its mark,
+its nav, its words and its search; it never draws its own frame.
+
+- **The frame.** From `lg` a fixed 224px sidebar on the sidebar colour; below `lg` a sticky top bar
+  (the mark, the search magnifier, the menu button) whose drawer slides in from the left over a
+  dimmed page, the page frozen behind it. The content column is centred, `max-w-6xl` (or `5xl`
+  for a reading app) with `gap-4 px-4 py-5` on phones and `gap-6 px-8 py-8` from `sm`; a page that
+  renders `[data-page-full-width]` escapes the width. Safe areas: the top bar clears the notch,
+  the drawer's account block and the palette's list clear the home indicator.
+- **The mark** is a slot: the app's BrandMark (the group's ochre dot plus the app's one line, and
+  its name), drawn on the sidebar colour, and the button of the suite's `AppSwitcher`. It sits
+  top-left in the sidebar and in the top bar, nowhere else.
+- **Navigation registers.** Three groups, each saying what kind of thing the link opens, by colour
+  alone: **workspaces** are the daily boards (accent, with a glyph), **records** are the business
+  itself (plain sidebar text, no glyph), **tools** serve the office (teal `--color-tool`, with a
+  glyph; an app with tools declares the token). All three rest in the same neutral grey and take
+  their colour on hover and when active, so no link claims the eye while the person is elsewhere.
+  Records and tools carry a quiet uppercase heading, the groups a hairline between them; Settings
+  (the footer) is pinned to the bottom. One colour per register, one register per group, nothing
+  else in the nav carrying meaning. An app without tools has no tools group at all.
+- **The nav shows only what the session may open.** The app filters its nav arrays by its own read
+  permissions before passing them; the pages stay the guard, the nav only never points at a
+  "No access" page.
+- **Workspace chords.** ⌥ / Alt + 1…N opens the Nth workspace (nav order is chord order, so a new
+  workspace goes last and the old numbers keep). While ⌥ is held the workspace glyphs turn into
+  their numbers; each link's title says the chord ("⌥2" on a Mac, "Alt+2" elsewhere).
+- **Search.** ⌘K / Ctrl+K anywhere, the Search button atop the sidebar (with its keycaps, one chip
+  per key: ⌘ K or Ctrl K), the top bar's magnifier, or a pull from the top of a phone page opens
+  the palette; `/` and ⌘⇧F focus the page's own search field first and fall through to the
+  palette on a page without one. The palette is a centred card from `sm`, a full-screen sheet on
+  phones sized to the visible viewport so the keyboard never hides its last row. Idle it offers
+  "Go to" and "Create new" shortcuts (only what the session may open or create); typing shows the
+  app's ranked records, the matching shortcuts and an optional last row that hands the query on
+  (an assistant, a list's database search). Arrows move, Enter opens, Escape and a backdrop press
+  close (the palette is navigation, not a form, so it is not the Dialog kit). **A row is selected
+  by a pointer that moved over it, never by a list that opened or scrolled under a resting
+  cursor.** Navigating anywhere closes it.
+- **Pull to search (phones).** Dragging the page down from its very top pulls the content along
+  with resistance and reveals a pill under the top bar, a ring that fills around the magnifier,
+  "Pull to search"; once the ring is full it turns solid primary, "Release to search", and letting
+  go opens the palette; a short pull springs back. The pull is long on purpose (150px of finger
+  travel) so a scroll bounce never triggers it, and it never fires from a scrolled page, a
+  sideways swipe, a form control or an open dialog or sheet.
+- **Back.** The frame mounts `NavTrail`, so a record's back link returns to the exact list the
+  person came from.
+
 ## Read-only
 
 A session that may not write never sees a control it cannot use. The kit's read-only scope

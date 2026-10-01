@@ -1,7 +1,7 @@
 // The words the kit itself says (spec §6.1): exactly the `common.*` keys the
 // two apps' kits read today, 17 top-level strings plus 16 for the date
 // picker, and since 1.1 optional groups with English defaults (EN_OPTIONAL_STRINGS):
-// tabs, appSwitcher, validity (1.1) and yearPicker (1.4). An app feeds its own
+// tabs, appSwitcher, validity (1.1), yearPicker (1.4) and shell (1.5). An app feeds its own
 // dictionary through OpsUiProvider; outside a provider (a root-layout Toaster, a login page) the kit speaks EN_STRINGS.
 // Per-call label props (closeLabel, openLabel, pendingLabel, clearLabel)
 // still win over these.
@@ -77,6 +77,33 @@ export type OpsUiStrings = {
     /** The footer button that picks the current year ("This year"). */
     thisYear: string;
   };
+  /**
+   * 1.5, optional: the shell's words (AppFrame, Sidebar, MobileTopBar, CommandPalette,
+   * PullToSearch, SignOutButton). Default EN_OPTIONAL_STRINGS.shell.
+   */
+  shell?: {
+    /** The sidebar's search button, the phone magnifier's and the palette's accessible name. */
+    search: string;
+    /** The records group heading. */
+    records: string;
+    /** The tools group heading. */
+    tools: string;
+    openMenu: string;
+    closeMenu: string;
+    signOut: string;
+    /** The pull-to-search pill while pulling, and once the pull is long enough. */
+    pullToSearch: string;
+    releaseToSearch: string;
+    /** The palette's backdrop and phone close button. */
+    closeSearch: string;
+    searchPlaceholder: string;
+    /** Under the shortcuts while nothing is typed. */
+    searchEmptyHint: string;
+    searchNoResults: string;
+    /** Section headers of the palette's shortcuts. */
+    searchNavigate: string;
+    searchCreate: string;
+  };
 };
 
 /** Today's Workforce Ops en `common` values (FinaOps' en values are identical). */
@@ -125,7 +152,7 @@ export const EN_STRINGS: OpsUiStrings = {
  * (`workers.compliance.expiredAgo` / `expiresIn`, `compliance.desk.unknown`,
  * `statuses.expiry.no_expiry`).
  */
-export const EN_OPTIONAL_STRINGS: Required<Pick<OpsUiStrings, "tabs" | "appSwitcher" | "validity" | "yearPicker">> = {
+export const EN_OPTIONAL_STRINGS: Required<Pick<OpsUiStrings, "tabs" | "appSwitcher" | "validity" | "yearPicker" | "shell">> = {
   tabs: "Tabs",
   appSwitcher: { label: "Switch app", current: "Current app" },
   validity: {
@@ -135,4 +162,22 @@ export const EN_OPTIONAL_STRINGS: Required<Pick<OpsUiStrings, "tabs" | "appSwitc
     noExpiry: "No expiry",
   },
   yearPicker: { placeholder: "YYYY", openPicker: "Choose year", thisYear: "This year" },
+  // The two apps' en `shell` words where they agree; the tools heading, the placeholder and the
+  // empty hint are each app's own (Workforce Ops has the only tools register today).
+  shell: {
+    search: "Search",
+    records: "Records",
+    tools: "Tools",
+    openMenu: "Open menu",
+    closeMenu: "Close menu",
+    signOut: "Sign out",
+    pullToSearch: "Pull to search",
+    releaseToSearch: "Release to search",
+    closeSearch: "Close search",
+    searchPlaceholder: "Search…",
+    searchEmptyHint: "Type to search.",
+    searchNoResults: "No matches.",
+    searchNavigate: "Go to",
+    searchCreate: "Create new",
+  },
 };

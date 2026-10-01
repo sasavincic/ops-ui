@@ -1,0 +1,27 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
+import { useDict } from "@/i18n/client";
+
+export function SignOutButton({ className }: { className?: string }) {
+  const router = useRouter();
+  const t = useDict();
+
+  return (
+    <button
+      onClick={async () => {
+        await authClient.signOut();
+        router.push("/login");
+        router.refresh();
+      }}
+      className={cn(
+        "text-xs text-sidebar-fg underline-offset-2 transition-colors duration-150 hover:text-sidebar-fg-active hover:underline",
+        className
+      )}
+    >
+      {t.shell.signOut}
+    </button>
+  );
+}

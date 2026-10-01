@@ -29,7 +29,10 @@ modules: it renders identically to today's kits.
   the library's `ReadOnlyScope`) and the app's `I18nProvider` (feeds the kit its
   strings through `OpsUiProvider`).
 - It is **never published** to a registry and has no runtime link to any app.
-- No shells, navigation, screens, pickers or business rules; no dark mode.
+- Since 1.5.0 it ships the app shell (`src/shell/`: `AppFrame`, the sidebar, the phone bar and
+  drawer, the ⌘K palette frame, pull-to-search); the app passes its mark, its nav arrays
+  (already filtered by its read permissions), its words and its search. No screens, pickers or
+  business rules; no dark mode.
 
 ## How apps use it: vendoring
 
@@ -117,6 +120,15 @@ styling programme spec §4.4), so a codemod commit changes no pixel: G2 (`tools/
 must show 0 changed pixels. Move a class into a prop only when no other class left in
 `className` belongs to the same group (one size, one colour, one weight).
 
+## Adopting the shell (1.5.0)
+
+Each app replaces its `components/shell/*` with one client component that renders `AppFrame`
+(`@/vendor/ops-ui/shell/app-frame`) from its own nav arrays, dictionary, sign-out and search
+index; the CHANGELOG's `## 1.5.0` Upgrade steps name every prop per app, and
+`tests/shell-fixtures.tsx` (`libraryProps`) is the exact recipe the markup proofs render. G2 must
+show 0 changed pixels on every route (the only markup change is Workforce Ops' sidebar mark row
+gaining `items-center`). An app with a tools register declares `--color-tool` as its extension.
+
 ## Versions: strict semver by what an unchanged call site renders
 
 | Level | Allowed |
@@ -172,13 +184,13 @@ fixture from `gallery/brands/`.
 ## Layout
 
 ```
-src/            the library (relative imports only): components/, config/, lib/, navigation/, stories/, types.ts, version.ts
+src/            the library (relative imports only): components/, config/, lib/, navigation/, shell/, stories/, types.ts, version.ts
 styles/         tokens.css (@theme contract), kit.css, base.css, app-feel.css
 sync/           sync-ops-ui.mjs + its generated .d.mts, shipped to each app as scripts/sync-ops-ui.{mjs,d.mts}
 tools/          api-surface, pull-brands (L5), diff-against-app (L6), release and app-shots (L7a)
 ship.json       what a release ships to an app, and where (read by the sync from the release commit)
 gallery/        Next app for stories and screenshots (brands/, tests/, __screenshots__/)
-tests/          vitest (node environment, renderToStaticMarkup)
+tests/          vitest (node environment, renderToStaticMarkup; happy-dom for the shell's DOM proof)
 docs/           the spec and the kit inventory
 ```
 

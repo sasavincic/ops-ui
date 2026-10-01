@@ -19,6 +19,11 @@
 @import "../../styles/kit.css";
 @import "../../styles/base.css";
 @import "../../styles/app-feel.css";
+/* An app extension the shell reads (1.5.0): the tools register's teal. Workforce Ops declares it
+   in its own theme, PrefabOps will; the library does not ship it. Workforce Ops' value. */
+@theme {
+  --color-tool: oklch(0.74 0.1 195);
+}
 @source "../../src";
 @source "../components";
 @source "../app";
