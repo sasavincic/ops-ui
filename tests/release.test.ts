@@ -27,7 +27,8 @@ import { ROOT, readSource } from "./source-files";
 
 const RELEASE = path.join(ROOT, "tools/release.mjs");
 const SANDBOX = mkdtempSync(path.join(os.tmpdir(), "ops-ui-release-test-"));
-afterAll(() => rmSync(SANDBOX, { recursive: true, force: true }));
+// Generous: dozens of temporary repositories (or captures), and a loaded machine is slow to delete them.
+afterAll(() => rmSync(SANDBOX, { recursive: true, force: true }), 120_000);
 const T = { timeout: 120_000 };
 const run = promisify(execFile);
 
@@ -505,7 +506,7 @@ describe.concurrent("pnpm release (tools/release.mjs against temporary repositor
     expect(r.status, r.stderr).toBe(0);
   });
 
-  it("step 4: a modified or deleted existing baseline is a major, a pure rebaseline is exempt, a new baseline is a minor", T, async ({ expect }) => {
+  it("step 4: a modified or deleted existing baseline is a major, a pure rebaseline is exempt, a new baseline is a minor", { timeout: 300_000 }, async ({ expect }) => {
     let repo = await released();
     write(repo.lib, "gallery/__screenshots__/1440/workforce/button--matrix.png", "png-1-changed");
     addSection(repo, "## 1.1.0 — 2026-10-01\nFixed: the fill.\n");

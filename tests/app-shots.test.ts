@@ -25,7 +25,8 @@ import { ROOT } from "./source-files";
 
 const TOOL = path.join(ROOT, "tools/app-shots.mjs");
 const SANDBOX = mkdtempSync(path.join(os.tmpdir(), "ops-ui-app-shots-test-"));
-afterAll(() => rmSync(SANDBOX, { recursive: true, force: true }));
+// Generous: dozens of temporary repositories (or captures), and a loaded machine is slow to delete them.
+afterAll(() => rmSync(SANDBOX, { recursive: true, force: true }), 120_000);
 const run = promisify(execFile);
 const T = { timeout: 180_000 };
 
