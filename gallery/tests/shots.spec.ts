@@ -73,6 +73,28 @@ async function settleAnimations(page: Page) {
 }
 
 /**
+ * Re-rasters the whole page once, with real frames between the steps, so a story that opened
+ * something is shot from ONE paint state every run. Opening the touch calendar (a modal sheet)
+ * takes focus from the field under its backdrop: the field loses its focus ring, and Chromium
+ * sometimes repaints just the field's rect for that and sometimes not, which left the field's
+ * rounded corners 1/255 apart in about 8% of runs (15-17 edge pixels of the 375-touch
+ * `date-input--calendar*` shots). Making the body a transparency group for a frame and back
+ * repaints everything; the timeouts are real time (the page clock is paused, so the page's own
+ * requestAnimationFrame does not run), and the screenshots below then see a settled page.
+ */
+async function repaintPage(page: Page) {
+  await page.waitForTimeout(100);
+  await page.evaluate(() => {
+    document.body.style.opacity = "0.99";
+  });
+  await page.waitForTimeout(100);
+  await page.evaluate(() => {
+    document.body.style.opacity = "";
+  });
+  await page.waitForTimeout(100);
+}
+
+/**
  * The gate (gallery/shot-options.ts): `toHaveScreenshot` has waited for a stable page, compared
  * with Playwright's comparator and, under `shots:accept`, written the baseline. That comparator
  * skips every pixel it takes for anti-aliasing, so the same page is shot once more and compared
@@ -240,6 +262,7 @@ for (const brand of BRANDS) {
         await loadGalleryFonts(page);
         if (story.open) await page.locator(story.open).first().click();
         await settleAnimations(page);
+        if (story.open) await repaintPage(page);
         await expect(page).toHaveScreenshot([brand, `${id}.png`], { fullPage: true });
         await expectExactShot(page, testInfo, [brand, `${id}.png`]);
         // Glyph coverage does not depend on the brand: asked once per story and width.
