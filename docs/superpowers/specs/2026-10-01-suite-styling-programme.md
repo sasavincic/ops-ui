@@ -1,6 +1,6 @@
 # One suite, one style: the styling programme for Workforce Ops, FinaOps and PrefabOps
 
-**Status: PLAN, 2026-10-01.** Saša: "Make PrefabOps feel like it is in the same suite… organise
+**Status: PLAN, 2026-10-01; Phase E (PrefabOps) DONE 2026-10-02 — end state in §12.** Saša: "Make PrefabOps feel like it is in the same suite… organise
 all styling code… redesign the app logo… adopt the record / workspace architecture… sweep the
 other two apps… prepare a workflow… First plan then execute." Recommendations below are
 decisions unless Saša overrules them; the few real choices are marked *(default)* and do not
@@ -633,3 +633,48 @@ entries, CopyValue, TagRemove, the PageHelp trigger already has its own `pointer
 the rule in DESIGN.md ("whatever a finger can press carries `TOUCH_FLOOR` or an invisible target")
 applies to them when they are measured; `Text` without `size` inheriting an island's 16px (plan
 §10.2, P4.3) is an island matter, not a floor one.
+
+---
+
+## 12. PrefabOps end state (restyle P5, 2026-10-02)
+
+Phase E is finished: PrefabOps (`prefab-ops-platform`, plan `2026-09-30-prefab-restyle.md` §15,
+branch `claude/restyle-p5-finish`) runs on the vendored kit (1.7.0) with the same style
+architecture as Workforce Ops and FinaOps (§2).
+
+- **One stylesheet.** `app/app.css` = `@import "tailwindcss"` (global preflight, automatic
+  scanning, the library §8.4 `@source not` lines + `style-allowlist.json`), the kit's `tokens`,
+  `kit`, `base`, `app-feel`, `brand.css`, the one extension `--color-tool`, and the Prefab layout
+  variables (`--page-gutter` 32 / 24 / 16 px, `--safe-*`). 59 + 26 lines. The 17 legacy sheets
+  (13.8k lines), the `legacy` cascade layer, `ops-ui-root.css`, the islands (`OpsIsland`), the
+  legacy canvas, `AppShell`, the island guard, the `--ops-z-*` overrides and the restyle scripts
+  are deleted.
+- **Shipped CSS:** ≈ 285 kB minified / 43 kB gzip at P0 → 108 / 20 kB before P5 → **77 / 15 kB**.
+- **Sign-in** looks like its siblings: the suite mark (pipe bend, `tone="page"` on white) and the
+  name over one `Card` on the surface.
+- **Guards** as in §5: `style-guards.test.ts` over `styleReport` with `style-allowlist.json`
+  (17 arbitrary values, the `themeColor` hex, 6 raw-control files — hidden file inputs, the review
+  pager tiles, the status gauge, two test doubles — each with a reason), a P5 `restyle-guards`
+  test (no class of the 928 legacy names frozen at P2, no `confirm(`, no hand-rolled modal, no
+  native date input, no `--legacy-`, one CSS entry) and the sister apps' credential-forms rule.
+- **Hygiene** (the §1 table's PrefabOps column, now): 190 `.tsx` files outside the kit,
+  `style={{…}}` 5 (all `runtime:` or variables), arbitrary values 17 distinct (allow-listed),
+  hand-written CSS 85 lines, raw controls only in the 6 allow-listed files, most repeated class
+  string `min-w-0` ×17. The 1.6 sweep (exact recipes, 0 changed pixels): 18 `Grid`, 28 `Text`
+  `nowrap` / `tabular`, 54 `Stack`, 33 `Cluster`.
+- **Found on the way:** inside the islands, `ops-ui-root.css`'s `width: revert` overrode SVG
+  `rect` width attributes, so every kit glyph drawn with a `<rect>` (Production nav, lock,
+  archive, several status glyphs) lost its box in PrefabOps from P2 to P4.8. Removing the islands
+  fixed it; a library-side note: a reset that reverts `width` / `height` on `*` breaks SVG
+  geometry.
+
+**Open for the library (batch into the next minor or 2.0):** `styles/preflight-scoped.css`, the
+`card--island-on-a-legacy-page` story and DESIGN.md's "Islands and stacking" paragraph have no
+user left (candidates for removal in 2.0; `--ops-z-*` stay, harmless); the bare `Checkbox` touch
+floor; `Segmented` width floor and lg size; `FileInput` lg; the `Sheet` pinned footer; 48 px
+floors for the `Dialog` ✕, `ConfirmDialog` buttons and the `DateInput` / `YearInput` button at
+`size="lg"`; `Disclosure`, table group rows / `tfoot` and a container-fold `Table` as promotion
+candidates; a `Tag` warning tone; `Text` as a heading; the `TR`'s `useRouter` in a static render;
+a `Combobox` pick not marking its `Dialog` dirty; the controlled `Segmented` ignoring a read-only
+scope; an icon-only download link; a `backdrop-filter` ancestor capturing the `RowMenu`'s fixed
+list (restyle plan §10.2).
