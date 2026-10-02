@@ -4,7 +4,7 @@ import { useId, useLayoutEffect, useRef, useState } from "react";
 import { useReadOnlyScope } from "../config/read-only";
 import { useOpsUi } from "../config/provider";
 import { cn } from "../lib/cn";
-import { CONTROL_SIZE_CLASS, TOUCH_FLOOR, type ControlSize } from "../lib/touch";
+import { CONTROL_SIZE_CLASS, TOUCH_FLOOR, TOUCH_TARGET, type ControlSize } from "../lib/touch";
 import { StatusIcon } from "./status-icon";
 import { useAnchoredToast } from "./toast";
 
@@ -241,8 +241,27 @@ export function Select({
 }
 
 /**
+ * 1.8.0: under the touch floor the box is 20px (16 otherwise).
+ */
+const CHECKBOX_BOX_FLOOR = "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:size-5";
+
+/**
+ * 1.8.0: the bare box's wrapper. On a fine pointer it is `display: contents` (no box: the input
+ * lays out exactly as a bare input); under the touch floor it becomes an inline-flex label whose
+ * invisible ::after (TOUCH_TARGET) is a 44 x 44 target around the box — a tap on it is a tap on
+ * the label, which toggles its input.
+ */
+const BARE_CHECKBOX_WRAPPER = cn(
+  "contents",
+  "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:inline-flex",
+  TOUCH_TARGET
+);
+
+/**
  * A checkbox with its label. 1.6.0: without `label` it is the bare box (a row's selection in a
- * list), which then needs `aria-label`; `className` then styles the box itself.
+ * list), which then needs `aria-label`; `className` then styles the box itself. 1.8.0: under the
+ * touch floor the labelled row is at least 44px tall and the box 20px; the bare box keeps its
+ * place and gets a 44 x 44 invisible target (its wrapper is `display: contents` elsewhere).
  */
 export function Checkbox({
   label,
@@ -258,25 +277,28 @@ export function Checkbox({
   const disabled = props.disabled || locked;
   if (label === undefined) {
     return (
-      <input
-        type="checkbox"
-        className={cn("size-4 accent-primary", className)}
-        {...props}
-        disabled={disabled}
-      />
+      <label className={BARE_CHECKBOX_WRAPPER} data-ops-checkbox="">
+        <input
+          type="checkbox"
+          className={cn("size-4 accent-primary", CHECKBOX_BOX_FLOOR, className)}
+          {...props}
+          disabled={disabled}
+        />
+      </label>
     );
   }
   return (
     <label
       className={cn(
         "flex items-center gap-2 text-sm text-ink",
+        TOUCH_FLOOR.height,
         disabled && "cursor-not-allowed text-ink-muted",
         className
       )}
     >
       <input
         type="checkbox"
-        className="size-4 accent-primary"
+        className={cn("size-4 accent-primary", CHECKBOX_BOX_FLOOR)}
         {...props}
         disabled={disabled}
       />
@@ -380,12 +402,17 @@ export function CheckTile({
 export function FileInput({
   className,
   readOnlySafe,
+  size,
   ...props
-}: React.ComponentProps<"input"> & ReadOnlyProps) {
+}: Omit<React.ComponentProps<"input">, "size"> & ReadOnlyProps & SizeProps) {
+  // 1.8.0: "lg" = 48px tall, 16px text and a larger Browse button (the workshop portal); a number
+  // stays the HTML attribute, as on Input.
   const locked = useLocked(readOnlySafe);
+  const sized = controlSize(size);
   return (
     <input
       type="file"
+      size={sized.htmlSize}
       accept="application/pdf,image/*"
       className={cn(
         "w-full rounded-control border border-border-strong bg-bg px-2 py-1.5 text-base text-ink-secondary lg:text-sm",
@@ -393,6 +420,8 @@ export function FileInput({
         "outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-muted",
         // 1.7.0: 44px tall under the touch floor (43.x px otherwise, unchanged).
         TOUCH_FLOOR.height,
+        // 1.8.0: lg, 48px at every width.
+        sized.size === "lg" && "min-h-12 lg:text-base file:px-4 file:py-1.5 file:text-sm",
         className
       )}
       {...props}

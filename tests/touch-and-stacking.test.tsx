@@ -119,12 +119,12 @@ const BUTTON_BASE =
   "inline-flex items-center justify-center gap-1.5 rounded-control font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
 
 describe("Button", () => {
-  it("an unchanged call site keeps its 1.2 classes and gains only the floor height", () => {
+  it("an unchanged call site keeps its 1.2 classes and gains only the floor height (and 1.8.0's whitespace-nowrap)", () => {
     expect(sorted(classesOf(html(<Button>Save</Button>), "button"))).toEqual(
-      sorted(cn(BUTTON_BASE, "bg-primary text-white hover:bg-primary-hover", "h-9 px-3.5 text-sm", TOUCH_FLOOR.height)),
+      sorted(cn(BUTTON_BASE, "whitespace-nowrap", "bg-primary text-white hover:bg-primary-hover", "h-9 px-3.5 text-sm", TOUCH_FLOOR.height)),
     );
     expect(sorted(classesOf(html(<Button variant="secondary" size="sm">Edit</Button>), "button"))).toEqual(
-      sorted(cn(BUTTON_BASE, "border border-border-strong bg-bg text-ink hover:bg-surface", "h-8 px-3 text-detail", TOUCH_FLOOR.height)),
+      sorted(cn(BUTTON_BASE, "whitespace-nowrap", "border border-border-strong bg-bg text-ink hover:bg-surface", "h-8 px-3 text-detail", TOUCH_FLOOR.height)),
     );
     // The glyph of a sm/md button is the 1.2 glyph.
     expect(html(<Button icon="add">New</Button>)).toContain('class="inline-block shrink-0 align-middle"');
@@ -212,7 +212,10 @@ describe("the stacking variables", () => {
       expect(lines).toHaveLength(1);
       const old = execFileSync("git", ["show", `${v120}:${file}`], { cwd: ROOT, encoding: "utf8" });
       // The line as it was in 1.2.0: the same line with the literal class in place of the variable.
-      expect(old.split("\n")).toContain(lines[0].replace(klass, was));
+      // 1.8.0: RowMenu's list became a top-layer popover (its z-index then decides nothing; kept for
+      // a browser without popovers) and gained the popover's own classes; those are taken out.
+      const line = lines[0].replace(" inset-auto", "").replace(" m-0", "").replace(" overflow-visible", "").replace(" text-ink shadow-lg backdrop:pointer-events-none", " shadow-lg");
+      expect(old.split("\n")).toContain(line.replace(klass, was));
     });
   }
 

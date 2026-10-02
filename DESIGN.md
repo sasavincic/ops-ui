@@ -169,6 +169,9 @@ shared one, build an app pattern, build a special) and reach for these first:
   that is itself an attention line) and one `weight`; `mono`, `block`, `truncate` as flags, and
   since 1.6 `nowrap` (a date, an amount, a code that must not break) and `tabular` (figures of
   equal width, so a column of numbers lines up).
+- **`Text` as a heading** (1.8): `as` takes `h1`-`h6`, for a heading of the outline that wears a
+  Text look (`<Text as="h3" size="detail" weight="medium" tone="secondary">`); the three
+  standard heading looks stay `Heading`.
 - **`Heading`** has three levels: `title` (a stand-alone card's title, the sign-in pages),
   `section` (a section of a page or a card) and `subsection` (a group inside a section or a
   sheet). A page's own title is `PageHeader`'s; an uppercase label is `Kicker`.
@@ -228,6 +231,17 @@ with a primary border and the keyboard focus drawn around the tile: a pick whose
 records or carry a mark (the issuing company, the employer, the quote type). Layouts: `row` (a
 mark and a name), `compact` (the mark alone on a phone, mark and name from sm), `stacked` (a short
 word on a phone, the long name from sm). A multi-pick is still `CheckTile`s.
+
+**A `Tag` that needs a second look** (1.8) takes `tone="warning"`: amber, still a fact and never a
+status ("weight differs from the drawing", "price older than 90 days"). Red stays for the
+Attention column's "wrong now".
+
+**A section that folds** (1.8) is `Disclosure`: the native `<details>`, so the browser owns the
+keyboard, the open state and find-in-page. Its summary row is a chevron, an optional uppercase
+`kicker` above the title, the title, and `meta` on the right (a `Tag`, a count, an amount).
+`bordered` for a fold that stands alone; without it the fold sits flush in a card, split from its
+siblings by the card's hairlines. `flushBody` for a body that is a flush table or rows with their
+own padding; `large` for an lg surface (a 48px summary row). Opening a fold changes no data.
 
 **A chip that can be taken away** (1.6) ends in a `TagRemove`: the small ✕ inside a `Tag` (give
 the Tag `className="pr-1"`), labelled with what it removes. Removing changes data, so it hides in
@@ -306,12 +320,40 @@ is "how deep in the page is this?"; a whole action row is one size. A third size
 16px, 1.3.0), is for a surface built for gloved hands and a phone at arm's length (PrefabOps'
 workshop portal): there EVERY control is `lg`, Button and the input family (`Input`, `Select`,
 `Combobox`, `DateInput`, `YearInput`) alike, at every width. It is a surface's size, never a way to make one
-button louder.
+button louder. Since 1.8 the rest of an lg surface follows: `Dialog` / `ConfirmDialog` /
+`DialogFooter` `size="lg"` (a 48px ✕ and footer buttons), `Segmented` and `FileInput`
+`size="lg"`, `Disclosure` `large`, and under the touch floor the `DateInput` / `YearInput` button
+reaches 48 x 48 inside an lg field.
+
+**Which button** (1.8). Two kinds of place, two forms:
+
+| Where the action sits | Form |
+|---|---|
+| A page header, a section or card header, a dialog or sheet footer, a filter bar, an empty state: an action that stands for the block | `Button` / `ButtonLink` at `md` or `sm` (above), the variant by its consequence |
+| INSIDE content: a table row, beside a field, a line in a card body ("Calculation", "Recalculate", "Download") | the **inline action**: the same component at `size="xs"`, usually `ghost` |
+| A small step inside a sentence or under a field ("+ alternative rate", "Show all") | `TextButton` |
+| One glyph says it all (✕ remove, ⬇ download, ✎ edit inside a dense grid) | `IconButton`, or `IconLink` for a download or a link to a file |
+
+The **inline action** (`size="xs"`) is 24px tall, 13px, tight, with an optional icon; it has no
+fill and no border at rest whatever its variant, and carries the variant's meaning in its colour
+alone (primary text, ink, red for danger, violet for admin), with a quiet fill on hover. It is
+how a row says "you can do this here" without a second row of chrome. Under the touch floor it is
+44px tall like every kit control. Never use it for a block's own commit.
+
+**A button's label never wraps** (1.8): every kit button, button link and `TextButton` is
+`whitespace-nowrap`. A two-line button is never the answer; a row of actions wraps BETWEEN its
+buttons, and only when the row has no room. The kit's own action rows follow that: `PageHeader`'s
+title block asks for 20rem and grows, so a long description wraps beside the actions instead of
+pushing them onto their own row; a `DialogFooter` note takes the room the buttons leave (at least 6rem) and wraps inside itself.
+Where a label truly cannot fit (a narrow card), shorten the label; `className="whitespace-normal"`
+is the last resort, not the default.
 
 An icon-only control is `IconButton` (1.3.0): square at `sm` / `md` / `lg`, ghost unless the
 action table asks otherwise, its required `label` is the accessible name and the tooltip. Use it
 only where the glyph is universally read (✕ remove, ⬇ download, ✎ edit inside a dense editing
-grid); a row action in a list stays a labelled button (below).
+grid); a row action in a list stays a labelled button (below). Its link twin is `IconLink`
+(1.8): a native anchor (a download keeps the browser's own handling, nothing is prefetched),
+the download glyph by default, `xs` to `lg`, shown in a read-only scope (it changes no data).
 
 A row action is a **labelled** kit button, never a bare glyph (a ✎ alone is unreadable on
 touch, where `title` never appears); when two actions in one row would both read "Edit", each
@@ -354,7 +396,10 @@ modal for one focused act: `DialogBody` for the field stack, `DialogError` for t
 (a toast), `DialogFooter` for the ghost Cancel plus the commit button whose variant follows the
 action table. A **Sheet** is the right-hand slide-over for reading and editing a record beside the
 surface that named it: `SheetBody` / `SheetError` / `SheetFooter`, the last holding the
-record-level destructive act at the END of the scroll, never pinned under a thumb. Below `sm` the
+record-level destructive act at the END of the scroll, never pinned under a thumb. A sheet that
+edits in place pins its **commit** in `footer` (1.8; a `DialogFooter` with `form=` the body's form
+id fits it), so Save is always in reach while the body scrolls; the destructive act still never
+goes there. Below `sm` the
 Dialog is a bottom sheet (full width, rounded top, the footer pinned above the safe area); from
 `sm` the centred card (since 1.0, spec §12.4 option 1).
 
@@ -397,8 +442,25 @@ into the name cell instead of scrolling sideways; wide content scrolls inside it
 never the page. Row menus (`RowMenu`) float at their button and open upward when there is no room
 below. The same menu with a labelled `trigger` (1.4.0) folds a toolbar's related actions ("AI
 tools ▾"); its `sections` group items under short headings, set off by a hairline. A menu holds
-actions only, never a filter (filters are selects in the filter bar). Empty tables use
-`EmptyState`.
+actions only, never a filter (filters are selects in the filter bar). Since 1.8 the open list is
+in the browser's top layer (a popover), so no ancestor can clip it, bury it or (with a
+`transform`, `filter` or `backdrop-filter`) move it: a frosted sticky bar may hold a menu.
+Empty tables use `EmptyState`.
+
+**Grouped tables and totals** (1.8). A table whose rows fall into groups gives each group its own
+row, `TGroupRow`: a surface band with the group's name, a muted count and, spanning the table
+(`colSpan`), its facts on the right; or, with `onToggle`, a toggle that folds the group's lines (a
+chevron and `aria-expanded`; folding is view state, so it works in a read-only scope) followed by
+cells lined up with the columns (the group's total under the amount). A total goes in the table's
+foot: `TFoot` (a strong hairline above it) with one `TTotalRow` (the label, then the amount as
+`<TD numeric>`).
+
+**A dense table of controls** (1.8) is `FoldTable`: the table described by its columns (header,
+`numeric`, width, a `headerAction` such as apply-to-all, the cell), compact cells, the first
+column sticky while the table scrolls sideways. Where it no longer fits, every row folds into a
+block of labelled cells instead of scrolling: by the viewport (`fold="md"`), or by its own width
+(`fold="container"`, below 32rem) for a table in a pane whose width the viewport does not tell
+(an editor beside a drawing). `flush` inside a card. A record list stays a plain `Table`.
 
 ## The shell: one frame for every app (1.5.0)
 
@@ -455,7 +517,10 @@ A session that may not write never sees a control it cannot use. The kit's read-
 (`ReadOnlyScope`, rendered by each app's own permission scope) is default-deny: inside it
 `Button`, `ButtonLink` and `AdminIconButton` render nothing, and `Field` controls, `DateInput` and `YearInput`
 come up disabled, unless marked `readOnlySafe` (a control that only narrows what is shown). A
-nested scope may re-open a subtree.
+nested scope may re-open a subtree. A controlled `Segmented` is view state by default (a review
+stage, a staged filter) and keeps working while reading; one whose choice is stored on the record
+says `changesData` (1.8) and comes up disabled like a field. Folding (`Disclosure`, a
+`TGroupRow` toggle) and downloading (`IconLink`) change nothing and always work.
 
 ## Responsive
 
@@ -486,13 +551,22 @@ must stay, an invisible target behind the same media query and attribute. Nothin
 floor may change: the 1440 and 375 shots stay byte-identical, the gallery's `* under the touch
 floor` stories show the floor at 375-touch and `gallery/tests/behaviour.spec.ts` measures it.
 
+Since 1.8.0: the labelled `Checkbox` and `Radio` rows are 44px tall with a 20px box; the bare
+`Checkbox` keeps its place and gets a 44 x 44 invisible target (its wrapper is a label that is
+`display: contents` on a fine pointer); `Segmented` options are 44 wide as well as tall; `Combobox`
+options 44 tall; `CopyValue` and `TagRemove` get a 44 x 44 invisible target (the line and the chip
+keep their size); the inline action (`size="xs"`) is 44 tall. The invisible target is
+`TOUCH_TARGET` in `lib/touch.ts` (a centred `::after`, never smaller than the control); inside an
+lg control the floor is 48 (`TOUCH_FLOOR_LG`).
+
 **A control that scrolls inside itself** (`Segmented`) keeps `max-w-full` and scrolls,
 but its content still counts as the minimum width of a grid item on an `auto` track: in a
 one-column grid on a phone it pushed the row, and the page, sideways. `Grid` with `cols` and
 `from` is one explicit `minmax(0, 1fr)` column below its breakpoint (`grid-cols-1`, 1.7.0); a
 hand-written grid that holds one should do the same, or give the item `min-w-0`.
 
-**Islands and stacking** (1.3.0, for an app whose legacy CSS predates the kit): kit markup may
+**Islands and stacking** (1.3.0; the island half **deprecated in 1.8.0**, no app uses it since
+PrefabOps' restyle finished, to be removed in 2.0; the stacking variables stay): kit markup may
 live inside an element of class `ops-ui-root` on a page WITHOUT the global reset;
 `styles/preflight-scoped.css`, imported in `layer(base)` above the app's legacy layer, resets what
 the legacy element rules set there, so the kit renders as everywhere else (legacy markup never

@@ -1007,3 +1007,318 @@ test.describe("phone behaviour", () => {
     }
   });
 });
+
+// ---- 1.8.0 (styling programme spec §4.8) ----------------------------------------------------
+
+test.describe("1.8.0 desktop behaviour", () => {
+  test.beforeEach(async ({ page }, info) => {
+    test.skip(info.project.name !== "1440", "desktop behaviour runs once, at 1440");
+    await page.clock.setFixedTime(FIXED_NOW);
+  });
+
+  const heightOf = (page: Page, selector: string) =>
+    page.locator(selector).evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)));
+
+  test("buttons: a label never wraps; the inline action (xs) is 24px tall; the row wraps between whole buttons", async ({ page }) => {
+    await open(page, "button--inline-actions");
+    const xs = await page.locator("[data-story] section").first().locator("button").evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)));
+    expect(xs.length).toBe(6);
+    for (const h of xs) expect(h).toBe(24);
+    for (const h of await heightOf(page, "[data-story] table button")) expect(h).toBe(24);
+    await open(page, "button--labels-never-wrap");
+    const narrow = page.locator("[data-story] .w-60");
+    const boxes = await narrow.locator("button").evaluateAll((els) =>
+      els.map((el) => ({ h: el.getBoundingClientRect().height, lineHeight: parseFloat(getComputedStyle(el).lineHeight), top: el.getBoundingClientRect().top })),
+    );
+    // Each label is one line (sm buttons are 32px; the text button one line of text) ...
+    expect(boxes[0].h).toBe(32);
+    expect(boxes[1].h).toBe(32);
+    expect(boxes[2].h).toBeLessThanOrEqual(boxes[2].lineHeight + 0.5);
+    // ... and the narrow box wraps BETWEEN them.
+    expect(boxes[1].top).toBeGreaterThan(boxes[0].top);
+    const wide = await page.locator("[data-story] section:nth-child(2) button").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
+    expect(new Set(wide).size).toBe(1);
+  });
+
+  test("IconLink: an icon-only anchor that downloads, named by its label", async ({ page }) => {
+    await open(page, "button--icon-links");
+    const link = page.getByRole("link", { name: "Download production pack" }).first();
+    await expect(link).toHaveAttribute("href", "#pack.pdf");
+    await expect(link).toHaveAttribute("download", "");
+    await expect(link).toHaveAttribute("title", "Download production pack");
+    const sizes = await page.getByRole("link", { name: "Download production pack" }).evaluateAll((els) => els.map((el) => [el.getBoundingClientRect().width, el.getBoundingClientRect().height]));
+    expect(sizes).toEqual([[24, 24], [32, 32], [36, 36], [48, 48]]);
+    await expect(page.getByRole("link", { name: "Download (read-only)" })).toBeVisible();
+  });
+
+  test("Dialog and ConfirmDialog size lg: the ✕ and the footer buttons are 48px", async ({ page }) => {
+    await open(page, "dialog--large");
+    const dialog = page.locator("dialog[open]");
+    const x = (await dialog.getByRole("button", { name: EN_STRINGS.close, exact: true }).boundingBox())!;
+    expect([x.width, x.height]).toEqual([48, 48]);
+    for (const h of await heightOf(page, "dialog[open] [data-ops-dismiss], dialog[open] [data-ops-commit]")) expect(h).toBe(48);
+    await open(page, "confirm-dialog--large");
+    const buttons = await heightOf(page, "dialog[open] button");
+    expect(buttons).toEqual([48, 48, 48]);
+  });
+
+  test("DialogFooter: a long note wraps beside the buttons, which keep its row", async ({ page }) => {
+    await open(page, "dialog--footer-with-a-long-note");
+    const note = (await page.locator("[data-story] span.mr-auto").boundingBox())!;
+    const cancel = (await page.locator("[data-story] [data-ops-dismiss]").boundingBox())!;
+    expect(cancel.x).toBeGreaterThan(note.x + note.width - 1);
+    expect(cancel.y).toBeLessThan(note.y + note.height);
+  });
+
+  test("Sheet: the footer stays pinned under the scrolling body and commits the body's form", async ({ page }) => {
+    await open(page, "sheet--pinned-footer");
+    const sheet = page.getByRole("dialog", { name: "Material cost review" });
+    const commit = sheet.getByRole("button", { name: "Apply prices" });
+    const before = (await commit.boundingBox())!;
+    expect(Math.round(before.y + before.height)).toBeGreaterThan(900 - 70);
+    await sheet.locator(".overflow-y-auto").evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    expect((await commit.boundingBox())!.y).toBe(before.y);
+    await sheet.getByLabel("Article 1", { exact: true }).fill("13.10");
+    const asked = answerConfirm(page, false);
+    await sheet.getByRole("button", { name: EN_STRINGS.close, exact: true }).click();
+    expect(await asked).toBe(EN_STRINGS.unsavedConfirm);
+    await commit.click();
+    await expect(sheet).toHaveCount(0);
+  });
+
+  test("Combobox: a pick marks the enclosing Dialog dirty, so ✕ asks before discarding", async ({ page }) => {
+    await open(page, "combobox--in-a-dialog");
+    const dialog = page.locator("dialog[open]");
+    let prompted = false;
+    const onDialog = () => (prompted = true);
+    page.on("dialog", onDialog);
+    await dialog.getByRole("button", { name: EN_STRINGS.close, exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(prompted).toBe(false);
+    page.off("dialog", onDialog);
+    await page.getByRole("button", { name: "Assign worker" }).click();
+    await dialog.getByRole("combobox").click();
+    await page.getByRole("option", { name: /Barišić/ }).click();
+    await expect(dialog.getByRole("combobox")).toHaveValue("Barišić, Josip");
+    const asked = answerConfirm(page, false);
+    await dialog.getByRole("button", { name: EN_STRINGS.close, exact: true }).click();
+    expect(await asked).toBe(EN_STRINGS.unsavedConfirm);
+    await expect(dialog).toBeVisible();
+  });
+
+  test("Segmented: changesData is disabled in a read-only scope, a view choice keeps working; lg is 48px", async ({ page }) => {
+    await open(page, "segmented--changes-data-in-a-read-only-scope");
+    const mode = page.getByRole("group", { name: "Weld book" });
+    for (const b of await mode.getByRole("button").all()) await expect(b).toBeDisabled();
+    const stage = page.getByRole("group", { name: "Review stage" });
+    await stage.getByRole("button", { name: "Materials" }).click();
+    await expect(stage.getByRole("button", { name: "Materials" })).toHaveAttribute("aria-pressed", "true");
+    await open(page, "segmented--large");
+    for (const name of ["CE format", "View"]) {
+      const box = (await page.getByRole(name === "View" ? "navigation" : "group", { name }).boundingBox())!;
+      expect(box.height).toBe(48);
+    }
+  });
+
+  test("RowMenu: inside a backdrop-filter / transform ancestor the list still opens at its button, in the top layer", async ({ page }) => {
+    await open(page, "row-menu--inside-a-frosted-bar");
+    const button = page.getByRole("button", { name: "AI tools" });
+    await button.click();
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    expect(await menu.evaluate((el) => el.matches(":popover-open"))).toBe(true);
+    const [b, m] = [(await button.boundingBox())!, (await menu.boundingBox())!];
+    // The bar sits at the bottom of the page: the menu opens upward, right above its button, on screen.
+    expect(m.y + m.height).toBeLessThanOrEqual(b.y);
+    expect(b.y - (m.y + m.height)).toBeLessThan(8);
+    expect(m.x).toBeGreaterThanOrEqual(0);
+    expect(m.x + m.width).toBeLessThanOrEqual(1440);
+    // A press outside reaches the page and closes it; Escape too.
+    await page.mouse.click(5, 5);
+    await expect(menu).toBeHidden();
+    await button.click();
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    // A pick still runs and closes.
+    await button.click();
+    await menu.getByRole("menuitem", { name: "Extract page" }).click();
+    await expect(menu).toBeHidden();
+  });
+
+  test("Table: a group row folds its lines; FoldTable folds by its container; Disclosure toggles", async ({ page }) => {
+    await open(page, "table--group-rows-and-a-total");
+    const labour = page.getByRole("button", { name: /Labour/ });
+    await expect(labour).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("cell", { name: "Welding, 118 h" })).toHaveCount(0);
+    await labour.click();
+    await expect(labour).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("cell", { name: "Welding, 118 h" })).toBeVisible();
+    await expect(page.locator("tfoot")).toContainText("Total cost");
+
+    await open(page, "fold-table--folds-by-its-container");
+    const wide = page.getByRole("table", { name: "Positions, wide pane" });
+    const narrow = page.getByRole("table", { name: "Positions, narrow pane" });
+    await expect(wide.locator("thead")).toBeVisible();
+    await expect(narrow.locator("thead")).toBeHidden();
+    // Folded rows carry the header's words as labels; the table does not show them.
+    await expect(narrow.locator("tbody tr").first().getByText("Designation", { exact: true })).toBeVisible();
+    await expect(wide.locator("tbody tr").first().getByText("Designation", { exact: true })).toBeHidden();
+
+    await open(page, "fold-table--folds-by-the-viewport");
+    await expect(page.getByRole("table", { name: "Positions", exact: true }).locator("thead")).toBeVisible();
+
+    await open(page, "disclosure--variants");
+    const fold = page.locator("details", { hasText: "Pressure test" });
+    await expect(fold).not.toHaveAttribute("open", "");
+    await fold.locator("summary").click();
+    await expect(fold).toHaveAttribute("open", "");
+  });
+});
+
+test.describe("1.8.0 touch floor", () => {
+  test.beforeEach(({}, info) => {
+    test.skip(!info.project.name.startsWith("375"), "the floor is a phone matter: 375 (off) and 375-touch (on)");
+  });
+
+  type Box = { width: number; height: number };
+  const boxes = (page: Page, selector: string) =>
+    page.locator(selector).evaluateAll((els) => els.map((el) => ({ width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height })));
+  /** The target of an element: how far from its centre a press still lands on it (or inside it). */
+  const reachOf = (page: Page, selector: string, owner?: string) =>
+    page.locator(selector).first().evaluate((el, ownerSel) => {
+      const r = el.getBoundingClientRect();
+      const target = ownerSel ? el.closest(ownerSel)! : el;
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const hits = (x: number, y: number) => {
+        const at = document.elementFromPoint(x, y);
+        return at !== null && (at === target || target.contains(at));
+      };
+      let up = 0, down = 0, left = 0, right = 0;
+      while (up < 80 && hits(cx, cy - up - 1)) up++;
+      while (down < 80 && hits(cx, cy + down + 1)) down++;
+      while (left < 80 && hits(cx - left - 1, cy)) left++;
+      while (right < 80 && hits(cx + right + 1, cy)) right++;
+      return { width: left + right + 1, height: up + down + 1, box: { width: r.width, height: r.height } };
+    }, owner);
+  const atLeast = (size: Box, min: number) => {
+    expect(size.width).toBeGreaterThanOrEqual(min);
+    expect(size.height).toBeGreaterThanOrEqual(min);
+  };
+
+  test("the bare Checkbox: a 44 x 44 target around its box (a tap beside it toggles); the labelled one's row 44, its box 20", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "field--checkboxes-under-the-touch-floor");
+    const bare = page.getByRole("checkbox", { name: "Select line b" });
+    const reach = await reachOf(page, '[aria-label="Select line b"]', "label");
+    if (touch) {
+      atLeast(reach, 44);
+      expect(reach.box).toEqual({ width: 20, height: 20 });
+      const box = (await bare.boundingBox())!;
+      await page.touchscreen.tap(box.x + box.width / 2 - 18, box.y + box.height / 2);
+      await expect(bare).toBeChecked();
+    } else {
+      expect(reach.box).toEqual({ width: 16, height: 16 });
+      expect(reach.width).toBeLessThanOrEqual(17);
+    }
+    const labelled = page.getByRole("checkbox", { name: "Show password" });
+    const row = (await page.locator("label:has(#story-show-password)").boundingBox())!;
+    const mark = (await labelled.boundingBox())!;
+    if (touch) {
+      expect(row.height).toBeGreaterThanOrEqual(44);
+      expect([mark.width, mark.height]).toEqual([20, 20]);
+    } else {
+      expect(row.height).toBe(20);
+      expect([mark.width, mark.height]).toEqual([16, 16]);
+    }
+  });
+
+  test("Segmented: a one-character option is 44 x 44", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "segmented--under-the-touch-floor");
+    for (const size of await boxes(page, '[data-story] [role=group] button')) {
+      if (touch) atLeast(size, 44);
+      else expect(size.width).toBeLessThan(30);
+    }
+  });
+
+  test("Combobox: every option is 44px tall", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "combobox--open-list-under-the-touch-floor");
+    const input = page.locator("[data-story] input[role=combobox]");
+    if (touch) await input.tap();
+    else await input.click();
+    const sizes = await boxes(page, "[role=option]");
+    expect(sizes.length).toBeGreaterThan(3);
+    const smallest = Math.min(...sizes.map((s) => s.height));
+    if (touch) expect(smallest).toBeGreaterThanOrEqual(44);
+    else expect(smallest).toBe(36);
+  });
+
+  test("CopyValue and TagRemove: a 44 x 44 target, the line and the chip keep their size", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "copy-value--under-the-touch-floor");
+    const copy = await reachOf(page, "[data-story] button");
+    await open(page, "tag-remove--under-the-touch-floor");
+    const remove = await reachOf(page, "[data-story] button");
+    const chip = (await page.locator("[data-story] span:has(> button)").boundingBox())!;
+    if (touch) {
+      atLeast(copy, 44);
+      atLeast(remove, 44);
+    } else {
+      expect(copy.height).toBeLessThan(30);
+      expect(remove.height).toBeLessThan(30);
+    }
+    // The chip is as tall with the floor as without it (28px: the 1.6 Tag with its ✕).
+    expect(Math.round(chip.height)).toBe(28);
+  });
+
+  test("the inline action (xs) is 44px tall under the floor, 24px elsewhere", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "button--inline-actions");
+    for (const size of await boxes(page, "[data-story] [data-ops-touch] button, [data-story] [data-ops-touch] a")) {
+      if (touch) atLeast(size, 44);
+      else expect(size.height).toBe(24);
+    }
+  });
+
+  test("lg under the floor: the DateInput / YearInput button is 48 x 48 and the text keeps 56px clear", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    for (const [id, name] of [
+      ["date-input--large-under-the-touch-floor", EN_STRINGS.datePicker.openCalendar],
+      ["year-input--large-under-the-touch-floor", EN_OPTIONAL_STRINGS.yearPicker.openPicker],
+    ] as const) {
+      await open(page, id);
+      const button = (await page.locator(`[data-story] button[aria-label="${name}"]`).boundingBox())!;
+      const padding = await page.locator("[data-story] input[role=combobox]").evaluate((el) => parseFloat(getComputedStyle(el).paddingRight));
+      if (touch) {
+        expect([button.width, button.height]).toEqual([48, 48]);
+        expect(padding).toBe(56);
+      } else {
+        expect([button.width, button.height]).toEqual([28, 28]);
+        expect(padding).toBe(36);
+      }
+    }
+  });
+
+  test("lg at every width: FileInput and Segmented are 48px tall", async ({ page }) => {
+    await open(page, "field--large-file-input");
+    expect((await page.locator("#story-lg-file").boundingBox())!.height).toBe(48);
+    await open(page, "segmented--large");
+    expect((await page.getByRole("group", { name: "CE format" }).boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  });
+
+  test("AppSwitcher entries are 44px tall on a coarse pointer (no floor needed)", async ({ page }, info) => {
+    const touch = info.project.name === "375-touch";
+    await open(page, "app-switcher--open");
+    const trigger = page.locator('[data-story] button[aria-haspopup="menu"]');
+    if (touch) await trigger.tap();
+    else await trigger.click();
+    const items = await boxes(page, "[role=menuitem]");
+    expect(items.length).toBeGreaterThan(1);
+    const smallest = Math.min(...items.map((s) => s.height));
+    if (touch) expect(smallest).toBeGreaterThanOrEqual(44);
+    else expect(smallest).toBe(32);
+  });
+});

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ActionIcon } from "../components/action-icon";
 import { Grid } from "../components/grid";
 import { Segmented } from "../components/segmented";
+import { ReadOnlyScope } from "../config/read-only";
 import { Stack as KitStack } from "../components/stack";
 import type { Story } from "./index";
 import { Row, Stack } from "./story-layout";
@@ -96,4 +97,96 @@ export const stories: Story[] = [
     ),
   },
   { name: "In a form grid", render: () => <InAFormGrid /> },
+  { name: "Large", render: () => <LargeSegmented /> },
+  { name: "Under the touch floor", render: () => <UnderTheFloor /> },
+  { name: "Changes data in a read-only scope", render: () => <InAReadOnlyScope /> },
 ];
+
+/** 1.8.0: size="lg", 48px tall with 16px text (an lg surface). */
+function LargeSegmented() {
+  const [format, setFormat] = useState<"a4" | "a5" | "label">("a4");
+  return (
+    <Stack>
+      <Row label="controlled, lg">
+        <Segmented
+          label="CE format"
+          size="lg"
+          value={format}
+          onValueChange={setFormat}
+          options={[
+            { value: "a4", label: "A4" },
+            { value: "a5", label: "A5" },
+            { value: "label", label: "Label" },
+          ]}
+        />
+      </Row>
+      <Row label="links, lg">
+        <Segmented
+          label="View"
+          size="lg"
+          value="list"
+          options={[
+            { value: "list", label: "List", href: "#list" },
+            { value: "board", label: "Board", href: "#board" },
+          ]}
+        />
+      </Row>
+    </Stack>
+  );
+}
+
+/** 1.8.0: under [data-ops-touch] on a phone a one-character option is 44 x 44. */
+function UnderTheFloor() {
+  const [grade, setGrade] = useState<"1" | "2" | "3">("2");
+  return (
+    <div data-ops-touch="">
+      <Row label="one-character options">
+        <Segmented
+          label="PED group"
+          value={grade}
+          onValueChange={setGrade}
+          options={[
+            { value: "1", label: "1" },
+            { value: "2", label: "2" },
+            { value: "3", label: "3" },
+          ]}
+        />
+      </Row>
+    </div>
+  );
+}
+
+/** 1.8.0: a choice stored on the record says changesData: a read-only scope disables it. */
+function InAReadOnlyScope() {
+  const [mode, setMode] = useState<"generated" | "upload">("generated");
+  const [stage, setStage] = useState<"info" | "materials">("info");
+  return (
+    <ReadOnlyScope readOnly>
+      <Stack>
+        <Row label="changesData: disabled while reading">
+          <Segmented
+            label="Weld book"
+            changesData
+            value={mode}
+            onValueChange={setMode}
+            options={[
+              { value: "generated", label: "Generated" },
+              { value: "upload", label: "Uploaded" },
+            ]}
+          />
+        </Row>
+        <Row label="a view choice: still works">
+          <Segmented
+            label="Review stage"
+            value={stage}
+            onValueChange={setStage}
+            options={[
+              { value: "info", label: "Drawing info" },
+              { value: "materials", label: "Materials" },
+            ]}
+          />
+        </Row>
+      </Stack>
+    </ReadOnlyScope>
+  );
+}

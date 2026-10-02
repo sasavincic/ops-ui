@@ -29,6 +29,9 @@ import { TOUCH_FLOOR } from "../lib/touch";
  * closing are the same for all three shapes; a menu with no room left of
  * its button's right edge lines up with the button's left edge instead.
  * Without either prop the menu renders exactly the 1.3 markup.
+ *
+ * 1.8.0: the open list is a manual popover in the top layer (see the layout effect): it escapes
+ * every containing block and stacking context an ancestor can create.
  */
 export type RowMenuItem = {
   key: string;
@@ -91,6 +94,16 @@ export function RowMenu({
   // moment a tap nudged the page on a phone).
   useLayoutEffect(() => {
     if (!open) return;
+    // 1.8.0: the list lives in the TOP LAYER (a manual popover), so no ancestor can capture it:
+    // a `transform`, `filter` or `backdrop-filter` ancestor becomes the containing block of a
+    // position: fixed element and threw the list off screen (PrefabOps' sticky action bar, P4.6b),
+    // and a parent's overflow or z-index cannot clip or bury it. Inside a modal Dialog it opens
+    // above the dialog (both are top layer; the later one is on top). Where popovers are not
+    // supported it stays the 1.7 fixed list.
+    const list = menuRef.current;
+    if (list && typeof list.showPopover === "function" && !list.matches(":popover-open")) {
+      list.showPopover();
+    }
     const place = () => {
       const button = wrapRef.current?.querySelector("button");
       const menu = menuRef.current;
@@ -213,8 +226,12 @@ export function RowMenu({
         <ul
           ref={menuRef}
           role="menu"
+          popover="manual"
           style={place ? (place.left === undefined ? { top: place.top, right: place.right } : { top: place.top, left: place.left }) : { visibility: "hidden" }}
-          className="fixed z-[var(--ops-z-menu,40)] w-52 max-w-[calc(100vw-2rem)] rounded-control border border-border bg-bg py-1 shadow-lg"
+          // inset-auto + m-0: the popover UA sheet centres a popover (inset: 0, margin: auto); the
+          // inline top / right (or left) place it at the button as before. Its ::backdrop takes no
+          // pointer, so a press outside still reaches the page (and closes the menu).
+          className="fixed inset-auto z-[var(--ops-z-menu,40)] m-0 w-52 max-w-[calc(100vw-2rem)] overflow-visible rounded-control border border-border bg-bg py-1 text-ink shadow-lg backdrop:pointer-events-none"
         >
           {items.map(renderItem)}
           {groups.map((section, index) => {

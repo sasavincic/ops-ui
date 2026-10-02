@@ -39,4 +39,18 @@ export const stories: Story[] = [
       </Stack>
     ),
   },
+  // 1.8.0: under [data-ops-touch] on a phone the ✕ has a 44 x 44 target; the chip keeps its size.
+  {
+    name: "Under the touch floor",
+    render: () => (
+      <div data-ops-touch="">
+        <Row label="chips with a remove">
+          <Tag className="pr-1">
+            Kraftwerk Bau GmbH
+            <TagRemove label="Remove Kraftwerk Bau GmbH" />
+          </Tag>
+        </Row>
+      </div>
+    ),
+  },
 ];

@@ -15,7 +15,11 @@ export function Tag({
   children,
 }: {
   icon?: React.ReactNode;
-  tone?: "neutral" | "admin";
+  /**
+   * 1.8.0: "warning" — a fact that needs a second look ("weight differs"), amber like a Field's
+   * warning; still a fact, never a status (no pill).
+   */
+  tone?: "neutral" | "admin" | "warning";
   className?: string;
   /** The full text when the chip truncates it. */
   title?: string;
@@ -26,7 +30,11 @@ export function Tag({
       title={title}
       className={cn(
         "inline-flex items-center gap-1.5 whitespace-nowrap rounded-control px-2 py-1 text-detail",
-        tone === "admin" ? "border border-admin/30 bg-admin-subtle text-admin" : "bg-surface text-ink",
+        tone === "admin"
+          ? "border border-admin/30 bg-admin-subtle text-admin"
+          : tone === "warning"
+            ? "border border-warning/30 bg-warning-subtle text-warning"
+            : "bg-surface text-ink",
         className
       )}
     >

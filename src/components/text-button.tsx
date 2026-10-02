@@ -33,7 +33,8 @@ export function TextButton({
   if (hidden) return null;
   return (
     <button
-      className={cn(TEXT_LINK_VARIANT[variant], size && TEXT_SIZE[size], tone && TEXT_TONE[tone], className)}
+      // 1.8.0: the label never wraps (as every kit button's); className may say otherwise.
+      className={cn(TEXT_LINK_VARIANT[variant], "whitespace-nowrap", size && TEXT_SIZE[size], tone && TEXT_TONE[tone], className)}
       {...props}
     />
   );

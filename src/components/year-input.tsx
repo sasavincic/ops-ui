@@ -5,7 +5,7 @@ import { useReadOnlyScope } from "../config/read-only";
 import { useOpsUi } from "../config/provider";
 import { EN_OPTIONAL_STRINGS } from "../config/strings";
 import { controlClasses } from "./field";
-import { CONTROL_SIZE_CLASS, TOUCH_FLOOR, type ControlSize } from "../lib/touch";
+import { CONTROL_SIZE_CLASS, TOUCH_FLOOR, TOUCH_FLOOR_LG, type ControlSize } from "../lib/touch";
 import { localTodayIso } from "../lib/date-input";
 import {
   anchorYear,
@@ -55,6 +55,12 @@ const thisYear = () => Number(localTodayIso().slice(0, 4));
  * so the text keeps 48px clear of it instead of 36px. Nothing changes without the floor.
  */
 const ROOM_FOR_TOUCH_BUTTON = "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:pr-12";
+
+/**
+ * 1.8.0: at size="lg" the floor is the lg surface's 48px: the field button is at least 48 x 48
+ * (TOUCH_FLOOR_LG) and the text keeps 56px clear of it.
+ */
+const ROOM_FOR_LG_TOUCH_BUTTON = "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:pr-14";
 
 export function YearInput({
   id,
@@ -316,7 +322,7 @@ export function YearInput({
         required={required}
         disabled={off}
         value={text}
-        className={cn(controlClasses, CONTROL_SIZE_CLASS[size], "pr-9 tabular-nums", TOUCH_FLOOR.height, TOUCH_FLOOR.text, ROOM_FOR_TOUCH_BUTTON)}
+        className={cn(controlClasses, CONTROL_SIZE_CLASS[size], "pr-9 tabular-nums", TOUCH_FLOOR.height, TOUCH_FLOOR.text, ROOM_FOR_TOUCH_BUTTON, size === "lg" && ROOM_FOR_LG_TOUCH_BUTTON)}
         onClick={() => {
           if (!open) openPicker(false);
         }}
@@ -363,7 +369,7 @@ export function YearInput({
           aria-label={yp.openPicker}
           title={yp.openPicker}
           onClick={() => (open ? close(true) : openPicker(true))}
-          className={cn("absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-control text-ink-muted hover:bg-surface-raised hover:text-ink", TOUCH_FLOOR.height, TOUCH_FLOOR.width)}
+          className={cn("absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-control text-ink-muted hover:bg-surface-raised hover:text-ink", TOUCH_FLOOR.height, TOUCH_FLOOR.width, size === "lg" && [TOUCH_FLOOR_LG.height, TOUCH_FLOOR_LG.width])}
         >
           <svg aria-hidden="true" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
             strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

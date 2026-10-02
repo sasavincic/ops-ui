@@ -22,6 +22,7 @@ export function Dialog({
   footer,
   className,
   confirmDiscard = true,
+  size = "md",
 }: {
   open: boolean;
   onClose: () => void;
@@ -32,6 +33,11 @@ export function Dialog({
   className?: string;
   /** Filter drafts can be discarded without a record-edit confirmation. */
   confirmDiscard?: boolean;
+  /**
+   * 1.8.0: "lg" on an lg surface (the workshop portal): the ✕ is 48 x 48 at every width, like the
+   * lg buttons beside it (give DialogFooter / ConfirmDialog `size="lg"` too). Default "md".
+   */
+  size?: "md" | "lg";
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const dirty = useRef(false);
@@ -126,7 +132,13 @@ export function Dialog({
           type="button"
           aria-label={strings.close}
           // 1.7.0: 44 x 44 under the touch floor (34 x 32 otherwise, unchanged).
-          className={cn("rounded-control p-2.5 text-sm leading-none text-ink-muted transition-colors duration-150 hover:bg-surface hover:text-ink", TOUCH_FLOOR.height, TOUCH_FLOOR.width)}
+          className={cn(
+            "rounded-control p-2.5 text-sm leading-none text-ink-muted transition-colors duration-150 hover:bg-surface hover:text-ink",
+            TOUCH_FLOOR.height,
+            TOUCH_FLOOR.width,
+            // 1.8.0: the lg surface's 48 x 48 at every width.
+            size === "lg" && "inline-flex size-12 items-center justify-center p-0 text-base"
+          )}
           onClick={closeFromX}
         >
           ✕
@@ -188,6 +200,7 @@ export function DialogFooter({
   disabled = false,
   pendingLabel,
   form,
+  size = "md",
   /** Rendered left of the buttons — a hint, or why submit is unavailable. */
   note,
   /** Extra control on the left, e.g. an InlineConfirm delete. */
@@ -212,6 +225,8 @@ export function DialogFooter({
   pendingLabel?: string;
   /** Associates a pinned submit button with the form in the dialog body. */
   form?: string;
+  /** 1.8.0: "lg" = both buttons 48px with 16px text (an lg surface). Default "md". */
+  size?: "md" | "lg";
   note?: React.ReactNode;
   children?: React.ReactNode;
 }) {
@@ -220,7 +235,9 @@ export function DialogFooter({
     <div className="flex flex-wrap items-center justify-end gap-2">
       {children}
       {note && (
-        <span className="mr-auto text-detail text-ink-muted">{note}</span>
+        // 1.8.0: the note takes the room the buttons leave (at least 6rem) and wraps inside
+        // itself, instead of pushing the buttons onto a second row by its one-line width.
+        <span className="mr-auto min-w-24 grow basis-0 text-detail text-ink-muted">{note}</span>
       )}
       {/* data-ops-dismiss / data-ops-commit (1.1, attributes only): the
           markers the 2.0 discard guard will match instead of the "Cancel"
@@ -230,6 +247,7 @@ export function DialogFooter({
         icon={closeLabel ? "back" : "close"}
         type="button"
         variant="ghost"
+        size={size}
         onClick={onClose}
         data-ops-dismiss={closeLabel ? undefined : ""}
       >
@@ -239,6 +257,7 @@ export function DialogFooter({
         type={onSubmit ? "button" : "submit"}
         form={form}
         variant={variant}
+        size={size}
         icon={submitIcon}
         disabled={pending || disabled}
         onClick={onSubmit}

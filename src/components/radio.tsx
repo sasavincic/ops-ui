@@ -3,6 +3,7 @@
 import { createContext, useContext } from "react";
 import { useReadOnlyScope } from "../config/read-only";
 import { cn } from "../lib/cn";
+import { TOUCH_FLOOR } from "../lib/touch";
 import { GAP_CLASS, type Gap } from "../lib/gap";
 
 /**
@@ -106,13 +107,15 @@ export function Radio({
     <label
       className={cn(
         "flex items-center gap-2 text-sm text-ink",
+        // 1.8.0: as the labelled Checkbox, under the touch floor the row is 44px tall and the mark 20px.
+        TOUCH_FLOOR.height,
         disabled && "cursor-not-allowed text-ink-muted",
         className
       )}
     >
       <input
         type="radio"
-        className="size-4 accent-primary"
+        className={cn("size-4 accent-primary", "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:size-5")}
         {...props}
         {...group}
         disabled={disabled}

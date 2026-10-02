@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { AdminIconButton, Button, ButtonLink, ExternalButtonLink, FileLink, IconButton } from "../components/button";
+import { AdminIconButton, Button, ButtonLink, ExternalButtonLink, FileLink, IconButton, IconLink } from "../components/button";
 import { Combobox } from "../components/combobox";
 import { DateInput } from "../components/date-input";
 import { Input, Select } from "../components/field";
 import { RowMenu } from "../components/row-menu";
+import { Table, TBody, TD, TH, THead, TR } from "../components/table";
 import { Segmented } from "../components/segmented";
+import { TextButton } from "../components/text-button";
 import { ReadOnlyScope } from "../config/read-only";
 import type { Story } from "./index";
 import { Row, Stack } from "./story-layout";
@@ -124,6 +126,9 @@ export const stories: Story[] = [
     ),
   },
   { name: "Touch floor", render: () => <TouchFloor /> },
+  { name: "Inline actions", render: () => <InlineActions /> },
+  { name: "Labels never wrap", render: () => <LabelsNeverWrap /> },
+  { name: "Icon links", render: () => <IconLinks /> },
 ];
 
 /** Every control the floor covers, once as it is and once under [data-ops-touch]. */
@@ -186,6 +191,106 @@ function TouchFloor() {
           <TouchControls id="floor-on" />
         </Row>
       </div>
+    </Stack>
+  );
+}
+
+/**
+ * 1.8.0: the inline action (size="xs"): an action that sits INSIDE content — a table row, beside a
+ * field, in a card body. 24px, 13px, no fill and no border at rest whatever the variant; the
+ * variant's meaning rides the colour. Under [data-ops-touch] on a phone it is 44px tall.
+ */
+function InlineActions() {
+  return (
+    <Stack className="gap-4">
+      <Row label="variants at xs">
+        {VARIANTS.map((variant) => (
+          <Button key={variant} variant={variant} size="xs" icon={ICON[variant]}>
+            {variant}
+          </Button>
+        ))}
+      </Row>
+      <Row label="icon-only, link, file, external, disabled">
+        <IconButton size="xs" icon="edit" label="Edit" />
+        <IconButton size="xs" icon="delete" label="Remove" variant="ghostDanger" />
+        <IconLink size="xs" href="#download" label="Download material list" download />
+        <ButtonLink href="#calc" size="xs" variant="ghost" icon="view">Calculation</ButtonLink>
+        <FileLink href="#file" size="xs">Certificate</FileLink>
+        <ExternalButtonLink href="mailto:office@example.com" size="xs" variant="ghost" icon="mail">E-mail</ExternalButtonLink>
+        <Button size="xs" variant="secondary" icon="refresh" disabled>Recalculate</Button>
+      </Row>
+      <Table containerClassName="max-w-2xl">
+        <THead>
+          <TR>
+            <TH>Material</TH>
+            <TH alignRight>Weight</TH>
+            <TH className="w-px"><span className="sr-only">Actions</span></TH>
+          </TR>
+        </THead>
+        <TBody>
+          {["P265GH 168.3 x 7.1", "P235GH 60.3 x 3.6"].map((name) => (
+            <TR key={name}>
+              <TD>{name}</TD>
+              <TD numeric>42.6 kg</TD>
+              <TD className="w-px">
+                <span className="flex justify-end gap-1">
+                  <Button size="xs" variant="ghost" icon="view">Calculation</Button>
+                  <Button size="xs" variant="secondary" icon="refresh">Recalculate</Button>
+                </span>
+              </TD>
+            </TR>
+          ))}
+        </TBody>
+      </Table>
+      <div data-ops-touch="">
+        <Row label="inside data-ops-touch">
+          <Button size="xs" variant="ghost" icon="view">Calculation</Button>
+          <IconButton size="xs" icon="edit" label="Edit (touch)" />
+          <IconLink size="xs" href="#download" label="Download (touch)" />
+        </Row>
+      </div>
+    </Stack>
+  );
+}
+
+/** 1.8.0: a label never wraps; a row wraps between whole buttons, and only when it must. */
+function LabelsNeverWrap() {
+  return (
+    <Stack className="gap-4">
+      <Row label="a narrow box: the row wraps between buttons, every label on one line" className="block">
+        <div className="w-60 rounded-container border border-border p-3">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" icon="refresh">Regenerate pack</Button>
+            <Button variant="ghost" size="sm" icon="download">Download material list</Button>
+            <TextButton type="button" variant="quiet" size="detail">Use another method</TextButton>
+          </div>
+        </div>
+      </Row>
+      <Row label="a row with room: one row">
+        <Button variant="ghost">Cancel</Button>
+        <Button variant="secondary" icon="save">Save draft</Button>
+        <Button icon="check">Finalize offer</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** 1.8.0: IconLink, the icon-only download link, at every size. */
+function IconLinks() {
+  return (
+    <Stack className="gap-4">
+      {(["xs", "sm", "md", "lg"] as const).map((size) => (
+        <Row key={size} label={`size ${size}`}>
+          <IconLink size={size} href="#pack.pdf" label="Download production pack" download />
+          <IconLink size={size} href="#pack.pdf" label="Download (secondary)" variant="secondary" />
+          <IconLink size={size} href="#drawing.pdf" label="Open drawing" icon="view" target="_blank" rel="noopener noreferrer" />
+        </Row>
+      ))}
+      <ReadOnlyScope readOnly>
+        <Row label="read-only scope: still shown (changes no data)">
+          <IconLink href="#pack.pdf" label="Download (read-only)" />
+        </Row>
+      </ReadOnlyScope>
     </Stack>
   );
 }

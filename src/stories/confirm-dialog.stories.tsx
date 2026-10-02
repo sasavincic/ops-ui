@@ -86,4 +86,26 @@ export const stories: Story[] = [
       </Stack>
     ),
   },
+  { name: "Large", render: () => <LargeDemo /> },
 ];
+
+/** 1.8.0: on an lg surface the ✕ and both buttons are 48px. */
+function LargeDemo() {
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      <Button size="lg" variant="ghostDanger" icon="delete" onClick={() => setOpen(true)}>
+        Remove file
+      </Button>
+      <ConfirmDialog
+        size="lg"
+        open={open}
+        onClose={() => setOpen(false)}
+        onConfirm={() => setOpen(false)}
+        title="Remove file"
+        body="Remove the weld book scan from project 26-118?"
+        confirmLabel="Remove"
+      />
+    </>
+  );
+}

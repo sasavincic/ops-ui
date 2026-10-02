@@ -29,7 +29,10 @@ export function PageHeader({
     // three sibling lists had three header layouts). From sm the row sits
     // beside the title and wraps only when it must.
     <header className={cn("flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4", className)}>
-      <div className="min-w-0">
+      {/* 1.8.0: from sm the title block asks for 20rem and grows into the rest, so a long
+          description wraps beside the actions instead of pushing them onto a row of their own
+          (the row wrapped by the description's full one-line width). */}
+      <div className="min-w-0 sm:grow sm:basis-80">
         {backHref && (
           // Contextual: returns to where the user came from when the
           // session trail knows it; the given href/label are the fallback.

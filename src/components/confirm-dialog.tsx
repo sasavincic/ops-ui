@@ -71,6 +71,7 @@ export function ConfirmDialog({
   error = null,
   onConfirm,
   children,
+  size = "md",
 }: {
   open: boolean;
   onClose: () => void;
@@ -84,9 +85,11 @@ export function ConfirmDialog({
   onConfirm: () => void;
   /** Extra fields — a date input, a checkbox — above the buttons. */
   children?: React.ReactNode;
+  /** 1.8.0: "lg" on an lg surface: the ✕ and both buttons are 48px (16px text). Default "md". */
+  size?: "md" | "lg";
 }) {
   return (
-    <Dialog open={open} onClose={onClose} title={title}>
+    <Dialog open={open} onClose={onClose} title={title} size={size}>
       <DialogBody>
         {body && <p className="text-sm text-ink-secondary">{body}</p>}
         {children}
@@ -98,6 +101,7 @@ export function ConfirmDialog({
           submitIcon={variant === "danger" ? "delete" : "check"}
           variant={variant}
           pending={pending}
+          size={size}
         />
       </DialogBody>
     </Dialog>

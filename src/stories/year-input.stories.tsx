@@ -67,4 +67,17 @@ export const stories: Story[] = [
     ),
     open: OPEN,
   },
+  // 1.8.0: at size="lg" the floor is 48px.
+  { name: "Large under the touch floor", render: () => <LargeUnderTheFloor /> },
 ];
+
+/** 1.8.0: an lg field under [data-ops-touch] on a phone: the picker button reaches 48 x 48. */
+function LargeUnderTheFloor() {
+  return (
+    <div data-ops-touch="" className="max-w-xs">
+      <Field label="Year of manufacture" htmlFor="story-lg-year">
+        <Controlled id="story-lg-year" initial="2026" size="lg" />
+      </Field>
+    </div>
+  );
+}

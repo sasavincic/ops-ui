@@ -17,7 +17,7 @@ const ALL = STORY_GROUPS.flatMap((group) => group.stories.map((story) => ({ grou
 
 describe("stories", () => {
   it("one group per component file, in file order, then the shell's frame, each with at least one story", () => {
-    expect(COMPONENTS).toHaveLength(48); // 1.6.0: grid, radio, split-layout, tag-remove, text-button
+    expect(COMPONENTS).toHaveLength(50); // 1.6.0: grid, radio, split-layout, tag-remove, text-button; 1.8.0: disclosure, fold-table
     // 1.5.0: src/shell/ has one story group, app-frame, covering the frame and its parts.
     expect(STORY_GROUPS.map((g) => g.component)).toEqual([...COMPONENTS, "app-frame"]);
     for (const group of STORY_GROUPS) expect(group.stories.length, group.component).toBeGreaterThan(0);

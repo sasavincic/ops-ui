@@ -27,6 +27,10 @@ const LEGACY_CSS = `@layer base { @layer ops-legacy-fixture {
  * the kit renders as everywhere else; outside it the legacy markup keeps its look. The gallery
  * turns its own global reset off for this story (`<html data-ops-preflight="scoped">`,
  * gallery/app/preflight-global.css); an app that has the global reset ignores the attribute.
+ *
+ * DEPRECATED in 1.8.0 with styles/preflight-scoped.css: no app hosts an island since PrefabOps'
+ * restyle finished (styling programme spec §12). The story keeps the file proven until 2.0
+ * removes both.
  */
 function IslandOnALegacyPage() {
   useLayoutEffect(() => {

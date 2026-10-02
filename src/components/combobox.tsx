@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Input } from "./field";
 import { cn } from "../lib/cn";
 import { Monogram } from "./monogram";
@@ -39,6 +39,12 @@ export type ComboboxOption = {
    */
   keywords?: string;
 };
+
+/**
+ * 1.8.0: under the touch floor an option is at least 44px tall (py-3 around one 20px line; it was
+ * 36), so a finger picks the row it meant. Nothing changes on a fine pointer.
+ */
+const OPTION_FLOOR = "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:py-3";
 
 const LINE_TONE = {
   muted: "text-ink-muted",
@@ -97,6 +103,7 @@ export function Combobox({
   size?: ControlSize;
 }) {
   const { strings } = useOpsUi();
+  const rootRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -109,6 +116,11 @@ export function Combobox({
     : options;
 
   function pick(next: string) {
+    // 1.8.0: a pick is an edit. The Dialog's (and Sheet's) discard guard listens for input /
+    // change events, and a pick by pointer or Enter fires neither, so a dialog whose only change
+    // was a pick closed without asking. Announce it as an input event (React's onInput; the value
+    // tracker sees no typed change, so no onChange fires anywhere).
+    if (next !== value) rootRef.current?.dispatchEvent(new Event("input", { bubbles: true }));
     onChange(next);
     setQuery("");
     setOpen(false);
@@ -143,7 +155,7 @@ export function Combobox({
     open && steering ? pickable[Math.min(active, pickable.length - 1)]?.value : undefined;
 
   return (
-    <div className="relative">
+    <div ref={rootRef} className="relative">
       <Input
         id={id}
         size={size}
@@ -182,7 +194,7 @@ export function Combobox({
             <li
               role="option"
               aria-selected={value === ""}
-              className="cursor-pointer px-3 py-2 text-sm text-ink-secondary hover:bg-surface-raised"
+              className={cn("cursor-pointer px-3 py-2 text-sm text-ink-secondary hover:bg-surface-raised", OPTION_FLOOR)}
               onMouseDown={(e) => {
                 e.preventDefault();
                 pick("");
@@ -220,13 +232,14 @@ export function Combobox({
                   aria-selected={o.value === value}
                   aria-disabled={o.disabled || undefined}
                   ref={o.value === activeValue ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined}
-                  className={
+                  className={cn(
                     o.disabled
                       ? "block px-3 py-2 text-sm text-ink opacity-50"
                       : o.value === activeValue
                         ? "block cursor-pointer bg-surface-raised px-3 py-2 text-sm text-ink"
-                        : "block cursor-pointer px-3 py-2 text-sm text-ink hover:bg-surface-raised"
-                  }
+                        : "block cursor-pointer px-3 py-2 text-sm text-ink hover:bg-surface-raised",
+                    OPTION_FLOOR
+                  )}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     if (o.disabled) return;

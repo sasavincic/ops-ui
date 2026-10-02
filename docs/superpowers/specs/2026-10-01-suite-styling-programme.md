@@ -634,6 +634,58 @@ the rule in DESIGN.md ("whatever a finger can press carries `TOUCH_FLOOR` or an 
 applies to them when they are measured; `Text` without `size` inheriting an island's 16px (plan
 §10.2, P4.3) is an island matter, not a floor one.
 
+### 4.8 Library 1.8.0 as specified
+
+**Status: SPECIFIED 2026-10-02** (measured, then built as 1.8.0). The subject is the kit gaps the
+three apps reported: PrefabOps restyle plan §10.2 (P4.3 to P5) and §12 "Open for the library", and
+Saša's complaint about inline buttons: "inline buttons like the calculation for material etc. should
+be more minimal, maybe a different button style, and they should never wrap, making more rows if
+not necessary." A minor: every addition is optional, and an unchanged call site renders what 1.7
+rendered except the visible changes named below (each declared under `Visible:` in the CHANGELOG
+and rebaselined in its own `shots: rebaseline` commit).
+
+**How it was measured.** In the gallery (1440, 375, 375-touch), as §4.7: bounding boxes, and a
+target's reach by `elementFromPoint` from its centre outwards; before = 375 (a fine pointer, or
+1.7 at 375-touch where the control had no floor), after = 375-touch inside `data-ops-touch`.
+Scratch: `/tmp/claude-0/s18/` (`zz-measure.spec.ts`, not shipped).
+
+| # | Gap | 1.8.0 API | Before → after |
+|---|---|---|---|
+| 1 | Buttons wrap their label; no minimal inline form | every `Button` / `ButtonLink` / `ExternalButtonLink` / `FileLink` / `IconButton` / `TextButton` label `whitespace-nowrap`; **the inline action** = `size="xs"` on `Button`, `ButtonLink`, `ExternalButtonLink`, `FileLink`, `IconButton` (+ `IconLink`): `h-6 gap-1 px-1.5 text-detail`, compound variants take every fill and border away (`primary` → primary text, `secondary` → ink, `danger` → red, `admin` → violet, each with a quiet hover fill), `TOUCH_FLOOR` as every button; `ButtonSize` type. DESIGN.md → "Which button". Action rows: `PageHeader`'s title block `sm:grow sm:basis-80`, `DialogFooter`'s note `min-w-24 grow basis-0` | xs 24px tall; under the floor 44 |
+| 2 | Touch floor: the bare `Checkbox`, `Segmented`'s width | bare `Checkbox`: its input wrapped in a `<label data-ops-checkbox>` that is `display: contents` on a fine pointer and, under the floor, `inline-flex` with `TOUCH_TARGET` (a centred `::after`, at least 44 x 44, never smaller than the control); the box `size-5` under the floor. Labelled `Checkbox` / `Radio`: row `TOUCH_FLOOR.height`, box `size-5` under the floor. `Segmented` options `TOUCH_FLOOR.width` + `justify-center` | see the measurements below |
+| 3 | lg sizes | `Segmented size="lg"` (`min-h-12 items-stretch`, options `px-4 text-base`), `FileInput size="lg"` (`min-h-12 lg:text-base file:px-4 file:py-1.5 file:text-sm`; a number stays the HTML attribute), `Dialog size="lg"` (✕ `size-12` at every width), `DialogFooter size="lg"`, `ConfirmDialog size="lg"`, `DateInput` / `YearInput` at `size="lg"`: the field button `TOUCH_FLOOR_LG` (48 x 48) and the field `pr-14` under the floor | 48 |
+| 4 | `Sheet` has no pinned footer | `Sheet footer` (a slot under the scroller, safe-area padded; the body drops its phone `pb-24`); the record-level destructive act stays `SheetFooter`, at the end of the body | — |
+| 5 | `Tag` has no warning tone | `tone="warning"`: `border border-warning/30 bg-warning-subtle text-warning` | — |
+| 6 | `Text` cannot be a heading | `TextTag` gains `h1`-`h6` | — |
+| 7 | `Table` | `TR` without `href` reads no router; with `href` it renders without a mounted App Router (the router is read in a try, the click falls back to `location.assign`). New `TGroupRow` (spanning heading row, or a folding toggle + the row's further cells), `TFoot`, `TTotalRow`. **Container fold:** `FoldTable` (components/fold-table.tsx, server-safe) = Prefab's `ReviewGrid` generalised by name only (same props, `FoldTableColumn<T>`; `fold="md"` / `"container"`; `@max-lg` / `@lg` written as the values `@max-[32rem]` / `@min-[32rem]`, so no app declares a container theme variable); `tests/additions-1-8.test.tsx` renders Prefab's file beside it | — |
+| 8 | `Disclosure` is Prefab's | promoted verbatim (components/disclosure.tsx, client), API unchanged (`title`, `kicker`, `meta`, `open` / `defaultOpen` / `onToggle`, `bordered`, `className`, `bodyClassName`, `flushBody`, `large`); markup equal to Prefab's (tested) | — |
+| 9 | A `Combobox` pick does not mark its `Dialog` dirty | a pick that changes the value dispatches a bubbling `input` event from the combobox's root (the Dialog's / Sheet's `onInputCapture` arms the discard prompt; no `onChange` fires anywhere) | — |
+| 10 | The controlled `Segmented` ignores a read-only scope | `changesData` (controlled only): disabled in a read-only scope unless `readOnlySafe`. **Opt-in on purpose**: a view choice (a review stage, a staged filter) must keep working while reading, and a default-deny would have disabled Prefab's review stages on archived projects — a visible change for an unchanged call site, which a minor cannot make. The options are rendered by the client leaf `config/segmented-button.tsx`, so `Segmented` stays server-safe. 2.0 may revisit the default | — |
+| 11 | No icon-only download link | `IconLink` (button.tsx): `IconButton`'s square on a native `<a>`, `download` glyph by default, `label` required, `xs` to `lg`, shown in a read-only scope | — |
+| 12 | A `backdrop-filter` / `transform` ancestor captures `RowMenu`'s fixed list | the list is a manual popover in the top layer (`popover="manual"`, `showPopover()` before measuring; `inset-auto m-0 overflow-visible text-ink backdrop:pointer-events-none` undo the popover UA sheet, so it sits exactly where 1.7's fixed list sat: every open-menu baseline unchanged). Inside a modal Dialog it opens above it. Without popover support it stays the fixed list | — |
+| 13 | `preflight-scoped.css` / islands have no user | deprecated (header comment, DESIGN.md, the `card--island-on-a-legacy-page` story's comment), kept working; **removed in 2.0** with `ISLAND_ROOT` in `gallery/preflight-scope.mjs`, the story, its baselines and DESIGN.md's island half. The `--ops-z-*` variables stay. `OpsIsland` was Prefab's own component (deleted at P5); the library never shipped one | — |
+| 14 | Unmeasured kit targets | `Combobox` options `py-3` under the floor; `CopyValue` and `TagRemove` `TOUCH_TARGET`; `AppSwitcher` entries already 44 on any coarse pointer (`pointer-coarse:py-3`, 1.1.0): measured, no change | see below |
+
+**Measurements** (375 → 375-touch under the floor; boxes in px):
+
+| Target | 375 (no floor) | 375-touch under the floor |
+|---|---|---|
+| bare `Checkbox` | box 16 x 16, target 16 x 16 | box 20 x 20, target 44 x 44 (a tap 18px beside it toggles) |
+| labelled `Checkbox` / `Radio` | row 20, box 16 | row 44, box 20 |
+| `Segmented` one-character option | 25-28 x 27.5 (1.7 under the floor: 44 tall, as wide as the label) | 44 x 44 |
+| `Combobox` option | 36 tall | 44 tall |
+| `CopyValue` | target 120 x 24 | target 120 x 44 (the line keeps 23.5) |
+| `TagRemove` | target 24 x 20 | target 44 x 44 (the chip keeps 28) |
+| inline action `size="xs"` | 24 tall (icon-only 24 x 24) | 44 (44 x 44) |
+| `DateInput` / `YearInput` button at lg | 28 x 28 (1.7 under the floor: 44 x 44) | 48 x 48, text 56px clear |
+| `AppSwitcher` entries | 32 tall | 44 tall (already, `pointer-coarse:py-3`): no change |
+| `Dialog` ✕ / footer at lg, `Segmented` / `FileInput` lg | 48 at every width | 48 |
+
+**Visible** (rebaselined in pure `shots: rebaseline` commits, listed in the CHANGELOG): `button--touch-floor` at 375-touch (three brands): the Segmented options inside `data-ops-touch` are 44 wide. Every 1440 and 375 baseline is byte-identical (the nowrap, `PageHeader` and `DialogFooter` changes paint nothing in an existing story; each app's G2 names its own pages).
+
+**Not in 1.8.0.** The AppSwitcher's list keeps its fixed position (no report of a capturing
+ancestor in the frame); a default-deny `Segmented`; removing the island files (2.0).
+
 ---
 
 ## 12. PrefabOps end state (restyle P5, 2026-10-02)
@@ -668,7 +720,8 @@ architecture as Workforce Ops and FinaOps (§2).
   fixed it; a library-side note: a reset that reverts `width` / `height` on `*` breaks SVG
   geometry.
 
-**Open for the library (batch into the next minor or 2.0):** `styles/preflight-scoped.css`, the
+**Open for the library (batch into the next minor or 2.0)** — closed by 1.8.0 (§4.8) except the
+island files, deprecated there and removed in 2.0: `styles/preflight-scoped.css`, the
 `card--island-on-a-legacy-page` story and DESIGN.md's "Islands and stacking" paragraph have no
 user left (candidates for removal in 2.0; `--ops-z-*` stay, harmless); the bare `Checkbox` touch
 floor; `Segmented` width floor and lg size; `FileInput` lg; the `Sheet` pinned footer; 48 px

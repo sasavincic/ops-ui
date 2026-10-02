@@ -2,6 +2,7 @@
 
 import { useReadOnlyScope } from "../config/read-only";
 import { cn } from "../lib/cn";
+import { TOUCH_TARGET } from "../lib/touch";
 
 /**
  * TagRemove (1.6.0, styling programme §4.6): the small ✕ at the end of a `Tag` that takes the
@@ -29,7 +30,8 @@ export function TagRemove({
     <button
       type="button"
       aria-label={label}
-      className={cn("shrink-0 rounded-control px-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink", className)}
+      // 1.8.0: a 44 x 44 invisible target under the touch floor; the chip keeps its size.
+      className={cn("shrink-0 rounded-control px-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink", TOUCH_TARGET, className)}
       {...props}
     >
       {children}

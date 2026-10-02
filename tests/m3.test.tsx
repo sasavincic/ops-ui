@@ -137,11 +137,13 @@ const ITEMS: RowMenuItem[] = [
 describe("RowMenu trigger + sections (G8)", () => {
   it("without them renders the 1.3.0 markup (closed, and nothing when there are no items)", () => {
     const Old = v130.RowMenu;
-    expect(html(<RowMenu label="Actions: Passport" items={ITEMS} />)).toBe(html(<Old label="Actions: Passport" items={ITEMS} />));
-    expect(html(<RowMenu label="x" items={ITEMS} className="ml-auto" />)).toBe(html(<Old label="x" items={ITEMS} className="ml-auto" />));
+    // 1.8.0: every kit button carries whitespace-nowrap (its label never wraps); nothing else moved.
+    const now = (node: ReactElement) => html(node).replace(" whitespace-nowrap", "");
+    expect(now(<RowMenu label="Actions: Passport" items={ITEMS} />)).toBe(html(<Old label="Actions: Passport" items={ITEMS} />));
+    expect(now(<RowMenu label="x" items={ITEMS} className="ml-auto" />)).toBe(html(<Old label="x" items={ITEMS} className="ml-auto" />));
     expect(html(<RowMenu label="x" items={[]} />)).toBe("");
     const OldScope = v130.ReadOnlyScope;
-    expect(html(<ReadOnlyScope readOnly><RowMenu label="x" items={ITEMS} /></ReadOnlyScope>)).toBe(
+    expect(now(<ReadOnlyScope readOnly><RowMenu label="x" items={ITEMS} /></ReadOnlyScope>)).toBe(
       html(<OldScope readOnly><Old label="x" items={ITEMS} /></OldScope>),
     );
   });
@@ -151,8 +153,11 @@ describe("RowMenu trigger + sections (G8)", () => {
     const now = execFileSync("cat", [path.join(ROOT, "src/components/row-menu.tsx")], { encoding: "utf8" });
     const squash = (s: string) => s.replace(/\s+/g, " ");
     // The menu list's classes, each item's two shapes, the ⋯ button's classes.
+    // 1.8.0: the list became a top-layer popover; its 1.3 classes are all still there, beside the
+    // popover's own (inset-auto m-0 overflow-visible text-ink backdrop:pointer-events-none).
+    const listClasses = (src: string) => /role="menu"[\s\S]*?className="([^"]+)"/.exec(src)![1].split(" ");
+    for (const token of listClasses(old)) expect(listClasses(now), token).toContain(token);
     for (const fragment of [
-      'className="fixed z-[var(--ops-z-menu,40)] w-52 max-w-[calc(100vw-2rem)] rounded-control border border-border bg-bg py-1 shadow-lg"',
       // 1.7.0 wraps the link item's string in cn(…, TOUCH_FLOOR.height): the classes are the same.
       '"flex items-center gap-1.5 px-3 py-1.5 text-sm text-ink hover:bg-surface"',
       '"flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm hover:bg-surface disabled:opacity-50", item.danger ? "text-danger hover:bg-danger/10" : "text-ink"',

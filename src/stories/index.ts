@@ -14,8 +14,10 @@ import { stories as copyValue } from "./copy-value.stories";
 import { stories as dateInput } from "./date-input.stories";
 import { stories as descriptionList } from "./description-list.stories";
 import { stories as dialog } from "./dialog.stories";
+import { stories as disclosure } from "./disclosure.stories";
 import { stories as emptyState } from "./empty-state.stories";
 import { stories as field } from "./field.stories";
+import { stories as foldTable } from "./fold-table.stories";
 import { stories as formActions } from "./form-actions.stories";
 import { stories as glanceCard } from "./glance-card.stories";
 import { stories as grid } from "./grid.stories";
@@ -83,8 +85,10 @@ export const STORY_GROUPS: readonly StoryGroup[] = [
   { component: "date-input", stories: dateInput },
   { component: "description-list", stories: descriptionList },
   { component: "dialog", stories: dialog },
+  { component: "disclosure", stories: disclosure },
   { component: "empty-state", stories: emptyState },
   { component: "field", stories: field },
+  { component: "fold-table", stories: foldTable },
   { component: "form-actions", stories: formActions },
   { component: "glance-card", stories: glanceCard },
   { component: "grid", stories: grid },

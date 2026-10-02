@@ -20,4 +20,16 @@ export const stories: Story[] = [
       </Stack>
     ),
   },
+  // 1.8.0: under [data-ops-touch] on a phone the value has a 44 x 44 target; the line keeps its height.
+  {
+    name: "Under the touch floor",
+    render: () => (
+      <div data-ops-touch="">
+        <Row label="A document number in a row">
+          <CopyValue value="LM-2026-001" />
+          <span className="text-detail text-ink-muted">beside other text</span>
+        </Row>
+      </div>
+    ),
+  },
 ];

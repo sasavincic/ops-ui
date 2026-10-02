@@ -237,4 +237,43 @@ export const stories: Story[] = [
     ),
   },
   { name: "Under the touch floor", render: () => <TouchFloorControls /> },
+  { name: "Checkboxes under the touch floor", render: () => <CheckboxesUnderTheFloor /> },
+  { name: "Large file input", render: () => <LargeFileInput /> },
 ];
+
+/** 1.8.0: the bare box and the labelled checkbox under [data-ops-touch] on a phone. */
+function CheckboxesUnderTheFloor() {
+  const [picked, setPicked] = useState<Record<string, boolean>>({ a: true });
+  const [show, setShow] = useState(false);
+  return (
+    <div data-ops-touch="" className="flex flex-col gap-4">
+      <Checkbox id="story-show-password" label="Show password" checked={show} onChange={(e) => setShow(e.target.checked)} />
+      <ul className="flex flex-col divide-y divide-border rounded-container border border-border">
+        {["a", "b"].map((key) => (
+          <li key={key} className="flex items-center gap-3 px-4 py-2 text-sm">
+            <Checkbox
+              aria-label={`Select line ${key}`}
+              checked={Boolean(picked[key])}
+              onChange={(e) => setPicked((p) => ({ ...p, [key]: e.target.checked }))}
+            />
+            Line {key.toUpperCase()} · 1 240.00
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** 1.8.0: FileInput size="lg", 48px with 16px text. */
+function LargeFileInput() {
+  return (
+    <div className="flex max-w-md flex-col gap-4">
+      <Field label="Weld book" htmlFor="story-lg-file">
+        <FileInput id="story-lg-file" size="lg" />
+      </Field>
+      <Field label="Material certificate (md)" htmlFor="story-md-file">
+        <FileInput id="story-md-file" />
+      </Field>
+    </div>
+  );
+}

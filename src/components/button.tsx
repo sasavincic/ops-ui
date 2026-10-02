@@ -11,6 +11,9 @@ import { TOUCH_FLOOR } from "../lib/touch";
 const buttonVariants = cva(
   [
     "inline-flex items-center justify-center gap-1.5 rounded-control font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+    // 1.8.0: a button's label never wraps: a two-line button is never the answer (the row wraps
+    // instead, between buttons, and only when it must).
+    "whitespace-nowrap",
     // The opt-in touch floor (lib/touch.ts): 44px tall under [data-ops-touch] on a screen that
     // cannot hover; it paints nothing anywhere else.
     TOUCH_FLOOR.height,
@@ -34,8 +37,18 @@ const buttonVariants = cva(
         md: "h-9 px-3.5 text-sm",
         // 1.3.0: 48px with 16px text, the workshop portal's controls (PrefabOps plan §7.8).
         lg: "h-12 px-4 text-base",
+        // 1.8.0: the INLINE action, inside content (a table row, beside a field, in a card body):
+        // 24px tall, 13px, tight. Quiet whatever the variant (compound variants below): no fill
+        // and no border at rest, the variant's meaning carried by the colour only.
+        xs: "h-6 gap-1 px-1.5 text-detail",
       },
     },
+    compoundVariants: [
+      { size: "xs", variant: "primary", class: "bg-transparent text-primary hover:bg-primary-subtle" },
+      { size: "xs", variant: "secondary", class: "border-0 bg-transparent text-ink hover:bg-surface" },
+      { size: "xs", variant: "admin", class: "border-0 bg-transparent hover:bg-admin-subtle" },
+      { size: "xs", variant: "danger", class: "bg-transparent text-danger hover:bg-danger/10 hover:opacity-100" },
+    ],
     defaultVariants: { variant: "primary", size: "md" },
   },
 );
@@ -50,9 +63,12 @@ const buttonVariants = cva(
 type ReadOnlyProps = { readOnlySafe?: boolean; icon?: ActionIconName };
 
 /** The glyph of a button: 14px, 16px on a large button. sm and md keep exactly the 1.2 markup. */
-function ButtonIcon({ name, size }: { name: ActionIconName; size: "sm" | "md" | "lg" | null | undefined }) {
+function ButtonIcon({ name, size }: { name: ActionIconName; size: ButtonSize | null | undefined }) {
   return <ActionIcon name={name} className={size === "lg" ? "size-4" : undefined} />;
 }
+
+/** The Button sizes: sm / md / lg (1.3.0) and xs, the inline action (1.8.0). */
+export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
 type ButtonProps = React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> &
@@ -153,7 +169,8 @@ export function FileLink({
   ...props
 }: Omit<React.ComponentProps<"a">, "href"> & {
   href?: string;
-  size?: "sm" | "md";
+  /** 1.8.0: "xs", the inline action's size. */
+  size?: "xs" | "sm" | "md";
   disabled?: boolean;
 }) {
   const classes = cn(buttonVariants({ variant: "ghost", size }), className);
@@ -167,6 +184,8 @@ export function FileLink({
 
 /** The square of each IconButton size: the Button heights, as wide as they are tall. */
 const ICON_BUTTON_SIZE = {
+  // 1.8.0: the inline action's square.
+  xs: "size-6 px-0",
   sm: "size-8 px-0",
   md: "size-9 px-0",
   lg: "size-12 px-0",
@@ -194,7 +213,8 @@ export function IconButton({
   label: string;
   icon: ActionIconName;
   variant?: NonNullable<VariantProps<typeof buttonVariants>["variant"]>;
-  size?: "sm" | "md" | "lg";
+  /** 1.8.0: "xs", the inline action's 24px square. */
+  size?: ButtonSize;
   readOnlySafe?: boolean;
 }) {
   const hidden = useReadOnlyScope() && !readOnlySafe;
@@ -209,6 +229,41 @@ export function IconButton({
     >
       <ActionIcon name={icon} always className={size === "lg" ? "size-5" : undefined} />
     </button>
+  );
+}
+
+/**
+ * An icon-only LINK (1.8.0; PrefabOps restyle plan §10.2, P4.6a): IconButton's square and glyph on
+ * a native anchor, for the one act a glyph says without words: download (the default glyph), or
+ * open in a new tab. A plain `<a>` like FileLink, so a file endpoint keeps the browser's download
+ * handling and Next never prefetches it; pass `download` (and `target`) as on any anchor. `label`
+ * is required (the accessible name and the tooltip). It changes no data, so it shows in a
+ * read-only scope too; under the touch floor it is 44 x 44 like IconButton.
+ */
+export function IconLink({
+  label,
+  icon = "download",
+  variant = "ghost",
+  size = "md",
+  className,
+  ...props
+}: Omit<React.ComponentProps<"a">, "children" | "aria-label" | "title"> & {
+  href: string;
+  label: string;
+  /** Default "download". */
+  icon?: ActionIconName;
+  variant?: NonNullable<VariantProps<typeof buttonVariants>["variant"]>;
+  size?: ButtonSize;
+}) {
+  return (
+    <a
+      aria-label={label}
+      title={label}
+      className={cn(buttonVariants({ variant, size }), ICON_BUTTON_SIZE[size], TOUCH_FLOOR.width, className)}
+      {...props}
+    >
+      <ActionIcon name={icon} always className={size === "lg" ? "size-5" : undefined} />
+    </a>
   );
 }
 

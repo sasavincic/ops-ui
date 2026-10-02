@@ -22,4 +22,16 @@ export const stories: Story[] = [
       </Row>
     ),
   },
+  {
+    name: "Warning tone",
+    render: () => (
+      <Row label="A fact that needs a second look">
+        <Tag tone="warning" icon={<StatusIcon name="question" />}>
+          Weight differs
+        </Tag>
+        <Tag tone="warning">Price older than 90 days</Tag>
+        <Tag>Neutral beside it</Tag>
+      </Row>
+    ),
+  },
 ];

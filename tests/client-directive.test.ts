@@ -27,8 +27,10 @@ const SERVER_SAFE = [
 ].map((name) => `src/components/${name}.tsx`);
 
 /** The server-safe components added after 1.0 (1.2.0: the primitives, styling programme §4.4). */
-// 1.6.0: grid and split-layout join the server-safe primitives.
-const SERVER_SAFE_LATER = ["cluster", "grid", "heading", "split-layout", "stack", "text", "text-link"].map((name) => `src/components/${name}.tsx`);
+// 1.6.0: grid and split-layout join the server-safe primitives. 1.8.0: fold-table (no hooks; its
+// `cell` functions run where it renders). Segmented's controlled options moved into the client
+// leaf config/segmented-button.tsx (it reads the read-only scope), Segmented stays server-safe.
+const SERVER_SAFE_LATER = ["cluster", "fold-table", "grid", "heading", "split-layout", "stack", "text", "text-link"].map((name) => `src/components/${name}.tsx`);
 
 const SOURCES = filesUnder("src").filter((f) => /\.(ts|tsx)$/.test(f));
 const code = (file: string) => stripCommentsAndStrings(readSource(file));
@@ -86,7 +88,7 @@ describe("client-directive", () => {
 
   it("the other component files are client modules", () => {
     const components = SOURCES.filter((f) => f.startsWith("src/components/"));
-    expect(components).toHaveLength(48); // 1.6.0: grid, radio, split-layout, tag-remove, text-button
+    expect(components).toHaveLength(50); // 1.6.0: grid, radio, split-layout, tag-remove, text-button; 1.8.0: disclosure, fold-table
     const clients = components.filter((f) => !SERVER_SAFE.includes(f) && !SERVER_SAFE_LATER.includes(f));
     expect(clients.filter((f) => !hasUseClient(readSource(f)))).toEqual([]);
   });

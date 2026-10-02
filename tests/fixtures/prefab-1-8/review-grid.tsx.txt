@@ -1,0 +1,176 @@
+import type { ReactNode } from 'react';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
+import { clsx as cn } from 'clsx';
+
+/**
+ * A dense editable table (restyle plan G12, Prefab-owned; first user the offer builder's
+ * positions): the kit `Table` with compact cells for kit `Input`s, numbers right-aligned, the
+ * first column sticky when the table scrolls sideways. Below `md` there is no table to scroll:
+ * each row folds into a bordered block of labelled cells (the same DOM — the header's words ride
+ * each cell as a phone-only label, hidden from screen readers, whose controls carry their own
+ * `aria-label`).
+ *
+ * `fold="container"` (restyle P4.6b, the drawing review's editor pane) folds by the width of the
+ * grid's OWN container instead of the viewport: below 32rem (`@max-lg`) the rows are the labelled
+ * blocks, from 32rem a table. A pane beside a drawing is narrow on a wide screen and wide on a
+ * stacked tablet, so the viewport says nothing about it. A column's `foldSpan` sets its width in
+ * a folded row (six columns; numbers default to half, the rest to the whole row). `headerAction` puts a
+ * small control after the header's words in the table header (an apply-to-all), never in the
+ * folded labels.
+ */
+type FoldSpan = 1 | 2 | 3 | 4 | 5 | 6;
+/** Written out whole so Tailwind generates them. */
+const FOLD_SPAN: Record<FoldSpan, string> = {
+  1: '@max-lg:col-span-1',
+  2: '@max-lg:col-span-2',
+  3: '@max-lg:col-span-3',
+  4: '@max-lg:col-span-4',
+  5: '@max-lg:col-span-5',
+  6: '@max-lg:col-span-6',
+};
+
+export type ReviewGridColumn<T> = {
+  key: string;
+  header: string;
+  /** A number or money column. */
+  numeric?: boolean;
+  /** Width classes for the column on a table (`md:w-32`). */
+  className?: string;
+  /** The phone label is left out (a trailing actions cell). */
+  bare?: boolean;
+  /** `fold="container"`: the column's width in a folded row, in sixths (numbers 3, the rest 6). */
+  foldSpan?: FoldSpan;
+  /** A control after the header's words in the table header (an apply-to-all); never in folded rows. */
+  headerAction?: ReactNode;
+  cell: (row: T, index: number) => ReactNode;
+};
+
+export function ReviewGrid<T>({
+  label,
+  columns,
+  rows,
+  rowKey,
+  rowId,
+  rowClassName,
+  flush = false,
+  fold = 'md',
+}: {
+  /** What the rows fold by: the viewport (`md`, default) or the grid's own width (`container`). */
+  fold?: 'md' | 'container';
+  /** Sits directly in a card (under its header): no border of its own, phone rows split by hairlines instead of boxed. */
+  flush?: boolean;
+  /** Names the table for screen readers. */
+  label: string;
+  columns: readonly ReviewGridColumn<T>[];
+  rows: readonly T[];
+  rowKey: (row: T, index: number) => string;
+  rowId?: (row: T, index: number) => string | undefined;
+  rowClassName?: (row: T, index: number) => string | undefined;
+}) {
+  if (fold === 'container') {
+    return <ContainerGrid label={label} columns={columns} rows={rows} rowKey={rowKey} rowId={rowId} rowClassName={rowClassName} flush={flush} />;
+  }
+  return (
+    <Table aria-label={label} className="max-md:block" containerClassName={cn('max-md:overflow-visible max-md:rounded-none max-md:border-0 max-md:bg-transparent', flush && 'rounded-none border-0')}>
+      <THead className="bg-surface max-md:hidden">
+        <tr>
+          {columns.map((column, index) => (
+            <TH key={column.key} alignRight={column.numeric} className={cn('px-2 py-2', flush ? 'first:pl-5 last:pr-5' : 'first:pl-3 last:pr-3', index === 0 && 'md:sticky md:left-0 md:z-10 md:bg-surface', column.className)}>
+              {column.bare ? <span className="sr-only">{column.header}</span> : column.header}
+              {column.headerAction ? <span className="ml-1 inline-flex align-middle">{column.headerAction}</span> : null}
+            </TH>
+          ))}
+        </tr>
+      </THead>
+      <TBody className={flush ? 'divide-y divide-border max-md:flex max-md:flex-col' : 'divide-y divide-border max-md:flex max-md:flex-col max-md:gap-3 max-md:divide-y-0'}>
+        {rows.map((row, rowIndex) => (
+          <TR
+            key={rowKey(row, rowIndex)}
+            id={rowId?.(row, rowIndex)}
+            className={cn('max-md:grid max-md:grid-cols-2 max-md:gap-3', flush ? 'max-md:px-5 max-md:py-4' : 'max-md:rounded-container max-md:border max-md:border-border max-md:bg-bg max-md:p-4', rowClassName?.(row, rowIndex))}
+          >
+            {columns.map((column, index) => (
+              <TD
+                key={column.key}
+                alignRight={column.numeric}
+                className={cn(
+                  flush ? 'px-2 py-2 align-top first:pl-5 last:pr-5' : 'px-2 py-1.5 align-top first:pl-3 last:pr-3',
+                  'max-md:col-span-2 max-md:p-0 max-md:text-left max-md:first:pl-0 max-md:last:pr-0',
+                  column.numeric && 'tabular-nums max-md:col-span-1',
+                  index === 0 && 'md:sticky md:left-0 md:z-10 md:bg-bg',
+                  column.className,
+                )}
+              >
+                {column.bare ? null : <span aria-hidden="true" className="mb-1 block text-detail font-medium text-ink md:hidden">{column.header}</span>}
+                {column.cell(row, rowIndex)}
+              </TD>
+            ))}
+          </TR>
+        ))}
+      </TBody>
+    </Table>
+  );
+}
+
+/** `fold="container"`: the same grid folding by its own width (`@container`, `@max-lg` = below 32rem). */
+function ContainerGrid<T>({
+  label,
+  columns,
+  rows,
+  rowKey,
+  rowId,
+  rowClassName,
+  flush,
+}: {
+  label: string;
+  columns: readonly ReviewGridColumn<T>[];
+  rows: readonly T[];
+  rowKey: (row: T, index: number) => string;
+  rowId?: (row: T, index: number) => string | undefined;
+  rowClassName?: (row: T, index: number) => string | undefined;
+  flush: boolean;
+}) {
+  return (
+    <div className="@container min-w-0">
+      <Table aria-label={label} className="@max-lg:block" containerClassName={cn('@max-lg:overflow-visible @max-lg:rounded-none @max-lg:border-0 @max-lg:bg-transparent', flush && 'rounded-none border-0')}>
+        <THead className="bg-surface @max-lg:hidden">
+          <tr>
+            {columns.map((column, index) => (
+              <TH key={column.key} alignRight={column.numeric} className={cn('px-2 py-2', flush ? 'first:pl-5 last:pr-5' : 'first:pl-3 last:pr-3', index === 0 && '@lg:sticky @lg:left-0 @lg:z-10 @lg:bg-surface', column.className)}>
+                {column.bare ? <span className="sr-only">{column.header}</span> : column.header}
+                {column.headerAction ? <span className="ml-1 inline-flex align-middle">{column.headerAction}</span> : null}
+              </TH>
+            ))}
+          </tr>
+        </THead>
+        <TBody className={flush ? 'divide-y divide-border @max-lg:flex @max-lg:flex-col' : 'divide-y divide-border @max-lg:flex @max-lg:flex-col @max-lg:gap-3 @max-lg:divide-y-0'}>
+          {rows.map((row, rowIndex) => (
+            <TR
+              key={rowKey(row, rowIndex)}
+              id={rowId?.(row, rowIndex)}
+              className={cn('@max-lg:grid @max-lg:grid-flow-row-dense @max-lg:grid-cols-6 @max-lg:gap-x-3 @max-lg:gap-y-2.5', flush ? '@max-lg:px-5 @max-lg:py-4' : '@max-lg:rounded-container @max-lg:border @max-lg:border-border @max-lg:bg-bg @max-lg:p-4', rowClassName?.(row, rowIndex))}
+            >
+              {columns.map((column, index) => (
+                <TD
+                  key={column.key}
+                  alignRight={column.numeric}
+                  className={cn(
+                    flush ? 'px-2 py-2 align-top first:pl-5 last:pr-5' : 'px-2 py-1.5 align-top first:pl-3 last:pr-3',
+                    '@max-lg:p-0 @max-lg:text-left @max-lg:first:pl-0 @max-lg:last:pr-0',
+                    FOLD_SPAN[column.foldSpan ?? (column.numeric ? 3 : 6)],
+                    column.numeric && 'tabular-nums',
+                    index === 0 && '@lg:sticky @lg:left-0 @lg:z-10 @lg:bg-bg',
+                    column.className,
+                  )}
+                >
+                  {column.bare ? null : <span aria-hidden="true" className="mb-1 block text-detail font-medium text-ink @lg:hidden">{column.header}</span>}
+                  {column.cell(row, rowIndex)}
+                </TD>
+              ))}
+            </TR>
+          ))}
+        </TBody>
+      </Table>
+    </div>
+  );
+}

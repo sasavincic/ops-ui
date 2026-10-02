@@ -4,6 +4,7 @@ import { ActionIcon } from "./action-icon";
 import { pushToast } from "./toast";
 import { useOpsUi } from "../config/provider";
 import { cn } from "../lib/cn";
+import { TOUCH_TARGET } from "../lib/touch";
 
 /**
  * A value that copies itself (2026-09-11, Saša: document numbers). The
@@ -35,6 +36,8 @@ export function CopyValue({
       }}
       className={cn(
         "group/copy inline-flex max-w-full items-center gap-1.5 rounded-control px-1.5 py-0.5 -mx-1.5 text-left font-mono text-detail text-ink transition-colors duration-150 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary",
+        // 1.8.0: a 44 x 44 invisible target under the touch floor; the line keeps its height.
+        TOUCH_TARGET,
         className
       )}
     >

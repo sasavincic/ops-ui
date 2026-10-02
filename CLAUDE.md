@@ -531,3 +531,20 @@ name changes its CSS with a docs commit: `@source not` them (spec §8.4).
   `tests/touch-floor-1-7.test.tsx` + behaviour "touch floor (1.7.0)" (375 / 375-touch). 7 stories
   (105), new baselines only; `button--touch-floor` 375-touch ×3 rebaselined in a pure
   `shots: rebaseline` commit (its DateInput button sits in `data-ops-touch`).
+- **1.8.0** (2026-10-02, styling programme §4.8; PrefabOps restyle plan §10.2 / styling programme
+  §12 "Open for the library", and Saša's "inline buttons should be more minimal and never wrap"):
+  every kit button label `whitespace-nowrap`; the inline action `size="xs"` (Button, ButtonLink,
+  ExternalButtonLink, FileLink, IconButton; quiet compound variants) and `IconLink` (icon-only
+  anchor, download by default); `PageHeader` title block `sm:grow sm:basis-80`, `DialogFooter`
+  note `grow basis-0 min-w-24` (no needless second row); touch floor for the bare `Checkbox`
+  (`display: contents` label + `TOUCH_TARGET`), labelled `Checkbox` / `Radio` rows, `Segmented`
+  option width, `Combobox` options, `CopyValue`, `TagRemove`; lg for `Segmented`, `FileInput`,
+  `Dialog` / `DialogFooter` / `ConfirmDialog` and the DateInput / YearInput button
+  (`TOUCH_FLOOR_LG`); `Sheet footer`; `Tag tone="warning"`; `Text as="h1"…"h6"`; `TR` without a
+  router; `TGroupRow` / `TFoot` / `TTotalRow`; `FoldTable` and `Disclosure` promoted from
+  PrefabOps (markup proven equal against `tests/fixtures/prefab-1-8`); a `Combobox` pick dispatches
+  `input` (the Dialog's discard guard); `Segmented changesData` (opt-in read-only; options in the
+  client leaf `config/segmented-button.tsx`); `RowMenu`'s list is a top-layer popover;
+  `preflight-scoped.css` and the island story deprecated (removed in 2.0).
+  `tests/additions-1-8.test.tsx` + behaviour "1.8.0 desktop behaviour" / "1.8.0 touch floor".
+

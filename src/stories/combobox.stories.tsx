@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Combobox, type ComboboxOption } from "../components/combobox";
+import { Button } from "../components/button";
+import { Dialog, DialogBody, DialogFooter } from "../components/dialog";
 import { Field } from "../components/field";
 import type { Story } from "./index";
 
@@ -70,4 +72,39 @@ export const stories: Story[] = [
   { name: "Open list", render: () => <Demo initial="" options={WORKERS} clearLabel="Not a worker" />, open: OPEN },
   { name: "Tall list", render: () => <Demo initial="w1" options={WORKERS} tall />, open: OPEN },
   { name: "No matches", render: () => <Demo initial="" options={[]} />, open: OPEN },
+  { name: "In a dialog", render: () => <InADialog /> },
+  { name: "Open list under the touch floor", render: () => <UnderTheFloor />, open: OPEN },
 ];
+
+/**
+ * 1.8.0: a pick is an edit. A dialog whose only change was a pick asks before discarding (the
+ * behaviour test picks, then presses ✕).
+ */
+function InADialog() {
+  const [open, setOpen] = useState(true);
+  const [value, setValue] = useState("");
+  return (
+    <>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        Assign worker
+      </Button>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Assign worker">
+        <DialogBody>
+          <Field label="Worker" htmlFor="story-dialog-combobox">
+            <Combobox id="story-dialog-combobox" value={value} options={WORKERS} onChange={setValue} />
+          </Field>
+          <DialogFooter onClose={() => setOpen(false)} onSubmit={() => setOpen(false)} submitLabel="Assign" />
+        </DialogBody>
+      </Dialog>
+    </>
+  );
+}
+
+/** 1.8.0: under [data-ops-touch] on a phone every option is at least 44px tall. */
+function UnderTheFloor() {
+  return (
+    <div data-ops-touch="">
+      <Demo initial="" options={WORKERS} clearLabel="Not a worker" />
+    </div>
+  );
+}

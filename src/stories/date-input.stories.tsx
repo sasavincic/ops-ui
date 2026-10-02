@@ -64,4 +64,18 @@ export const stories: Story[] = [
     ),
     open: OPEN,
   },
+  // 1.8.0: at size="lg" the floor is 48px (at 1440 and 375 the lg field as it was).
+  { name: "Large under the touch floor", render: () => <LargeUnderTheFloor /> },
 ];
+
+/** 1.8.0: an lg field under [data-ops-touch] on a phone: the calendar button reaches 48 x 48. */
+function LargeUnderTheFloor() {
+  const [value, setValue] = useState("2026-10-02");
+  return (
+    <div data-ops-touch="" className="max-w-xs">
+      <Field label="Shipping date" htmlFor="story-lg-date">
+        <DateInput id="story-lg-date" size="lg" value={value} onChange={(e) => setValue(e.target.value)} />
+      </Field>
+    </div>
+  );
+}

@@ -21,7 +21,8 @@ export const TEXT_WEIGHT = { normal: "font-normal", medium: "font-medium", semib
 export type TextSize = keyof typeof TEXT_SIZE;
 export type TextTone = keyof typeof TEXT_TONE;
 export type TextWeight = keyof typeof TEXT_WEIGHT;
-export type TextTag = "span" | "p" | "div" | "li" | "dt" | "dd";
+/** 1.8.0: the heading elements too, for a heading that wears a Text look (`<Text as="h3" weight="medium">`). */
+export type TextTag = "span" | "p" | "div" | "li" | "dt" | "dd" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 
 export type TextStyleProps = {
   size?: TextSize;

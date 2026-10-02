@@ -119,4 +119,44 @@ export const stories: Story[] = [
   { name: "Pinned footer and a long body", render: () => <PinnedFooterDialog /> },
   { name: "Footers", render: () => <Footers /> },
   { name: "Under the touch floor", render: () => <TouchFloorDialog /> },
+  { name: "Large", render: () => <LargeDialog /> },
+  { name: "Footer with a long note", render: () => <FooterWithLongNote /> },
 ];
+
+/** 1.8.0: an lg surface's dialog: the ✕ and both footer buttons are 48px at every width. */
+function LargeDialog() {
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      <Button size="lg" variant="secondary" onClick={() => setOpen(true)}>
+        Record weight
+      </Button>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Record weight" size="lg">
+        <DialogBody>
+          <Field label="Weight" htmlFor="story-lg-weight">
+            <Input id="story-lg-weight" size="lg" defaultValue="1 240" suffix="kg" />
+          </Field>
+          <DialogFooter size="lg" onClose={() => setOpen(false)} onSubmit={() => setOpen(false)} submitLabel="Save" />
+        </DialogBody>
+      </Dialog>
+    </>
+  );
+}
+
+/** 1.8.0: a long note wraps beside the buttons instead of pushing them onto a second row. */
+function FooterWithLongNote() {
+  const noop = () => {};
+  return (
+    <Stack className="max-w-xl">
+      <Row label="a long note keeps the buttons on its row" className="block">
+        <DialogFooter
+          onClose={noop}
+          onSubmit={noop}
+          submitLabel="Generate"
+          submitIcon="refresh"
+          note="Two drawings are not reviewed yet: the pack covers the reviewed ones."
+        />
+      </Row>
+    </Stack>
+  );
+}

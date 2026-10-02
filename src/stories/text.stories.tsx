@@ -88,4 +88,22 @@ export const stories: Story[] = [
       </Stack>
     ),
   },
+  {
+    name: "As a heading",
+    render: () => (
+      <Stack>
+        <Row label="h2 / h3 / h4 in a Text look" className="block">
+          <Text as="h2" weight="semibold" block>
+            Cut list
+          </Text>
+          <Text as="h3" size="detail" weight="medium" tone="secondary" block>
+            Assembly 3 · 14 parts
+          </Text>
+          <Text as="h4" size="micro" tone="muted" block>
+            Drawing 26-118-03
+          </Text>
+        </Row>
+      </Stack>
+    ),
+  },
 ];

@@ -34,6 +34,7 @@ export function Sheet({
   exitCheck = false,
   onClose,
   children,
+  footer,
   className,
 }: {
   title: React.ReactNode;
@@ -49,6 +50,12 @@ export function Sheet({
   exitCheck?: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  /**
+   * 1.8.0: the sheet's COMMIT, pinned under the scroller like the Dialog's footer (a form in the
+   * body targets its submit by `form=` id; DialogFooter fits here too). Only a commit goes here:
+   * a record-level destructive act stays at the end of the body (`SheetFooter`).
+   */
+  footer?: React.ReactNode;
   className?: string;
 }) {
   const { strings } = useOpsUi();
@@ -110,9 +117,14 @@ export function Sheet({
         {toolbar}
         {/* The body scrolls; the extra bottom padding on phones keeps the
             last row clear of the thumb rail. */}
-        <div key={contentKey} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 pb-24 sm:pb-4">
+        <div key={contentKey} className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4", footer ? null : "pb-24 sm:pb-4")}>
           {children}
         </div>
+        {footer && (
+          <div className="shrink-0 border-t border-border px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+            {footer}
+          </div>
+        )}
       </aside>
     </div>
   );

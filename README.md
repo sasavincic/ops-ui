@@ -143,6 +143,25 @@ phone (`Grid` is now one explicit `minmax(0, 1fr)` column below its breakpoint; 
 `/workers/new` at 375). PrefabOps (`<html data-ops-touch>`) gets its kit-internal targets at
 44px at 375-touch: the CHANGELOG lists each one, before → after.
 
+## Adopting 1.8.0
+
+A minor: run `node scripts/sync-ops-ui.mjs --version 1.8.0`, then `--write-wrappers` (two new
+component files, `disclosure` and `fold-table`, want their one-line wrappers in
+`components/ui/`). Nothing must change in an app's code; every new prop is optional. What an
+unchanged page may show (each named under `Visible:` in the CHANGELOG, so G2 lists them as
+Expected): a button label that used to wrap stays on one line (the row wraps between buttons
+instead); a `PageHeader` whose long description pushed its actions onto a row of their own now
+keeps them beside it; a `DialogFooter` note likewise; and, with `data-ops-touch` (PrefabOps),
+the new touch-floor targets at 375-touch. G3: no token change.
+
+What each app may then adopt (CHANGELOG "Upgrade steps" lists the call sites): the inline action
+`size="xs"` for actions inside rows, fields and card bodies; `IconLink` for an icon-only
+download; `Sheet` `footer` for a sheet's commit; `Tag tone="warning"`; `Text as="h3"`;
+`TGroupRow` / `TFoot` / `TTotalRow`; `FoldTable` (PrefabOps' `ReviewGrid`); `Disclosure`
+(PrefabOps' own, same API); `Segmented changesData` for a mode stored on the record; the lg
+sizes (`Dialog`, `ConfirmDialog`, `DialogFooter`, `Segmented`, `FileInput`). A unit test that
+mocked the App Router only to render a `TR` can drop the mock.
+
 ## Adopting the shell (1.5.0)
 
 Each app replaces its `components/shell/*` with one client component that renders `AppFrame`

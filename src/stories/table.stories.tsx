@@ -4,7 +4,8 @@ import { AttentionList } from "../components/attention-list";
 import { Monogram } from "../components/monogram";
 import { RowMenu } from "../components/row-menu";
 import { StateMark } from "../components/state-mark";
-import { RowLink, Table, TBody, TD, TH, THead, TR } from "../components/table";
+import { useState } from "react";
+import { RowLink, Table, TBody, TD, TFoot, TGroupRow, TH, THead, TR, TTotalRow } from "../components/table";
 import type { Story } from "./index";
 
 const ROWS = [
@@ -95,4 +96,78 @@ export const stories: Story[] = [
       </Table>
     ),
   },
+  { name: "Group rows and a total", render: () => <Grouped /> },
 ];
+
+const LEDGER = [
+  { group: "Material", lines: [{ name: "Pipes P265GH", amount: "4,812.00" }, { name: "Flanges PN40", amount: "1,240.50" }], total: "6,052.50" },
+  { group: "Labour", lines: [{ name: "Welding, 118 h", amount: "5,192.00" }], total: "5,192.00" },
+];
+
+/** 1.8.0: group rows (a spanning heading and a folding group with its total) and the tfoot total. */
+function Grouped() {
+  const [open, setOpen] = useState<Record<string, boolean>>({ Material: true, Labour: false });
+  return (
+    <div className="flex max-w-2xl flex-col gap-6">
+      <Table aria-label="Material prices">
+        <THead>
+          <TR>
+            <TH>Article</TH>
+            <TH alignRight>Price</TH>
+          </TR>
+        </THead>
+        <TBody>
+          <TGroupRow colSpan={2} label="Pipes" meta="2 articles" />
+          <TR>
+            <TD>P265GH 168.3 x 7.1</TD>
+            <TD numeric>4.82 €/kg</TD>
+          </TR>
+          <TR>
+            <TD>P235GH 60.3 x 3.6</TD>
+            <TD numeric>3.95 €/kg</TD>
+          </TR>
+          <TGroupRow colSpan={2} label="Flanges" meta="1 article" />
+          <TR>
+            <TD>Weld neck PN40 DN150</TD>
+            <TD numeric>62.00 €/pc</TD>
+          </TR>
+        </TBody>
+      </Table>
+      <Table aria-label="Cost ledger">
+        <THead>
+          <TR>
+            <TH>Cost</TH>
+            <TH alignRight>Amount</TH>
+          </TR>
+        </THead>
+        <TBody>
+          {LEDGER.map((group) => (
+            <GroupLines key={group.group} group={group} open={Boolean(open[group.group])} onToggle={() => setOpen((o) => ({ ...o, [group.group]: !o[group.group] }))} />
+          ))}
+        </TBody>
+        <TFoot>
+          <TTotalRow label="Total cost">
+            <TD numeric>11,244.50</TD>
+          </TTotalRow>
+        </TFoot>
+      </Table>
+    </div>
+  );
+}
+
+function GroupLines({ group, open, onToggle }: { group: (typeof LEDGER)[number]; open: boolean; onToggle: () => void }) {
+  return (
+    <>
+      <TGroupRow label={group.group} count={group.lines.length} open={open} onToggle={onToggle}>
+        <TD numeric className="py-1.5 font-semibold">{group.total}</TD>
+      </TGroupRow>
+      {open &&
+        group.lines.map((line) => (
+          <TR key={line.name}>
+            <TD className="pl-10">{line.name}</TD>
+            <TD numeric>{line.amount}</TD>
+          </TR>
+        ))}
+    </>
+  );
+}

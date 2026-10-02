@@ -107,4 +107,24 @@ export const stories: Story[] = [
     ),
     open: '[data-story] button[aria-haspopup="menu"]',
   },
+  {
+    name: "Inside a frosted bar",
+    render: () => <InsideAFrostedBar />,
+    open: '[data-story] button[title="AI tools"]',
+  },
 ];
+
+/**
+ * 1.8.0: the list is a top-layer popover, so a `backdrop-filter` / `transform` ancestor (a sticky
+ * frosted action bar) cannot capture it: it opens at its button as anywhere else.
+ */
+function InsideAFrostedBar() {
+  return (
+    <div className="flex h-[calc(100dvh-3rem)] max-w-xl flex-col justify-end">
+      <div className="flex translate-x-0 items-center justify-between gap-2 rounded-container border border-border bg-bg/80 p-2 backdrop-blur">
+        <span className="text-detail text-ink-secondary">Page 3 / 12</span>
+        <RowMenu label="AI tools" trigger={{ label: "AI tools", icon: "sparkle", variant: "ghost" }} items={RESET} sections={SECTIONS} />
+      </div>
+    </div>
+  );
+}

@@ -65,12 +65,13 @@ import Link from "next/link";
 import { type ActionIconName } from "./action-icon";
 declare const buttonVariants: (props?: ({
     variant?: "danger" | "admin" | "primary" | "secondary" | "ghost" | "ghostDanger" | null | undefined;
-    size?: "md" | "lg" | "sm" | null | undefined;
+    size?: "md" | "lg" | "sm" | "xs" | null | undefined;
 } & import("class-variance-authority/types").ClassProp) | undefined) => string;
 type ReadOnlyProps = {
     readOnlySafe?: boolean;
     icon?: ActionIconName;
 };
+export type ButtonSize = "xs" | "sm" | "md" | "lg";
 type ButtonProps = React.ComponentProps<"button"> & VariantProps<typeof buttonVariants> & ReadOnlyProps;
 export declare function Button({ className, variant, size, readOnlySafe, icon, children, ...props }: ButtonProps): import("react").JSX.Element | null;
 type ButtonLinkProps = React.ComponentProps<typeof Link> & VariantProps<typeof buttonVariants> & ReadOnlyProps & {
@@ -82,16 +83,23 @@ export declare function ExternalButtonLink({ className, variant, size, icon, chi
 }): import("react").JSX.Element;
 export declare function FileLink({ href, children, size, className, disabled, target, rel, ...props }: Omit<React.ComponentProps<"a">, "href"> & {
     href?: string;
-    size?: "sm" | "md";
+    size?: "xs" | "sm" | "md";
     disabled?: boolean;
 }): import("react").JSX.Element;
 export declare function IconButton({ label, icon, variant, size, readOnlySafe, className, type, ...props }: Omit<React.ComponentProps<"button">, "children" | "aria-label" | "title"> & {
     label: string;
     icon: ActionIconName;
     variant?: NonNullable<VariantProps<typeof buttonVariants>["variant"]>;
-    size?: "sm" | "md" | "lg";
+    size?: ButtonSize;
     readOnlySafe?: boolean;
 }): import("react").JSX.Element | null;
+export declare function IconLink({ label, icon, variant, size, className, ...props }: Omit<React.ComponentProps<"a">, "children" | "aria-label" | "title"> & {
+    href: string;
+    label: string;
+    icon?: ActionIconName;
+    variant?: NonNullable<VariantProps<typeof buttonVariants>["variant"]>;
+    size?: ButtonSize;
+}): import("react").JSX.Element;
 export declare function AdminIconButton({ label, icon, className, ...props }: Omit<React.ComponentProps<"button">, "children"> & {
     label: string;
     icon?: "edit" | "delete" | "unlock" | "permissions" | "key" | "deactivate" | "reactivate";
@@ -196,7 +204,7 @@ export declare function InlineConfirm({ label, question, confirmLabel, pending, 
     armed: boolean;
     onArm: (armed: boolean) => void;
 }): import("react").JSX.Element;
-export declare function ConfirmDialog({ open, onClose, title, body, confirmLabel, variant, pending, error, onConfirm, children, }: {
+export declare function ConfirmDialog({ open, onClose, title, body, confirmLabel, variant, pending, error, onConfirm, children, size, }: {
     open: boolean;
     onClose: () => void;
     title: string;
@@ -207,6 +215,7 @@ export declare function ConfirmDialog({ open, onClose, title, body, confirmLabel
     error?: string | null;
     onConfirm: () => void;
     children?: React.ReactNode;
+    size?: "md" | "lg";
 }): import("react").JSX.Element;
 
 // src/components/copy-value.d.ts
@@ -254,7 +263,7 @@ export declare function NotSet({ label }: {
 
 // src/components/dialog.d.ts
 import type { ActionIconName } from "./action-icon";
-export declare function Dialog({ open, onClose, title, children, footer, className, confirmDiscard, }: {
+export declare function Dialog({ open, onClose, title, children, footer, className, confirmDiscard, size, }: {
     open: boolean;
     onClose: () => void;
     title: string;
@@ -262,6 +271,7 @@ export declare function Dialog({ open, onClose, title, children, footer, classNa
     footer?: React.ReactNode;
     className?: string;
     confirmDiscard?: boolean;
+    size?: "md" | "lg";
 }): import("react").JSX.Element;
 export declare function DialogBody({ children, className, }: {
     children: React.ReactNode;
@@ -271,7 +281,7 @@ export declare function DialogError({ children, trigger }: {
     children?: string | null;
     trigger?: unknown;
 }): null;
-export declare function DialogFooter({ onClose, onSubmit, submitLabel, submitIcon, closeLabel, variant, pending, disabled, pendingLabel, form, note, children, }: {
+export declare function DialogFooter({ onClose, onSubmit, submitLabel, submitIcon, closeLabel, variant, pending, disabled, pendingLabel, form, size, note, children, }: {
     onClose: () => void;
     onSubmit?: () => void;
     submitLabel: string;
@@ -282,8 +292,26 @@ export declare function DialogFooter({ onClose, onSubmit, submitLabel, submitIco
     disabled?: boolean;
     pendingLabel?: string;
     form?: string;
+    size?: "md" | "lg";
     note?: React.ReactNode;
     children?: React.ReactNode;
+}): import("react").JSX.Element;
+
+// src/components/disclosure.d.ts
+import type { ReactNode } from "react";
+export declare function Disclosure({ title, kicker, meta, open, defaultOpen, onToggle, bordered, className, bodyClassName, flushBody, large, children, }: {
+    title: ReactNode;
+    kicker?: ReactNode;
+    meta?: ReactNode;
+    open?: boolean;
+    defaultOpen?: boolean;
+    onToggle?: (open: boolean) => void;
+    bordered?: boolean;
+    className?: string;
+    bodyClassName?: string;
+    flushBody?: boolean;
+    large?: boolean;
+    children: ReactNode;
 }): import("react").JSX.Element;
 
 // src/components/empty-state.d.ts
@@ -331,7 +359,7 @@ export declare function CheckTile({ label, hint, icon, className, readOnlySafe, 
     hint?: string;
     icon?: React.ReactNode;
 } & ReadOnlyProps): import("react").JSX.Element;
-export declare function FileInput({ className, readOnlySafe, ...props }: React.ComponentProps<"input"> & ReadOnlyProps): import("react").JSX.Element;
+export declare function FileInput({ className, readOnlySafe, size, ...props }: Omit<React.ComponentProps<"input">, "size"> & ReadOnlyProps & SizeProps): import("react").JSX.Element;
 export declare function Textarea({ className, readOnlySafe, ...props }: React.ComponentProps<"textarea"> & ReadOnlyProps): import("react").JSX.Element;
 export declare function Switch({ id, name, label, hint, checked, onChange, disabled: disabledProp, readOnlySafe, className, }: {
     id?: string;
@@ -344,6 +372,31 @@ export declare function Switch({ id, name, label, hint, checked, onChange, disab
     className?: string;
 } & ReadOnlyProps): import("react").JSX.Element;
 export {};
+
+// src/components/fold-table.d.ts
+import type { ReactNode } from "react";
+export type FoldTableSpan = 1 | 2 | 3 | 4 | 5 | 6;
+export type FoldTableColumn<T> = {
+    key: string;
+    header: string;
+    numeric?: boolean;
+    className?: string;
+    bare?: boolean;
+    foldSpan?: FoldTableSpan;
+    headerAction?: ReactNode;
+    cell: (row: T, index: number) => ReactNode;
+};
+export type FoldTableProps<T> = {
+    label: string;
+    columns: readonly FoldTableColumn<T>[];
+    rows: readonly T[];
+    rowKey: (row: T, index: number) => string;
+    rowId?: (row: T, index: number) => string | undefined;
+    rowClassName?: (row: T, index: number) => string | undefined;
+    flush?: boolean;
+    fold?: "md" | "container";
+};
+export declare function FoldTable<T>({ fold, ...props }: FoldTableProps<T>): import("react").JSX.Element;
 
 // src/components/form-actions.d.ts
 export declare function HeaderActions({ children }: {
@@ -552,11 +605,15 @@ export type SegmentedOption<T extends string> = {
     href: string;
     icon?: React.ReactNode;
 };
-export declare function Segmented<T extends string>({ label, value, options, className, onValueChange, disabled, }: {
+export type SegmentedSize = "md" | "lg";
+export declare function Segmented<T extends string>({ label, value, options, className, onValueChange, disabled, size, changesData, readOnlySafe, }: {
     label: string;
     value: T;
     className?: string;
     disabled?: boolean;
+    size?: SegmentedSize;
+    changesData?: boolean;
+    readOnlySafe?: boolean;
 } & ({
     options: SegmentedOption<T>[];
     onValueChange?: never;
@@ -566,7 +623,7 @@ export declare function Segmented<T extends string>({ label, value, options, cla
 })): import("react").JSX.Element;
 
 // src/components/sheet.d.ts
-export declare function Sheet({ title, badge, toolbar, headerActions, contentKey, exitCheck, onClose, children, className, }: {
+export declare function Sheet({ title, badge, toolbar, headerActions, contentKey, exitCheck, onClose, children, footer, className, }: {
     title: React.ReactNode;
     badge?: React.ReactNode;
     toolbar?: React.ReactNode;
@@ -575,6 +632,7 @@ export declare function Sheet({ title, badge, toolbar, headerActions, contentKey
     exitCheck?: boolean;
     onClose: () => void;
     children: React.ReactNode;
+    footer?: React.ReactNode;
     className?: string;
 }): import("react").JSX.Element;
 export declare function SheetBody({ children, className, }: {
@@ -633,7 +691,7 @@ export declare function Table({ className, containerClassName, ...props }: React
 }): import("react").JSX.Element;
 export declare function THead({ ...props }: React.ComponentProps<"thead">): import("react").JSX.Element;
 export declare function TBody({ ...props }: React.ComponentProps<"tbody">): import("react").JSX.Element;
-export declare function TR({ className, href, onClick, ...props }: React.ComponentProps<"tr"> & {
+export declare function TR({ href, className, onClick, ...props }: React.ComponentProps<"tr"> & {
     href?: string;
 }): import("react").JSX.Element;
 export declare const CELL_HIDE_BELOW: {
@@ -651,6 +709,23 @@ export declare function TD({ className, hideBelow, alignRight, numeric, ...props
     numeric?: boolean;
 }): import("react").JSX.Element;
 export declare function RowLink({ className, children, ...props }: React.ComponentProps<typeof Link>): import("react").JSX.Element;
+export declare function TGroupRow({ label, count, meta, colSpan, open, onToggle, className, children, }: {
+    label: React.ReactNode;
+    count?: React.ReactNode;
+    meta?: React.ReactNode;
+    colSpan?: number;
+    open?: boolean;
+    onToggle?: () => void;
+    className?: string;
+    children?: React.ReactNode;
+}): import("react").JSX.Element;
+export declare function TFoot({ className, ...props }: React.ComponentProps<"tfoot">): import("react").JSX.Element;
+export declare function TTotalRow({ label, labelColSpan, className, children, }: {
+    label: React.ReactNode;
+    labelColSpan?: number;
+    className?: string;
+    children?: React.ReactNode;
+}): import("react").JSX.Element;
 
 // src/components/tabs.d.ts
 export type TabItem = {
@@ -676,7 +751,7 @@ export declare function TagRemove({ label, readOnlySafe, className, children, ..
 // src/components/tag.d.ts
 export declare function Tag({ icon, tone, className, title, children, }: {
     icon?: React.ReactNode;
-    tone?: "neutral" | "admin";
+    tone?: "neutral" | "admin" | "warning";
     className?: string;
     title?: string;
     children: React.ReactNode;
@@ -732,7 +807,7 @@ export declare const TEXT_WEIGHT: {
 export type TextSize = keyof typeof TEXT_SIZE;
 export type TextTone = keyof typeof TEXT_TONE;
 export type TextWeight = keyof typeof TEXT_WEIGHT;
-export type TextTag = "span" | "p" | "div" | "li" | "dt" | "dd";
+export type TextTag = "span" | "p" | "div" | "li" | "dt" | "dd" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 export type TextStyleProps = {
     size?: TextSize;
     tone?: TextTone;
@@ -860,6 +935,17 @@ export declare function ReadOnlyScope({ readOnly, children, }: {
     children: React.ReactNode;
 }): import("react").JSX.Element;
 export declare function useReadOnlyScope(): boolean;
+
+// src/config/segmented-button.d.ts
+export declare function SegmentedButton({ active, disabled, changesData, readOnlySafe, className, onClick, children, }: {
+    active: boolean;
+    disabled?: boolean;
+    changesData: boolean;
+    readOnlySafe: boolean;
+    className: string;
+    onClick: () => void;
+    children: React.ReactNode;
+}): import("react").JSX.Element;
 
 // src/config/strings.d.ts
 export type OpsUiStrings = {
@@ -1054,6 +1140,11 @@ export declare const TOUCH_FLOOR: {
 };
 export type ControlSize = "md" | "lg";
 export declare const CONTROL_SIZE_CLASS: Record<ControlSize, string>;
+export declare const TOUCH_FLOOR_LG: {
+    readonly height: "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:min-h-12";
+    readonly width: "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:min-w-12";
+};
+export declare const TOUCH_TARGET: readonly ["[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:relative", "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:after:absolute", "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:after:top-1/2", "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:after:left-1/2", "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:after:size-full", "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:after:min-h-11", "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:after:min-w-11", "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:after:-translate-1/2"];
 
 // src/lib/use-dismissable.d.ts
 import { type RefObject } from "react";
@@ -1321,11 +1412,19 @@ export declare const stories: Story[];
 import type { Story } from "./index";
 export declare const stories: Story[];
 
+// src/stories/disclosure.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
 // src/stories/empty-state.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
 
 // src/stories/field.stories.d.ts
+import type { Story } from "./index";
+export declare const stories: Story[];
+
+// src/stories/fold-table.stories.d.ts
 import type { Story } from "./index";
 export declare const stories: Story[];
 

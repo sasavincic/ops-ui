@@ -20,8 +20,16 @@ import { cn } from "../src/lib/cn";
 // FinaOps 526d1a7 (file named per case); where a component writes its attributes in another order
 // than the app did, the recipe is written in the component's order (the DOM is the same).
 
+// 1.8.0 adds to these components only what tests/additions-1-8.test.tsx proves: a button label's
+// `whitespace-nowrap`, the touch floor's classes (behind the floor's media query and
+// [data-ops-touch], nothing on a fine pointer) and the bare Checkbox's `display: contents` label.
+// Taken out here, every 1.6 recipe is still the primitive's markup class for class.
+const FLOOR = "[@media(hover:none)_and_(pointer:coarse)]:in-data-ops-touch:";
+const ADDED_1_8 = (token: string) => token === "whitespace-nowrap" || token.startsWith(FLOOR);
 const normalize = (html: string) =>
-  html.replace(/class="([^"]*)"/g, (_, c: string) => `class="${c.split(/\s+/).filter(Boolean).sort().join(" ")}"`);
+  html
+    .replace(/<label class="[^"]*" data-ops-checkbox="">(.*?)<\/label>/g, "$1")
+    .replace(/class="([^"]*)"/g, (_, c: string) => `class="${c.split(/\s+/).filter((t) => t && !ADDED_1_8(t)).sort().join(" ")}"`);
 const html = (node: ReactElement) => normalize(renderToStaticMarkup(node));
 const same = (primitive: ReactElement, recipe: ReactElement) => expect(html(primitive)).toBe(html(recipe));
 const pair = (name: string, primitive: ReactElement, recipe: ReactElement): [string, ReactElement, ReactElement] => [name, primitive, recipe];
