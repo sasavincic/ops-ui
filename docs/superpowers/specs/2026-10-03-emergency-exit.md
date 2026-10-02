@@ -1,7 +1,12 @@
 # EmergencyExit — lock down, export, verify, erase
 
-**Status:** PROPOSED, design only (2026-10-03). Nothing is built, no account,
-token, repo or cloud resource exists yet. Sections marked **[unverified]**
+**Status:** APPROVED (Saša, 2026-10-03); **B2, B4, B5, B6 BUILT** locally
+(2026-10-02/03, repos `emergency-exit` and `emergency-exit-runner`, not yet
+pushed — they do not exist on GitHub yet), drills D1, D2, D3, D5 run against
+local stand-ins (runner `docs/drills.md`). B1/B3 are written as patch
+instructions (runner `docs/b1-maintenance-flag.md`, `docs/b3-prefab-secret-keys.md`);
+B7 is Saša's (runner `ARMING.md`). The decisions taken while building are
+§12 at the end. No account, token or cloud resource exists yet. Sections marked **[unverified]**
 were not confirmed against current provider documentation from this session
 (the network policy blocked supabase.com, neon.com, docs.github.com and
 the cloud providers' docs; Neon's and Supabase's docs were read through
@@ -586,3 +591,86 @@ during drills).
     (every authenticator dies); only when the secret itself leaked.
 11. **Who else may press Lock down?** Recommend **nobody else** for now;
     a second person later only for Lock down, never Erase.
+
+---
+
+## 12. Answers and build decisions (2026-10-03)
+
+**Saša's answers:** Q1 (part) `royal-glitter-74272254` is unused — leave it
+alone; it is on the runner's `neverErase` list and an allow-list naming it is
+refused as a whole. Q2 own Vercel team: **yes**. Q4 personal cloud:
+**Dropbox, app folder only**. Design approved, build started.
+
+**The other questions, as recommended:** Q1 FinaOps = `old-king-68563825`,
+to be confirmed before arming (ARMING.md A3). Q3 GitHub Pro if the private
+repo needs it for required reviewers. Q5 bucket size: read before arming.
+Q6 support tickets to Neon and Supabase: on the erase checklist. Q7 Railway at
+Erase: wipe + redeploy, keep the service (checklist — the app and runner hold
+no Railway token). Q8 sign-in alerts: **yes**, Pushover and/or Telegram,
+optional by env. Q9 countdown: **15 minutes** = the `erase` environment's wait
+timer. Q10 `BETTER_AUTH_SECRET` at lock down: **no** (checklist only). Q11
+nobody else may press Lock down.
+
+**Decisions taken while building:**
+
+- **D-1 Export credentials.** Supabase: the runner sets a fresh random
+  database password at EVERY Prefab export and lock down (the Prefab app
+  never uses the database password), so no Prefab password is stored
+  anywhere; the connection is `PREFAB_DB_URL_TEMPLATE` (a repo variable with
+  `{password}`). Neon: lock down resets the role password; a plain export
+  reads the current connection string from the Neon API.
+- **D-2 Lock down includes the export.** `lockdown.yml` rotates, signs out
+  and exports in the SAME job per system, so the rotated credential never
+  leaves the VM (§5.1 step 3's "then export.yml" is folded in). `export.yml`
+  stays for Back up now and for a second export under lock down.
+- **D-3 The app's audit lines.** The app holds no cloud token; it dispatches
+  the runner's `audit.yml` with the event (a strict 1 KB schema) as its only
+  input — the event then lands in the app's DB, the GitHub run log and
+  `audit.jsonl`. This is the one exception to §2 rule 7 ("only an action name
+  and a run id"): a hostile app can add a line, nothing else.
+- **D-4 Counts and dump in one snapshot.** Each export counts every table
+  inside the REPEATABLE READ transaction whose exported snapshot `pg_dump
+  --snapshot` uses, so "Back up now" on a live database compares like with
+  like. Prefab also dumps `supabase_migrations` (small; helps the restore).
+- **D-5 Erase ordering across systems.** Phase A empties and PROVES empty
+  all three systems (Neon: snapshots, non-default branches, history window
+  0, every schema dropped in one transaction, databases dropped and
+  recreated; Supabase: bucket via the Storage API, `public` and
+  `supabase_migrations` dropped, every `auth` table truncated in one
+  transaction); phase B deletes the projects only if A held for all; phase C
+  removes the database/integration env vars and prints the checklist.
+  Supabase refuses direct deletes from `storage.objects` (found in D3), so
+  the bucket is emptied through the API and proven via the table.
+- **D-6 Lock down's rate limit** (once per 10 minutes) does not apply when the
+  previous lock down had a failed step — a refused pause must be retryable at
+  once. Erase: once per hour, counting cancelled requests.
+- **D-7 What an erase reaches is on the allow-list.** Besides the project ids
+  and the Vercel projects, the Prefab erase names `storage:<host>` (the
+  Storage endpoint it empties) and `postgres:<user>@<host>/<db>` (the
+  database it drops schemas in); both are checked by the guard and again at
+  the call, and any target containing a production ref counts as production
+  (refused unless armed). Found in the app's end-to-end drill, where an
+  override pointed the storage URL at the shared local Supabase stack and
+  emptied its fixture bucket (restored byte-identical from the drill export).
+- **D-8 The runner's own countdown check.** Besides the GitHub wait timer,
+  the erase job reads its run's `created_at` from the GitHub API and refuses
+  before 15 minutes — a misconfigured environment cannot shorten it. An erase
+  requested by the app is also refused unless the app, asked with a signed
+  request, still answers "confirmed" (Cancel makes it "cancelled"). A run
+  started by hand from the GitHub app (Vercel unreachable) has no request id
+  and skips that question; its `waive_flags` input accepts UNREADABLE flags
+  (never flags that read off) when the projects were paused by hand.
+- **D-9 The chained erase (§5.6)** uses the same 15-minute countdown (Q9),
+  not a separate N: the app dispatches `erase.yml` when the export it started
+  reports verified under lock down.
+- **D-10 Sign-in.** Owner only, seeded with a ONE-TIME password replaced at
+  the first sign-in; TOTP required before anything opens; no "trust this
+  device"; 3 wrong codes from an address (sign-in) or on the account
+  (confirmations) lock 15 minutes, on top of better-auth's own lockout. A
+  "fresh" code = not used in the last 10 minutes to sign in or confirm.
+- **D-11 Content policy** stays report-only like the rest of the suite (an
+  emergency app that fails to load is worse than a reported violation);
+  framing, referrer, permissions, nosniff and HSTS are enforced.
+- **D-12 Restore** (`pnpm ee restore`) verifies every ciphertext hash before
+  decrypting, recounts against the manifest and checks every bucket object's
+  SHA-256; D5 restored all three systems with each of the two keys.
